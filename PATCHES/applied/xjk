@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/tools/vps/autobuild/pkg-files/dist/etc_vps_example.conf trunk-clean/tools/vps/autobuild/pkg-files/dist/etc_vps_example.conf
+--- 10.0.0-stripped/tools/vps/autobuild/pkg-files/dist/etc_vps_example.conf	1970-01-01 01:00:00.000000000 +0100
++++ trunk-clean/tools/vps/autobuild/pkg-files/dist/etc_vps_example.conf	2014-01-15 14:31:05.000000000 +0100
+@@ -0,0 +1,8 @@
++NAME = 'example'
++FSROOT = '/usr/vps/example_mp'
++FSROOT_PRIV = '/usr/vps/example'
++NETIF_0_ADDRESS = '10.0.0.190, 2001:10:20::190'
++ROOT_MOUNT = 'mount_vpsfs /usr/vps/example /usr/vps/example_mp'
++ROOT_UNMOUNT = 'umount /usr/vps/example_mp'
++INIT = '/sbin/init'
++LIMITS = 'phys:6000000:8000000,virt:100000000:160000000:pctcpu:100:200'

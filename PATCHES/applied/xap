@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/amd64/linux32/linux32_machdep.c trunk-clean/sys/amd64/linux32/linux32_machdep.c
+--- 10.0.0-stripped/sys/amd64/linux32/linux32_machdep.c	2014-01-15 14:19:15.000000000 +0100
++++ trunk-clean/sys/amd64/linux32/linux32_machdep.c	2014-01-15 14:31:47.000000000 +0100
+@@ -60,6 +60,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/a
+ #include <machine/segments.h>
+ #include <machine/specialreg.h>
+ 
++#include <vps/vps.h>
++
+ #include <vm/vm.h>
+ #include <vm/pmap.h>
+ #include <vm/vm_map.h>

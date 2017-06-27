@@ -1,0 +1,48 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_time.c trunk-clean/sys/kern/kern_time.c
+--- 10.0.0-stripped/sys/kern/kern_time.c	2014-01-15 14:20:23.000000000 +0100
++++ trunk-clean/sys/kern/kern_time.c	2014-01-15 14:31:10.000000000 +0100
+@@ -55,6 +55,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <sys/timetc.h>
+ #include <sys/vnode.h>
+ 
++#include <vps/vps.h>
++
+ #include <vm/vm.h>
+ #include <vm/vm_extern.h>
+ 
+@@ -347,11 +349,35 @@ kern_clock_gettime(struct thread *td, cl
+ 	case CLOCK_MONOTONIC_PRECISE:
+ 	case CLOCK_UPTIME:
+ 	case CLOCK_UPTIME_PRECISE:
++#ifdef VPS
++		if (curthread->td_vps == vps0)
++			nanouptime(ats);
++		else {
++			struct timespec t1;
++
++			nanotime(ats);
++			bintime2timespec(&V_boottimebin, &t1);
++			timespecsub(ats, &t1);
++		}
++#else
+ 		nanouptime(ats);
++#endif
+ 		break;
+ 	case CLOCK_UPTIME_FAST:
+ 	case CLOCK_MONOTONIC_FAST:
++#ifdef VPS
++		if (curthread->td_vps == vps0)
++			getnanouptime(ats);
++		else {
++			struct timespec t1;
++
++			getnanotime(ats);
++			bintime2timespec(&V_boottimebin, &t1);
++			timespecsub(ats, &t1);
++		}
++#else
+ 		getnanouptime(ats);
++#endif
+ 		break;
+ 	case CLOCK_SECOND:
+ 		ats->tv_sec = time_second;

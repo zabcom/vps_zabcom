@@ -1,0 +1,14 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/amd64/amd64/identcpu.c trunk-clean/sys/amd64/amd64/identcpu.c
+--- 10.0.0-stripped/sys/amd64/amd64/identcpu.c	2014-01-15 14:19:15.000000000 +0100
++++ trunk-clean/sys/amd64/amd64/identcpu.c	2014-01-15 14:31:47.000000000 +0100
+@@ -98,8 +98,8 @@ sysctl_hw_machine(SYSCTL_HANDLER_ARGS)
+ 	return (error);
+ 
+ }
+-SYSCTL_PROC(_hw, HW_MACHINE, machine, CTLTYPE_STRING | CTLFLAG_RD,
+-    NULL, 0, sysctl_hw_machine, "A", "Machine class");
++_SYSCTL_PROC(_hw, HW_MACHINE, machine, CTLTYPE_STRING | CTLFLAG_RD,
++    NULL, 0, sysctl_hw_machine, "A", "Machine class", VPS_PUBLIC);
+ 
+ static char cpu_model[128];
+ SYSCTL_STRING(_hw, HW_MODEL, model, CTLFLAG_RD, 

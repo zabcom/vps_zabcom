@@ -1,0 +1,14 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/tools/vps/installdist.sh trunk-clean/tools/vps/installdist.sh
+--- 10.0.0-stripped/tools/vps/installdist.sh	1970-01-01 01:00:00.000000000 +0100
++++ trunk-clean/tools/vps/installdist.sh	2014-01-15 14:31:05.000000000 +0100
+@@ -0,0 +1,10 @@
++#!/bin/sh -x
++
++tar xzpvf dist.tgz
++rm -rf /boot/kernel
++mv boot/kernel /boot/
++mv usr/sbin/vpsctl /usr/sbin/vpsctl
++mv sbin/mount_vpsfs /sbin/mount_vpsfs
++mv usr/sbin/rsync_vps /usr/sbin/rsync_vps
++
++

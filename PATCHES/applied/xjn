@@ -1,0 +1,21 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/tools/vps/autoinstalldist.sh trunk-clean/tools/vps/autoinstalldist.sh
+--- 10.0.0-stripped/tools/vps/autoinstalldist.sh	1970-01-01 01:00:00.000000000 +0100
++++ trunk-clean/tools/vps/autoinstalldist.sh	2014-01-15 14:31:06.000000000 +0100
+@@ -0,0 +1,17 @@
++#!/bin/sh
++
++fail() {
++        echo "FAILURE"
++        exit 1
++}
++
++tar xzpf dist.tgz || fail
++rm -rf /boot/kernel || fail
++mv boot/kernel /boot/ || fail
++mv usr/sbin/vpsctl /usr/sbin/vpsctl || fail
++mv sbin/mount_vpsfs /sbin/mount_vpsfs || fail
++
++echo "SUCCESS"
++exit 0
++
++# EOF

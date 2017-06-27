@@ -1,0 +1,32 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/vfs_mountroot.c trunk-clean/sys/kern/vfs_mountroot.c
+--- 10.0.0-stripped/sys/kern/vfs_mountroot.c	2014-01-15 14:20:22.000000000 +0100
++++ trunk-clean/sys/kern/vfs_mountroot.c	2014-01-15 14:31:10.000000000 +0100
+@@ -65,6 +65,9 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <sys/systm.h>
+ #include <sys/vnode.h>
+ 
++#include <vps/vps.h>
++#include <vps/vps2.h>
++
+ #include <geom/geom.h>
+ 
+ /*
+@@ -981,10 +984,14 @@ vfs_mountroot(void)
+ 	inittodr(timebase);
+ 
+ 	/* Keep prison0's root in sync with the global rootvnode. */
+-	mtx_lock(&prison0.pr_mtx);
+-	prison0.pr_root = rootvnode;
+-	vref(prison0.pr_root);
+-	mtx_unlock(&prison0.pr_mtx);
++	mtx_lock(&V_prison0->pr_mtx);
++	V_prison0->pr_root = rootvnode;
++	vref(V_prison0->pr_root);
++	mtx_unlock(&V_prison0->pr_mtx);
++#ifdef VPS
++	/* XXX locking */
++	vps0->_rootvnode = rootvnode;
++#endif
+ 
+ 	mtx_lock(&mountlist_mtx);
+ 	atomic_store_rel_int(&root_mount_complete, 1);

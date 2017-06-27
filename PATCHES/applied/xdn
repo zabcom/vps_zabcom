@@ -1,0 +1,71 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_sig.c trunk-clean/sys/kern/kern_sig.c
+--- 10.0.0-stripped/sys/kern/kern_sig.c	2014-01-15 14:20:23.000000000 +0100
++++ trunk-clean/sys/kern/kern_sig.c	2014-01-15 14:31:10.000000000 +0100
+@@ -86,6 +86,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ 
+ #include <sys/jail.h>
+ 
++#include <vps/vps.h>
++
+ #include <machine/cpu.h>
+ 
+ #include <security/audit/audit.h>
+@@ -1605,7 +1607,7 @@ killpg1(struct thread *td, int sig, int 
+ 		/*
+ 		 * broadcast
+ 		 */
+-		sx_slock(&allproc_lock);
++		sx_slock(&V_allproc_lock);
+ 		FOREACH_PROC_IN_SYSTEM(p) {
+ 			PROC_LOCK(p);
+ 			if (p->p_pid <= 1 || p->p_flag & P_SYSTEM ||
+@@ -1623,9 +1625,9 @@ killpg1(struct thread *td, int sig, int 
+ 				ret = err;
+ 			PROC_UNLOCK(p);
+ 		}
+-		sx_sunlock(&allproc_lock);
++		sx_sunlock(&V_allproc_lock);
+ 	} else {
+-		sx_slock(&proctree_lock);
++		sx_slock(&V_proctree_lock);
+ 		if (pgid == 0) {
+ 			/*
+ 			 * zero pgid means send to my process group.
+@@ -1635,11 +1637,11 @@ killpg1(struct thread *td, int sig, int 
+ 		} else {
+ 			pgrp = pgfind(pgid);
+ 			if (pgrp == NULL) {
+-				sx_sunlock(&proctree_lock);
++				sx_sunlock(&V_proctree_lock);
+ 				return (ESRCH);
+ 			}
+ 		}
+-		sx_sunlock(&proctree_lock);
++		sx_sunlock(&V_proctree_lock);
+ 		LIST_FOREACH(p, &pgrp->pg_members, p_pglist) {
+ 			PROC_LOCK(p);
+ 			if (p->p_pid <= 1 || p->p_flag & P_SYSTEM ||
+@@ -1828,9 +1830,9 @@ gsignal(int pgid, int sig, ksiginfo_t *k
+ 	struct pgrp *pgrp;
+ 
+ 	if (pgid != 0) {
+-		sx_slock(&proctree_lock);
++		sx_slock(&V_proctree_lock);
+ 		pgrp = pgfind(pgid);
+-		sx_sunlock(&proctree_lock);
++		sx_sunlock(&V_proctree_lock);
+ 		if (pgrp != NULL) {
+ 			pgsignal(pgrp, sig, 0, ksi);
+ 			PGRP_UNLOCK(pgrp);
+@@ -2685,7 +2687,11 @@ issignal(struct thread *td)
+ 			/*
+ 			 * Don't take default actions on system processes.
+ 			 */
++#ifdef VPS
++			if (p->p_flag & P_SYSTEM) {
++#else
+ 			if (p->p_pid <= 1) {
++#endif
+ #ifdef DIAGNOSTIC
+ 				/*
+ 				 * Are you sure you want to ignore SIGSEGV

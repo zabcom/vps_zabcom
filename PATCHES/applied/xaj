@@ -1,0 +1,25 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/amd64/amd64/trap.c trunk-clean/sys/amd64/amd64/trap.c
+--- 10.0.0-stripped/sys/amd64/amd64/trap.c	2014-01-15 14:19:15.000000000 +0100
++++ trunk-clean/sys/amd64/amd64/trap.c	2014-01-15 14:31:47.000000000 +0100
+@@ -656,6 +656,9 @@ trap_pfault(frame, usermode)
+ 	struct proc *p = td->td_proc;
+ 	vm_offset_t eva = frame->tf_addr;
+ 
++	ftype = 0;
++	map = NULL;
++
+ 	if (__predict_false((td->td_pflags & TDP_NOFAULTING) != 0)) {
+ 		/*
+ 		 * Due to both processor errata and lazy TLB invalidation when
+@@ -797,7 +800,11 @@ nogo:
+ 		}
+ 		trap_fatal(frame, eva);
+ 		return (-1);
++	} else {
++		printf("%s: proc=%p/%d map=%p eva=%016lx prot=%x rv=%d\n",
++			__func__, p, p->p_pid, map, eva, ftype, rv);
+ 	}
++
+ 	return ((rv == KERN_PROTECTION_FAILURE) ? SIGBUS : SIGSEGV);
+ }
+ 

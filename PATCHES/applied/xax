@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/compat/linux/linux_ioctl.c trunk-clean/sys/compat/linux/linux_ioctl.c
+--- 10.0.0-stripped/sys/compat/linux/linux_ioctl.c	2014-01-15 14:19:22.000000000 +0100
++++ trunk-clean/sys/compat/linux/linux_ioctl.c	2014-01-15 14:31:32.000000000 +0100
+@@ -72,6 +72,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/c
+ 
+ #include <dev/usb/usb_ioctl.h>
+ 
++#include <vps/vps.h>
++
+ #ifdef COMPAT_LINUX32
+ #include <machine/../linux32/linux.h>
+ #include <machine/../linux32/linux32_proto.h>

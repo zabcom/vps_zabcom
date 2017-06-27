@@ -1,0 +1,16 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/vm/vm.h trunk-clean/sys/vm/vm.h
+--- 10.0.0-stripped/sys/vm/vm.h	2014-01-15 14:19:22.000000000 +0100
++++ trunk-clean/sys/vm/vm.h	2014-01-15 14:31:32.000000000 +0100
+@@ -83,7 +83,11 @@ typedef u_char vm_prot_t;	/* protection 
+ #define	VM_PROT_DEFAULT		VM_PROT_ALL
+ 
+ enum obj_type { OBJT_DEFAULT, OBJT_SWAP, OBJT_VNODE, OBJT_DEVICE, OBJT_PHYS,
+-		OBJT_DEAD, OBJT_SG, OBJT_MGTDEVICE };
++		OBJT_DEAD, OBJT_SG, OBJT_MGTDEVICE
++#ifdef VPS
++		, OBJT_VPS
++#endif
++              };
+ typedef u_char objtype_t;
+ 
+ union vm_map_object;

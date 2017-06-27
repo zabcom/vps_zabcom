@@ -1,0 +1,24 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_environment.c trunk-clean/sys/kern/kern_environment.c
+--- 10.0.0-stripped/sys/kern/kern_environment.c	2014-01-15 14:20:22.000000000 +0100
++++ trunk-clean/sys/kern/kern_environment.c	2014-01-15 14:31:10.000000000 +0100
+@@ -52,6 +52,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <sys/libkern.h>
+ #include <sys/kenv.h>
+ 
++#include <vps/vps.h>
++
+ #include <security/mac/mac_framework.h>
+ 
+ static MALLOC_DEFINE(M_KENV, "kenv", "kernel environment");
+@@ -92,6 +94,11 @@ sys_kenv(td, uap)
+ 
+ 	KASSERT(dynamic_kenv, ("kenv: dynamic_kenv = 0"));
+ 
++#ifdef VPS
++	if (td->td_vps != vps0)
++		return (ENOSYS);
++#endif
++
+ 	error = 0;
+ 	if (uap->what == KENV_DUMP) {
+ #ifdef MAC

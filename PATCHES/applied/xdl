@@ -1,0 +1,15 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_sharedpage.c trunk-clean/sys/kern/kern_sharedpage.c
+--- 10.0.0-stripped/sys/kern/kern_sharedpage.c	2014-01-15 14:20:23.000000000 +0100
++++ trunk-clean/sys/kern/kern_sharedpage.c	2014-01-15 14:31:10.000000000 +0100
+@@ -50,7 +50,11 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <vm/vm_pager.h>
+ 
+ static struct sx shared_page_alloc_sx;
++#ifdef VPS
++vm_object_t shared_page_obj;
++#else
+ static vm_object_t shared_page_obj;
++#endif
+ static int shared_page_free;
+ char *shared_page_mapping;
+ 

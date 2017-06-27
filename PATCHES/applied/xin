@@ -1,0 +1,11 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/vm/vm_pager.h trunk-clean/sys/vm/vm_pager.h
+--- 10.0.0-stripped/sys/vm/vm_pager.h	2014-01-15 14:19:22.000000000 +0100
++++ trunk-clean/sys/vm/vm_pager.h	2014-01-15 14:31:32.000000000 +0100
+@@ -72,6 +72,7 @@ extern struct pagerops devicepagerops;
+ extern struct pagerops physpagerops;
+ extern struct pagerops sgpagerops;
+ extern struct pagerops mgtdevicepagerops;
++extern struct pagerops vps_pager_ops;
+ 
+ /*
+  * get/put return values

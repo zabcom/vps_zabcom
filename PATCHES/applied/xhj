@@ -1,0 +1,15 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/sys/msgbuf.h trunk-clean/sys/sys/msgbuf.h
+--- 10.0.0-stripped/sys/sys/msgbuf.h	2014-01-15 14:19:16.000000000 +0100
++++ trunk-clean/sys/sys/msgbuf.h	2014-01-15 14:31:48.000000000 +0100
+@@ -78,7 +78,11 @@ int	msgbuf_peekbytes(struct msgbuf *mbp,
+ void	msgbuf_reinit(struct msgbuf *mbp, void *ptr, int size);
+ 
+ #ifndef MSGBUF_SIZE
++#if defined(VPS) && defined(DIAGNOSTIC)
++#define	MSGBUF_SIZE	(64 * 32768 * 3)
++#else
+ #define	MSGBUF_SIZE	(32768 * 3)
++#endif /* VPS && DIAGNOSTIC */
+ #endif
+ #endif /* KERNEL */
+ 

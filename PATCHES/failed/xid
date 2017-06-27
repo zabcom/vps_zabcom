@@ -1,0 +1,95 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/vm/vm_glue.c trunk-clean/sys/vm/vm_glue.c
+--- 10.0.0-stripped/sys/vm/vm_glue.c	2014-01-15 14:19:22.000000000 +0100
++++ trunk-clean/sys/vm/vm_glue.c	2014-01-15 14:31:32.000000000 +0100
+@@ -86,6 +86,9 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/v
+ #include <sys/ktr.h>
+ #include <sys/unistd.h>
+ 
++#include <vps/vps.h>
++#include <vps/vps2.h>
++
+ #include <vm/vm.h>
+ #include <vm/vm_param.h>
+ #include <vm/pmap.h>
+@@ -695,6 +698,9 @@ swapper(void)
+ 	int swtime;
+ 	int ppri;
+ 	int pri;
++#ifdef VPS
++	struct vps *vps, *save_vps;
++#endif
+ 
+ loop:
+ 	if (vm_page_count_min()) {
+@@ -704,7 +710,13 @@ loop:
+ 
+ 	pp = NULL;
+ 	ppri = INT_MIN;
+-	sx_slock(&allproc_lock);
++#ifdef VPS
++	save_vps = curthread->td_vps;
++	sx_slock(&vps_all_lock);
++	LIST_FOREACH(vps, &vps_head, vps_all) {
++		curthread->td_vps = vps;
++#endif
++	sx_slock(&V_allproc_lock);
+ 	FOREACH_PROC_IN_SYSTEM(p) {
+ 		PROC_LOCK(p);
+ 		if (p->p_state == PRS_NEW ||
+@@ -740,7 +752,12 @@ loop:
+ 		}
+ 		PROC_UNLOCK(p);
+ 	}
+-	sx_sunlock(&allproc_lock);
++	sx_sunlock(&V_allproc_lock);
++#ifdef VPS
++	}
++	sx_sunlock(&vps_all_lock);
++	curthread->td_vps = save_vps;
++#endif
+ 
+ 	/*
+ 	 * Nothing to do, back to sleep.
+@@ -809,9 +826,18 @@ int action;
+ 	struct proc *p;
+ 	struct thread *td;
+ 	int didswap = 0;
++#ifdef VPS
++	struct vps *vps, *save_vps;
++	save_vps = curthread->td_vps;
++#endif
+ 
++#ifdef VPS
++	sx_slock(&vps_all_lock);
++	LIST_FOREACH(vps, &vps_head, vps_all) {
++		curthread->td_vps = vps;
++#endif
+ retry:
+-	sx_slock(&allproc_lock);
++	sx_slock(&V_allproc_lock);
+ 	FOREACH_PROC_IN_SYSTEM(p) {
+ 		struct vmspace *vm;
+ 		int minslptime = 100000;
+@@ -935,7 +961,7 @@ retry:
+ 				PROC_UNLOCK(p);
+ 				vm_map_unlock(&vm->vm_map);
+ 				vmspace_free(vm);
+-				sx_sunlock(&allproc_lock);
++				sx_sunlock(&V_allproc_lock);
+ 				goto retry;
+ 			}
+ 		}
+@@ -946,7 +972,12 @@ nextproc1:
+ 		vmspace_free(vm);
+ 		continue;
+ 	}
+-	sx_sunlock(&allproc_lock);
++	sx_sunlock(&V_allproc_lock);
++#ifdef VPS
++	}
++	sx_sunlock(&vps_all_lock);
++	curthread->td_vps = save_vps;
++#endif
+ 	/*
+ 	 * If we swapped something out, and another process needed memory,
+ 	 * then wakeup the sched process.

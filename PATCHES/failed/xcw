@@ -1,0 +1,44 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_event.c trunk-clean/sys/kern/kern_event.c
+--- 10.0.0-stripped/sys/kern/kern_event.c	2014-01-15 14:20:22.000000000 +0100
++++ trunk-clean/sys/kern/kern_event.c	2014-01-15 14:31:10.000000000 +0100
+@@ -92,10 +92,10 @@ TASKQUEUE_DEFINE_THREAD(kqueue);
+ 
+ static int	kevent_copyout(void *arg, struct kevent *kevp, int count);
+ static int	kevent_copyin(void *arg, struct kevent *kevp, int count);
+-static int	kqueue_register(struct kqueue *kq, struct kevent *kev,
++/* XXX static*/ int	kqueue_register(struct kqueue *kq, struct kevent *kev,
+ 		    struct thread *td, int waitok);
+-static int	kqueue_acquire(struct file *fp, struct kqueue **kqp);
+-static void	kqueue_release(struct kqueue *kq, int locked);
++/* XXX static*/ int	kqueue_acquire(struct file *fp, struct kqueue **kqp);
++/* XXX static*/ void	kqueue_release(struct kqueue *kq, int locked);
+ static int	kqueue_expand(struct kqueue *kq, struct filterops *fops,
+ 		    uintptr_t ident, int waitok);
+ static void	kqueue_task(void *arg, int pending);
+@@ -975,7 +975,7 @@ kqueue_fo_release(int filt)
+  * influence if memory allocation should wait.  Make sure it is 0 if you
+  * hold any mutexes.
+  */
+-static int
++/*static XXX */ int
+ kqueue_register(struct kqueue *kq, struct kevent *kev, struct thread *td, int waitok)
+ {
+ 	struct filterops *fops;
+@@ -1197,7 +1197,7 @@ done:
+ 	return (error);
+ }
+ 
+-static int
++/* XXX static*/ int
+ kqueue_acquire(struct file *fp, struct kqueue **kqp)
+ {
+ 	int error;
+@@ -1220,7 +1220,7 @@ kqueue_acquire(struct file *fp, struct k
+ 	return error;
+ }
+ 
+-static void
++/* XXX static*/ void
+ kqueue_release(struct kqueue *kq, int locked)
+ {
+ 	if (locked)

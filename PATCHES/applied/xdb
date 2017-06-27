@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_khelp.c trunk-clean/sys/kern/kern_khelp.c
+--- 10.0.0-stripped/sys/kern/kern_khelp.c	2014-01-15 14:20:22.000000000 +0100
++++ trunk-clean/sys/kern/kern_khelp.c	2014-01-15 14:31:10.000000000 +0100
+@@ -51,6 +51,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <sys/rwlock.h>
+ #include <sys/systm.h>
+ 
++#include <vps/vps.h>
++
+ static struct rwlock khelp_list_lock;
+ RW_SYSINIT(khelplistlock, &khelp_list_lock, "helper list lock");
+ 

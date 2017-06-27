@@ -1,0 +1,13 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/vm/phys_pager.c trunk-clean/sys/vm/phys_pager.c
+--- 10.0.0-stripped/sys/vm/phys_pager.c	2014-01-15 14:19:22.000000000 +0100
++++ trunk-clean/sys/vm/phys_pager.c	2014-01-15 14:31:32.000000000 +0100
+@@ -168,7 +168,8 @@ phys_pager_putpages(vm_object_t object, 
+ 		    int *rtvals)
+ {
+ 
+-	panic("phys_pager_putpage called");
++	panic("phys_pager_putpage called: object=%p m=%p count=%u sync=%u rtvals=%p",
++		object, m, count, sync, rtvals);
+ }
+ 
+ /*

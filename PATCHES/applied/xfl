@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/modules/vps_suspend/Makefile trunk-clean/sys/modules/vps_suspend/Makefile
+--- 10.0.0-stripped/sys/modules/vps_suspend/Makefile	1970-01-01 01:00:00.000000000 +0100
++++ trunk-clean/sys/modules/vps_suspend/Makefile	2014-01-15 14:31:14.000000000 +0100
+@@ -0,0 +1,8 @@
++
++.PATH: ${.CURDIR}/../../vps
++
++KMOD=	vps_suspend
++SRCS=	vps_suspend.c opt_ddb.h opt_vps.h opt_inet.h opt_inet6.h opt_compat.h \
++	vnode_if.h vps.h vps_user.h vps_snapst.h
++
++.include <bsd.kmod.mk>

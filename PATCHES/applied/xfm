@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/modules/vpsfs/Makefile trunk-clean/sys/modules/vpsfs/Makefile
+--- 10.0.0-stripped/sys/modules/vpsfs/Makefile	1970-01-01 01:00:00.000000000 +0100
++++ trunk-clean/sys/modules/vpsfs/Makefile	2014-01-15 14:31:15.000000000 +0100
+@@ -0,0 +1,8 @@
++
++.PATH: ${.CURDIR}/../../fs/vpsfs
++
++KMOD=	vpsfs
++SRCS=	vnode_if.h \
++	vpsfs_subr.c vpsfs_vfsops.c vpsfs_vnops.c vpsfs_quota.c
++
++.include <bsd.kmod.mk>

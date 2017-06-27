@@ -1,0 +1,13 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/sys/shm.h trunk-clean/sys/sys/shm.h
+--- 10.0.0-stripped/sys/sys/shm.h	2014-01-15 14:19:16.000000000 +0100
++++ trunk-clean/sys/sys/shm.h	2014-01-15 14:31:48.000000000 +0100
+@@ -127,7 +127,9 @@ struct shmid_kernel {
+ 	struct ucred *cred;	/* creator's credendials */
+ };
+ 
++#ifndef VPS
+ extern struct shminfo	shminfo;
++#endif
+ 
+ struct shm_info {
+ 	int used_ids;

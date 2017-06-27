@@ -1,0 +1,49 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/vfs_export.c trunk-clean/sys/kern/vfs_export.c
+--- 10.0.0-stripped/sys/kern/vfs_export.c	2014-01-15 14:20:22.000000000 +0100
++++ trunk-clean/sys/kern/vfs_export.c	2014-01-15 14:31:10.000000000 +0100
+@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <sys/mbuf.h>
+ #include <sys/mount.h>
+ #include <sys/mutex.h>
++#include <sys/proc.h>
+ #include <sys/rwlock.h>
+ #include <sys/refcount.h>
+ #include <sys/signalvar.h>
+@@ -54,6 +55,9 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <sys/systm.h>
+ #include <sys/vnode.h>
+ 
++#include <vps/vps.h>
++#include <vps/vps2.h>
++
+ #include <net/radix.h>
+ 
+ static MALLOC_DEFINE(M_NETADDR, "export_host", "Export host address structure");
+@@ -124,8 +128,12 @@ vfs_hang_addrlist(struct mount *mp, stru
+ 		np->netc_anon->cr_uid = argp->ex_anon.cr_uid;
+ 		crsetgroups(np->netc_anon, argp->ex_anon.cr_ngroups,
+ 		    argp->ex_anon.cr_groups);
+-		np->netc_anon->cr_prison = &prison0;
++		np->netc_anon->cr_prison = V_prison0;
+ 		prison_hold(np->netc_anon->cr_prison);
++#ifdef VPS
++		np->netc_anon->cr_vps = curthread->td_vps;
++		vps_ref(np->netc_anon->cr_vps, np->netc_anon);
++#endif
+ 		np->netc_numsecflavors = argp->ex_numsecflavors;
+ 		bcopy(argp->ex_secflavors, np->netc_secflavors,
+ 		    sizeof(np->netc_secflavors));
+@@ -210,8 +218,12 @@ vfs_hang_addrlist(struct mount *mp, stru
+ 	np->netc_anon->cr_uid = argp->ex_anon.cr_uid;
+ 	crsetgroups(np->netc_anon, argp->ex_anon.cr_ngroups,
+ 	    argp->ex_anon.cr_groups);
+-	np->netc_anon->cr_prison = &prison0;
++	np->netc_anon->cr_prison = V_prison0;
+ 	prison_hold(np->netc_anon->cr_prison);
++#ifdef VPS
++	np->netc_anon->cr_vps = curthread->td_vps;
++	vps_ref(np->netc_anon->cr_vps, np->netc_anon);
++#endif
+ 	np->netc_numsecflavors = argp->ex_numsecflavors;
+ 	bcopy(argp->ex_secflavors, np->netc_secflavors,
+ 	    sizeof(np->netc_secflavors));

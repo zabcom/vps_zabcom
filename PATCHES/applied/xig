@@ -1,0 +1,10 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/vm/vm_map.h trunk-clean/sys/vm/vm_map.h
+--- 10.0.0-stripped/sys/vm/vm_map.h	2014-01-15 14:19:22.000000000 +0100
++++ trunk-clean/sys/vm/vm_map.h	2014-01-15 14:31:32.000000000 +0100
+@@ -395,5 +395,6 @@ int vm_map_unwire(vm_map_t map, vm_offse
+ int vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end,
+     int flags);
+ long vmspace_swap_count(struct vmspace *vmspace);
++void vmspace_zone_reclaim(void);
+ #endif				/* _KERNEL */
+ #endif				/* _VM_MAP_ */

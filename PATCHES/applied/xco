@@ -1,0 +1,29 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/imgact_elf.c trunk-clean/sys/kern/imgact_elf.c
+--- 10.0.0-stripped/sys/kern/imgact_elf.c	2014-01-15 14:20:25.000000000 +0100
++++ trunk-clean/sys/kern/imgact_elf.c	2014-01-15 14:31:10.000000000 +0100
+@@ -78,6 +78,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <vm/vm_object.h>
+ #include <vm/vm_extern.h>
+ 
++#include <vps/vps.h>
++
+ #include <machine/elf.h>
+ #include <machine/md_var.h>
+ 
+@@ -243,14 +245,14 @@ __elfN(brand_inuse)(Elf_Brandinfo *entry
+ 	struct proc *p;
+ 	int rval = FALSE;
+ 
+-	sx_slock(&allproc_lock);
++	sx_slock(&V_allproc_lock);
+ 	FOREACH_PROC_IN_SYSTEM(p) {
+ 		if (p->p_sysent == entry->sysvec) {
+ 			rval = TRUE;
+ 			break;
+ 		}
+ 	}
+-	sx_sunlock(&allproc_lock);
++	sx_sunlock(&V_allproc_lock);
+ 
+ 	return (rval);
+ }

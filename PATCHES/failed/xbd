@@ -1,0 +1,11 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/conf/files.amd64 trunk-clean/sys/conf/files.amd64
+--- 10.0.0-stripped/sys/conf/files.amd64	2014-01-15 14:20:17.000000000 +0100
++++ trunk-clean/sys/conf/files.amd64	2014-01-15 14:31:09.000000000 +0100
+@@ -136,6 +136,7 @@ amd64/amd64/trap.c		standard
+ amd64/amd64/uio_machdep.c	standard
+ amd64/amd64/uma_machdep.c	standard
+ amd64/amd64/vm_machdep.c	standard
++amd64/amd64/vps_machdep.c	optional	vps
+ amd64/pci/pci_cfgreg.c		optional	pci
+ cddl/contrib/opensolaris/common/atomic/amd64/opensolaris_atomic.S	optional zfs compile-with "${ZFS_S}"
+ crypto/aesni/aeskeys_amd64.S	optional aesni

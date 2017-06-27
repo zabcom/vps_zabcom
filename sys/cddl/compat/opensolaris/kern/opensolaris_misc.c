@@ -46,9 +46,9 @@ opensolaris_utsname_init(void *arg)
 {
 
 	utsname.sysname = ostype;
-	utsname.nodename = prison0.pr_hostname;
+	utsname.nodename = V_prison0->pr_hostname;
 	utsname.release = osrelease;
 	snprintf(utsname.version, sizeof(utsname.version), "%d", osreldate);
 }
-SYSINIT(opensolaris_utsname_init, SI_SUB_TUNABLES, SI_ORDER_ANY,
+SYSINIT(opensolaris_utsname_init, SI_SUB_OPENSOLARIS, SI_ORDER_ANY,
     opensolaris_utsname_init, NULL);

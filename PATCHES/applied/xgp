@@ -1,0 +1,15 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netinet6/nd6.c trunk-clean/sys/netinet6/nd6.c
+--- 10.0.0-stripped/sys/netinet6/nd6.c	2014-01-15 14:19:24.000000000 +0100
++++ trunk-clean/sys/netinet6/nd6.c	2014-01-15 14:31:36.000000000 +0100
+@@ -1191,6 +1191,11 @@ nd6_rtrequest(int req, struct rtentry *r
+ 	gateway = (struct sockaddr_in6 *)rt->rt_gateway;
+ 	ifp = rt->rt_ifp;
+ 
++#ifdef VPS
++	if (rt->rt_flags & RTF_PROTO1)
++		return(nd6_rtrequest_koh(req, rt, info));
++#endif /* VPS */
++
+ 	switch (req) {
+ 	case RTM_ADD:
+ 		break;

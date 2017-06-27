@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netinet/in_proto.c trunk-clean/sys/netinet/in_proto.c
+--- 10.0.0-stripped/sys/netinet/in_proto.c	2014-01-15 14:19:26.000000000 +0100
++++ trunk-clean/sys/netinet/in_proto.c	2014-01-15 14:31:12.000000000 +0100
+@@ -100,7 +100,7 @@ static struct pr_usrreqs nousrreqs;
+ #include <netinet/sctp_var.h>
+ #endif /* SCTP */
+ 
+-FEATURE(inet, "Internet Protocol version 4");
++_FEATURE(inet, "Internet Protocol version 4", VPS_PUBLIC);
+ 
+ extern	struct domain inetdomain;
+ 

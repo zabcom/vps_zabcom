@@ -1,0 +1,14 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netinet6/ip6_input.c trunk-clean/sys/netinet6/ip6_input.c
+--- 10.0.0-stripped/sys/netinet6/ip6_input.c	2014-01-15 14:19:24.000000000 +0100
++++ trunk-clean/sys/netinet6/ip6_input.c	2014-01-15 14:31:36.000000000 +0100
+@@ -315,6 +315,10 @@ ip6_destroy()
+ 	hashdestroy(V_in6_ifaddrhashtbl, M_IFADDR, V_in6_ifaddrhmask);
+ 	nd6_destroy();
+ 	callout_drain(&V_in6_tmpaddrtimer_ch);
++
++#ifdef FLOWTABLE
++        //flowtable_destroy(V_ip6_ft);
++#endif /* FLOWTABLE */
+ }
+ #endif
+ 

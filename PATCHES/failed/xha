@@ -1,0 +1,21 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/ofed/include/linux/sysfs.h trunk-clean/sys/ofed/include/linux/sysfs.h
+--- 10.0.0-stripped/sys/ofed/include/linux/sysfs.h	2014-01-15 14:19:15.000000000 +0100
++++ trunk-clean/sys/ofed/include/linux/sysfs.h	2014-01-15 14:31:18.000000000 +0100
+@@ -128,7 +128,7 @@ sysfs_create_file(struct kobject *kobj, 
+ 
+ 	sysctl_add_oid(NULL, SYSCTL_CHILDREN(kobj->oidp), OID_AUTO,
+ 	    attr->name, CTLTYPE_STRING|CTLFLAG_RW|CTLFLAG_MPSAFE, kobj,
+-	    (uintptr_t)attr, sysctl_handle_attr, "A", "");
++	    (uintptr_t)attr, sysctl_handle_attr, "A", "", VPS_0);
+ 
+ 	return (0);
+ }
+@@ -160,7 +160,7 @@ sysfs_create_group(struct kobject *kobj,
+ 	for (attr = grp->attrs; *attr != NULL; attr++) {
+ 		sysctl_add_oid(NULL, SYSCTL_CHILDREN(oidp), OID_AUTO,
+ 		    (*attr)->name, CTLTYPE_STRING|CTLFLAG_RW|CTLFLAG_MPSAFE,
+-		    kobj, (uintptr_t)*attr, sysctl_handle_attr, "A", "");
++		    kobj, (uintptr_t)*attr, sysctl_handle_attr, "A", "", VPS_0);
+ 	}
+ 
+ 	return (0);

@@ -1,0 +1,13 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/sys/mount.h trunk-clean/sys/sys/mount.h
+--- 10.0.0-stripped/sys/sys/mount.h	2014-01-15 14:19:16.000000000 +0100
++++ trunk-clean/sys/sys/mount.h	2014-01-15 14:31:47.000000000 +0100
+@@ -185,6 +185,9 @@ struct mount {
+ 	int		mnt_secondary_writes;   /* (i) # of secondary writes */
+ 	int		mnt_secondary_accwrites;/* (i) secondary wr. starts */
+ 	struct thread	*mnt_susp_owner;	/* (i) thread owning suspension */
++#ifdef VPS
++	struct vps	*mnt_vps;		/* VPS instance reference */
++#endif
+ #define	mnt_endzero	mnt_gjprovider
+ 	char		*mnt_gjprovider;	/* gjournal provider name */
+ 	struct lock	mnt_explock;		/* vfs_export walkers lock */

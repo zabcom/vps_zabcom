@@ -1,0 +1,13 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/sys/resourcevar.h trunk-clean/sys/sys/resourcevar.h
+--- 10.0.0-stripped/sys/sys/resourcevar.h	2014-01-15 14:19:16.000000000 +0100
++++ trunk-clean/sys/sys/resourcevar.h	2014-01-15 14:31:48.000000000 +0100
+@@ -145,6 +145,9 @@ struct uidinfo
+ 	*uifind(uid_t uid);
+ void	 uifree(struct uidinfo *uip);
+ void	 uihashinit(void);
++#ifdef VPS
++void	 uihashdestroy(void);
++#endif
+ void	 uihold(struct uidinfo *uip);
+ void	 ui_racct_foreach(void (*callback)(struct racct *racct,
+ 	    void *arg2, void *arg3), void *arg2, void *arg3);

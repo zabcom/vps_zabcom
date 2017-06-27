@@ -1,0 +1,14 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/i386/i386/identcpu.c trunk-clean/sys/i386/i386/identcpu.c
+--- 10.0.0-stripped/sys/i386/i386/identcpu.c	2014-01-15 14:19:23.000000000 +0100
++++ trunk-clean/sys/i386/i386/identcpu.c	2014-01-15 14:31:35.000000000 +0100
+@@ -89,8 +89,8 @@ int	cpu_class;
+ u_int	cpu_exthigh;		/* Highest arg to extended CPUID */
+ u_int	cyrix_did;		/* Device ID of Cyrix CPU */
+ char machine[] = MACHINE;
+-SYSCTL_STRING(_hw, HW_MACHINE, machine, CTLFLAG_RD, 
+-    machine, 0, "Machine class");
++_SYSCTL_STRING(_hw, HW_MACHINE, machine, CTLFLAG_RD, 
++    machine, 0, "Machine class", VPS_PUBLIC);
+ 
+ static char cpu_model[128];
+ SYSCTL_STRING(_hw, HW_MODEL, model, CTLFLAG_RD, 

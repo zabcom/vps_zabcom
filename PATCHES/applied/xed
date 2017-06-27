@@ -1,0 +1,20 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/subr_trap.c trunk-clean/sys/kern/subr_trap.c
+--- 10.0.0-stripped/sys/kern/subr_trap.c	2014-01-15 14:20:23.000000000 +0100
++++ trunk-clean/sys/kern/subr_trap.c	2014-01-15 14:31:10.000000000 +0100
+@@ -176,6 +176,16 @@ userret(struct thread *td, struct trapfr
+ 		msleep(p->p_racct, &p->p_mtx, 0, "racct", 0);
+ 	PROC_UNLOCK(p);
+ #endif
++#ifdef VPS
++	/*
++	KASSERT(td->td_vps == NULL || td->td_vps == td->td_ucred->cr_vps,
++		("%s: bad vps ref: td=%p, td->td_vps=%p, td->td_ucred->cr_vps=%p\n",
++		__func__, td, td->td_vps, td->td_ucred->cr_vps));
++	*/
++	KASSERT(td->td_vps != NULL && td->td_vps == td->td_ucred->cr_vps,
++		("%s: bad vps ref: td=%p, td->td_vps=%p, td->td_ucred->cr_vps=%p\n",
++		__func__, td, td->td_vps, td->td_ucred->cr_vps));
++#endif
+ }
+ 
+ /*

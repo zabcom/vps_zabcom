@@ -1,0 +1,30 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/ddb/db_thread.c trunk-clean/sys/ddb/db_thread.c
+--- 10.0.0-stripped/sys/ddb/db_thread.c	2014-01-15 14:20:21.000000000 +0100
++++ trunk-clean/sys/ddb/db_thread.c	2014-01-15 14:31:35.000000000 +0100
+@@ -38,6 +38,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/d
+ #include <ddb/db_command.h>
+ #include <ddb/db_sym.h>
+ 
++#include <vps/vps.h>
++
+ void
+ db_print_thread(void)
+ {
+@@ -137,7 +139,7 @@ db_lookup_thread(db_expr_t addr, boolean
+ 			if (p->p_pid == decaddr)
+ 				return (FIRST_THREAD_IN_PROC(p));
+ 		}
+-		LIST_FOREACH(p, &zombproc, p_list) {
++		LIST_FOREACH(p, &V_zombproc, p_list) {
+ 			if (p->p_pid == decaddr)
+ 				return (FIRST_THREAD_IN_PROC(p));
+ 		}
+@@ -163,7 +165,7 @@ db_lookup_proc(db_expr_t addr)
+ 			if (p->p_pid == decaddr)
+ 				return (p);
+ 		}
+-		LIST_FOREACH(p, &zombproc, p_list) {
++		LIST_FOREACH(p, &V_zombproc, p_list) {
+ 			if (p->p_pid == decaddr)
+ 				return (p);
+ 		}

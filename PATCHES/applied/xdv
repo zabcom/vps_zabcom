@@ -1,0 +1,50 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_umtx.c trunk-clean/sys/kern/kern_umtx.c
+--- 10.0.0-stripped/sys/kern/kern_umtx.c	2014-01-15 14:20:23.000000000 +0100
++++ trunk-clean/sys/kern/kern_umtx.c	2014-01-15 14:31:10.000000000 +0100
+@@ -50,6 +50,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <sys/eventhandler.h>
+ #include <sys/umtx.h>
+ 
++#include <vps/vps2.h>
++
+ #include <vm/vm.h>
+ #include <vm/vm_param.h>
+ #include <vm/pmap.h>
+@@ -3916,3 +3918,37 @@ umtx_thread_cleanup(struct thread *td)
+ 	sched_lend_user_prio(td, PRI_MAX);
+ 	thread_unlock(td);
+ }
++
++#ifdef VPS
++
++/*
++ * VPS stuff
++ */
++
++int
++vps_umtx_snapshot(struct thread *td)
++{
++	struct umtx_q *uq, *uq2;
++	struct umtx_pi *pi;
++
++	uq = td->td_umtxq;
++
++	printf("%s: td->td_umtxq=%p\n", __func__, uq);
++	if (uq == NULL)
++		return (0);
++
++	printf("%s: uq->uq_spare_queue=%p\n", __func__, uq->uq_spare_queue);
++	printf("%s: uq->uq_inherited_pri=%d\n", __func__, uq->uq_inherited_pri);
++
++	if (uq->uq_spare_queue)
++		TAILQ_FOREACH(uq2, &uq->uq_spare_queue->head, uq_link)
++			printf("%s: uq2=%p\n", __func__, uq2);
++
++	TAILQ_FOREACH(pi, &uq->uq_pi_contested, pi_link)
++		printf("%s: pi=%p\n", __func__, pi);
++	
++	return (0);
++}
++
++#endif /* VPS */
++

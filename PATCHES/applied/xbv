@@ -1,0 +1,18 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/fs/nfsclient/nfs_clvfsops.c trunk-clean/sys/fs/nfsclient/nfs_clvfsops.c
+--- 10.0.0-stripped/sys/fs/nfsclient/nfs_clvfsops.c	2014-01-15 14:19:15.000000000 +0100
++++ trunk-clean/sys/fs/nfsclient/nfs_clvfsops.c	2014-01-15 14:31:12.000000000 +0100
+@@ -498,10 +498,10 @@ nfs_mountroot(struct mount *mp)
+ 	 * set hostname here and then let the "/etc/rc.xxx" files
+ 	 * mount the right /var based upon its preset value.
+ 	 */
+-	mtx_lock(&prison0.pr_mtx);
+-	strlcpy(prison0.pr_hostname, nd->my_hostnam,
+-	    sizeof(prison0.pr_hostname));
+-	mtx_unlock(&prison0.pr_mtx);
++	mtx_lock(&V_prison0->pr_mtx);
++	strlcpy(V_prison0->pr_hostname, nd->my_hostnam,
++	    sizeof(V_prison0->pr_hostname));
++	mtx_unlock(&V_prison0->pr_mtx);
+ 	inittodr(ntohl(nd->root_time));
+ 	return (0);
+ }

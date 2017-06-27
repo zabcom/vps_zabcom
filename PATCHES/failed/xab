@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/include/Makefile trunk-clean/include/Makefile
+--- 10.0.0-stripped/include/Makefile	2014-01-15 14:21:17.000000000 +0100
++++ trunk-clean/include/Makefile	2014-01-15 14:31:06.000000000 +0100
+@@ -39,7 +39,7 @@ LHDRS=	aio.h errno.h fcntl.h linker_set.
+ LDIRS=	bsm cam geom net net80211 netatalk netgraph netinet netinet6 \
+ 	netipsec ${_netipx} netnatm netsmb \
+ 	nfs nfsclient nfsserver \
+-	sys vm
++	sys vm vps
+ 
+ LSUBDIRS=	cam/ata cam/scsi \
+ 	dev/acpica dev/agp dev/an dev/bktr dev/ciss dev/filemon dev/firewire \

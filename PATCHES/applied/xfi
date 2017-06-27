@@ -1,0 +1,18 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/modules/vps_libdump/Makefile trunk-clean/sys/modules/vps_libdump/Makefile
+--- 10.0.0-stripped/sys/modules/vps_libdump/Makefile	1970-01-01 01:00:00.000000000 +0100
++++ trunk-clean/sys/modules/vps_libdump/Makefile	2014-01-15 14:31:14.000000000 +0100
+@@ -0,0 +1,14 @@
++
++.PATH: ${.CURDIR}/../../vps
++
++KMOD=	vps_libdump
++SRCS=	vps_libdump.c \
++	vps_libdump.h \
++	opt_ddb.h opt_vps.h opt_inet.h opt_inet6.h \
++	vnode_if.h
++
++.if !defined(KERNBUILDDIR)
++
++.endif
++
++.include <bsd.kmod.mk>

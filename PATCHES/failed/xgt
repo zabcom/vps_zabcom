@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netpfil/ipfw/ip_fw_sockopt.c trunk-clean/sys/netpfil/ipfw/ip_fw_sockopt.c
+--- 10.0.0-stripped/sys/netpfil/ipfw/ip_fw_sockopt.c	2014-01-15 14:19:11.000000000 +0100
++++ trunk-clean/sys/netpfil/ipfw/ip_fw_sockopt.c	2014-01-15 14:31:45.000000000 +0100
+@@ -882,7 +882,7 @@ ipfw_getrules(struct ip_fw_chain *chain,
+ 	int l, i;
+ 	time_t	boot_seconds;
+ 
+-        boot_seconds = boottime.tv_sec;
++        boot_seconds = V_boottime.tv_sec;
+ 	for (i = 0; i < chain->n_rules; i++) {
+ 		rule = chain->map[i];
+ 

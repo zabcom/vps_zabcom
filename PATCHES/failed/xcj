@@ -1,0 +1,61 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/i386/i386/pmap.c trunk-clean/sys/i386/i386/pmap.c
+--- 10.0.0-stripped/sys/i386/i386/pmap.c	2014-01-15 14:19:23.000000000 +0100
++++ trunk-clean/sys/i386/i386/pmap.c	2014-01-15 14:31:35.000000000 +0100
+@@ -746,7 +746,7 @@ pmap_init(void)
+ 	 * numbers of pv entries.
+ 	 */
+ 	TUNABLE_INT_FETCH("vm.pmap.shpgperproc", &shpgperproc);
+-	pv_entry_max = shpgperproc * maxproc + cnt.v_page_count;
++	pv_entry_max = shpgperproc * G_maxproc + cnt.v_page_count;
+ 	TUNABLE_INT_FETCH("vm.pmap.pv_entries", &pv_entry_max);
+ 	pv_entry_max = roundup(pv_entry_max, _NPCPV);
+ 	pv_entry_high_water = 9 * (pv_entry_max / 10);
+@@ -788,7 +788,7 @@ pmap_init(void)
+ 	for (i = 0; i < pv_npg; i++)
+ 		TAILQ_INIT(&pv_table[i].pv_list);
+ 
+-	pv_maxchunks = MAX(pv_entry_max / _NPCPV, maxproc);
++	pv_maxchunks = MAX(pv_entry_max / _NPCPV, G_maxproc);
+ 	pv_chunkbase = (struct pv_chunk *)kva_alloc(PAGE_SIZE * pv_maxchunks);
+ 	if (pv_chunkbase == NULL)
+ 		panic("pmap_init: not enough kvm for pv chunks");
+@@ -2255,7 +2255,7 @@ pmap_pv_reclaim(pmap_t locked_pmap)
+ 					if (TAILQ_EMPTY(&pvh->pv_list)) {
+ 						vm_page_aflag_clear(m,
+ 						    PGA_WRITEABLE);
+-					}
++				 	}
+ 				}
+ 				pc->pc_map[field] |= 1UL << bit;
+ 				pmap_unuse_pt(pmap, va, &free);
+@@ -2297,7 +2297,7 @@ pmap_pv_reclaim(pmap_t locked_pmap)
+ 			break;
+ 		}
+ 	}
+-out:
++out:  
+ 	TAILQ_CONCAT(&pv_chunks, &newtail, pc_lru);
+ 	if (pmap != NULL) {
+ 		pmap_invalidate_all(pmap);
+@@ -2663,8 +2663,9 @@ pmap_demote_pde(pmap_t pmap, pd_entry_t 
+ 			    " in pmap %p", va, pmap);
+ 			return (FALSE);
+ 		}
+-		if (va < VM_MAXUSER_ADDRESS)
++		if (va < VM_MAXUSER_ADDRESS) {
+ 			pmap->pm_stats.resident_count++;
++		}
+ 	}
+ 	mptepa = VM_PAGE_TO_PHYS(mpte);
+ 
+@@ -3546,8 +3547,9 @@ pmap_enter(pmap_t pmap, vm_offset_t va, 
+ 			    ("pmap_enter: missing reference to page table page,"
+ 			     " va: 0x%x", va));
+ 		}
+-	} else
++	} else {
+ 		pmap->pm_stats.resident_count++;
++	}
+ 
+ 	/*
+ 	 * Enter on the PV list if part of our managed memory.

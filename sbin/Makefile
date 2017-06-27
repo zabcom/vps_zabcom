@@ -50,6 +50,7 @@ SUBDIR=adjkerntz \
 	mount_nullfs \
 	mount_udf \
 	mount_unionfs \
+	mount_vpsfs \
 	newfs \
 	newfs_msdos \
 	nfsiod \

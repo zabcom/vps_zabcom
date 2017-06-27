@@ -1,0 +1,14 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netinet6/in6.c trunk-clean/sys/netinet6/in6.c
+--- 10.0.0-stripped/sys/netinet6/in6.c	2014-01-15 14:19:24.000000000 +0100
++++ trunk-clean/sys/netinet6/in6.c	2014-01-15 14:31:36.000000000 +0100
+@@ -2732,6 +2732,10 @@ in6_lltable_dump(struct lltable *llt, st
+ 			if (lle->la_flags & LLE_PUB)
+ 				ndpc.rtm.rtm_flags |= RTF_ANNOUNCE;
+ 
++			/* proxy */
++			if (lle->la_flags & LLE_PROXY)
++				ndpc.rtm.rtm_flags |= RTF_PROTO1;
++
+ 			sdl = &ndpc.sdl;
+ 			sdl->sdl_family = AF_LINK;
+ 			sdl->sdl_len = sizeof(*sdl);

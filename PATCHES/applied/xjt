@@ -1,0 +1,29 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/tools/vps/merge.sh trunk-clean/tools/vps/merge.sh
+--- 10.0.0-stripped/tools/vps/merge.sh	1970-01-01 01:00:00.000000000 +0100
++++ trunk-clean/tools/vps/merge.sh	2014-01-15 14:31:06.000000000 +0100
+@@ -0,0 +1,25 @@
++#!/bin/sh
++
++SRCDIR=trunk
++DSTDIR=head
++
++DIRS=$(cd ${SRCDIR} && find . -type d | grep -v '\.svn')
++FILES=$(cd ${SRCDIR} && find . -type f | grep -v '\.svn')
++
++
++for DIR in ${DIRS}
++do
++	if [ ! -e "${DSTDIR}/${DIR}" ]
++	then
++		mkdir -p "${DSTDIR}/${DIR}"
++	fi
++done
++
++for FILE in ${FILES}
++do
++	cp -av "${SRCDIR}/${FILE}" "${DSTDIR}/${FILE}"
++done 
++
++exit 0
++
++# EOF

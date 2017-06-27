@@ -1,0 +1,13 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/amd64/ia32/ia32_exception.S trunk-clean/sys/amd64/ia32/ia32_exception.S
+--- 10.0.0-stripped/sys/amd64/ia32/ia32_exception.S	2014-01-15 14:19:15.000000000 +0100
++++ trunk-clean/sys/amd64/ia32/ia32_exception.S	2014-01-15 14:31:47.000000000 +0100
+@@ -44,6 +44,9 @@ IDTVEC(int0x80_syscall)
+ 	swapgs
+ 	pushq	$2			/* sizeof "int 0x80" */
+ 	subq	$TF_ERR,%rsp		/* skip over tf_trapno */
++#ifdef VPS
++	movl	$0x80,TF_TRAPNO(%rsp)
++#endif	
+ 	movq	%rdi,TF_RDI(%rsp)
+ 	movq	PCPU(CURPCB),%rdi
+ 	andl	$~PCB_FULL_IRET,PCB_FLAGS(%rdi)

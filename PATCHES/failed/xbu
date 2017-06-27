@@ -1,0 +1,32 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/fs/nfs/nfsport.h trunk-clean/sys/fs/nfs/nfsport.h
+--- 10.0.0-stripped/sys/fs/nfs/nfsport.h	2014-01-15 14:19:15.000000000 +0100
++++ trunk-clean/sys/fs/nfs/nfsport.h	2014-01-15 14:31:12.000000000 +0100
+@@ -99,6 +99,8 @@
+ #include <rpc/rpc.h>
+ #include <rpc/rpcsec_gss.h>
+ 
++#include <vps/vps.h>
++
+ /*
+  * For Darwin, these functions should be "static" when built in a kext.
+  * (This is always defined as nil otherwise.)
+@@ -631,8 +633,8 @@ void nfsrvd_rcv(struct socket *, void *,
+ #define	NFSUNLOCKMNT(m)		mtx_unlock(&((m)->nm_mtx))
+ #define	NFSLOCKREQUEST(r)	mtx_lock(&((r)->r_mtx))
+ #define	NFSUNLOCKREQUEST(r)	mtx_unlock(&((r)->r_mtx))
+-#define	NFSPROCLISTLOCK()	sx_slock(&allproc_lock)
+-#define	NFSPROCLISTUNLOCK()	sx_sunlock(&allproc_lock)
++#define	NFSPROCLISTLOCK()	sx_slock(&V_allproc_lock)
++#define	NFSPROCLISTUNLOCK()	sx_sunlock(&V_allproc_lock)
+ #define	NFSLOCKSOCKREQ(r)	mtx_lock(&((r)->nr_mtx))
+ #define	NFSUNLOCKSOCKREQ(r)	mtx_unlock(&((r)->nr_mtx))
+ #define	NFSLOCKDS(d)		mtx_lock(&((d)->nfsclds_mtx))
+@@ -864,7 +866,7 @@ int newnfs_realign(struct mbuf **, int);
+ /*
+  * Set boottime.
+  */
+-#define	NFSSETBOOTTIME(b)	((b) = boottime)
++#define	NFSSETBOOTTIME(b)	((b) = G_boottime)
+ 
+ /*
+  * The size of directory blocks in the buffer cache.

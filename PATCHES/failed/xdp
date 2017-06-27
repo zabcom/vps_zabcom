@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_synch.c trunk-clean/sys/kern/kern_synch.c
+--- 10.0.0-stripped/sys/kern/kern_synch.c	2014-01-15 14:20:23.000000000 +0100
++++ trunk-clean/sys/kern/kern_synch.c	2014-01-15 14:31:10.000000000 +0100
+@@ -103,7 +103,7 @@ static fixpt_t cexp[3] = {
+ 
+ /* kernel uses `FSCALE', userland (SHOULD) use kern.fscale */
+ static int      fscale __unused = FSCALE;
+-SYSCTL_INT(_kern, OID_AUTO, fscale, CTLFLAG_RD, 0, FSCALE, "");
++_SYSCTL_INT(_kern, OID_AUTO, fscale, CTLFLAG_RD, 0, FSCALE, "", VPS_PUBLIC);
+ 
+ static void	loadav(void *arg);
+ 

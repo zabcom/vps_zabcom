@@ -1,0 +1,15 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/cddl/compat/opensolaris/kern/opensolaris_misc.c trunk-clean/sys/cddl/compat/opensolaris/kern/opensolaris_misc.c
+--- 10.0.0-stripped/sys/cddl/compat/opensolaris/kern/opensolaris_misc.c	2014-01-15 14:19:25.000000000 +0100
++++ trunk-clean/sys/cddl/compat/opensolaris/kern/opensolaris_misc.c	2014-01-15 14:31:46.000000000 +0100
+@@ -46,9 +46,9 @@ opensolaris_utsname_init(void *arg)
+ {
+ 
+ 	utsname.sysname = ostype;
+-	utsname.nodename = prison0.pr_hostname;
++	utsname.nodename = V_prison0->pr_hostname;
+ 	utsname.release = osrelease;
+ 	snprintf(utsname.version, sizeof(utsname.version), "%d", osreldate);
+ }
+-SYSINIT(opensolaris_utsname_init, SI_SUB_TUNABLES, SI_ORDER_ANY,
++SYSINIT(opensolaris_utsname_init, SI_SUB_OPENSOLARIS, SI_ORDER_ANY,
+     opensolaris_utsname_init, NULL);

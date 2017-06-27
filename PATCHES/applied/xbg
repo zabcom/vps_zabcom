@@ -1,0 +1,13 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/conf/options trunk-clean/sys/conf/options
+--- 10.0.0-stripped/sys/conf/options	2014-01-15 14:20:17.000000000 +0100
++++ trunk-clean/sys/conf/options	2014-01-15 14:31:09.000000000 +0100
+@@ -886,6 +886,9 @@ SND_FEEDER_RATE_HP	opt_snd.h
+ SND_PCM_64		opt_snd.h
+ SND_OLDSTEREO		opt_snd.h
+ 
++VPS			opt_global.h
++VPS_STATIC		opt_global.h
++
+ X86BIOS
+ 
+ # Flattened device tree options

@@ -1,0 +1,14 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/fs/devfs/devfs.h trunk-clean/sys/fs/devfs/devfs.h
+--- 10.0.0-stripped/sys/fs/devfs/devfs.h	2014-01-15 14:19:14.000000000 +0100
++++ trunk-clean/sys/fs/devfs/devfs.h	2014-01-15 14:31:12.000000000 +0100
+@@ -161,6 +161,10 @@ struct devfs_mount {
+ 	int			dm_holdcnt;
+ 	struct sx		dm_lock;
+ 	devfs_rsnum		dm_ruleset;
++#ifdef VPS
++	struct vps		*dm_vps;
++	int			dm_vps_rsnum;
++#endif
+ };
+ 
+ #define DEVFS_ROOTINO 2

@@ -1,0 +1,31 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/uipc_syscalls.c trunk-clean/sys/kern/uipc_syscalls.c
+--- 10.0.0-stripped/sys/kern/uipc_syscalls.c	2014-01-15 14:20:22.000000000 +0100
++++ trunk-clean/sys/kern/uipc_syscalls.c	2014-01-15 14:31:10.000000000 +0100
+@@ -99,6 +99,10 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #endif /* SCTP */
+ #endif /* INET || INET6 */
+ 
++#ifdef VPS
++int getsock(struct filedesc *fdp, int fd, struct file **fpp, u_int *fflagp);
++#endif
++
+ /*
+  * Flags for accept1() and kern_accept4(), in addition to SOCK_CLOEXEC
+  * and SOCK_NONBLOCK.
+@@ -177,6 +181,16 @@ getsock_cap(struct filedesc *fdp, int fd
+ 	return (0);
+ }
+ 
++#ifdef VPS
++int
++getsock(struct filedesc *fdp, int fd, struct file **fpp, u_int *fflagp)
++{
++
++	/* XXX cap_rights_t rights --> 0 */
++	return (getsock_cap(fdp, fd, 0, fpp, fflagp));
++}
++#endif
++
+ /*
+  * System call interface to the socket abstraction.
+  */

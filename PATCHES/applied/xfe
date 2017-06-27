@@ -1,0 +1,23 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/modules/if_vps/Makefile trunk-clean/sys/modules/if_vps/Makefile
+--- 10.0.0-stripped/sys/modules/if_vps/Makefile	1970-01-01 01:00:00.000000000 +0100
++++ trunk-clean/sys/modules/if_vps/Makefile	2014-01-15 14:31:14.000000000 +0100
+@@ -0,0 +1,19 @@
++
++.PATH: ${.CURDIR}/../../vps
++
++KMOD=	if_vps
++SRCS=	if_vps.c opt_ddb.h opt_vps.h opt_inet.h opt_inet6.h vps.h vps_user.h
++
++.if !defined(KERNBUILDDIR)
++opt_ddb.h:
++	echo "#define DDB 1" > ${.TARGET}
++
++opt_inet.h:
++        echo "#define INET 1" > ${.TARGET}
++
++opt_inet6.h:
++        echo "#define INET6 1" > ${.TARGET}
++
++.endif
++
++.include <bsd.kmod.mk>

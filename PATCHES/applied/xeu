@@ -1,0 +1,23 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/vfs_default.c trunk-clean/sys/kern/vfs_default.c
+--- 10.0.0-stripped/sys/kern/vfs_default.c	2014-01-15 14:20:22.000000000 +0100
++++ trunk-clean/sys/kern/vfs_default.c	2014-01-15 14:31:10.000000000 +0100
+@@ -69,10 +69,6 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ static int	vop_nolookup(struct vop_lookup_args *);
+ static int	vop_norename(struct vop_rename_args *);
+ static int	vop_nostrategy(struct vop_strategy_args *);
+-static int	get_next_dirent(struct vnode *vp, struct dirent **dpp,
+-				char *dirbuf, int dirbuflen, off_t *off,
+-				char **cpos, int *len, int *eofflag,
+-				struct thread *td);
+ static int	dirent_exists(struct vnode *vp, const char *dirname,
+ 			      struct thread *td);
+ 
+@@ -261,7 +257,7 @@ vop_nostrategy (struct vop_strategy_args
+ 	return (EOPNOTSUPP);
+ }
+ 
+-static int
++int
+ get_next_dirent(struct vnode *vp, struct dirent **dpp, char *dirbuf,
+ 		int dirbuflen, off_t *off, char **cpos, int *len,
+ 		int *eofflag, struct thread *td)

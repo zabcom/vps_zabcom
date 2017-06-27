@@ -1,0 +1,13 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/sys/tty.h trunk-clean/sys/sys/tty.h
+--- 10.0.0-stripped/sys/sys/tty.h	2014-01-15 14:19:16.000000000 +0100
++++ trunk-clean/sys/sys/tty.h	2014-01-15 14:31:48.000000000 +0100
+@@ -213,6 +213,9 @@ void	ttyconsdev_select(const char *name)
+ int	pts_alloc(int fflags, struct thread *td, struct file *fp);
+ int	pts_alloc_external(int fd, struct thread *td, struct file *fp,
+     struct cdev *dev, const char *name);
++#ifdef VPS
++int	pts_alloc2(int fflags, struct thread *td, struct file *fp, int unit);
++#endif
+ 
+ /* Drivers and line disciplines also need to call these. */
+ #include <sys/ttydisc.h>

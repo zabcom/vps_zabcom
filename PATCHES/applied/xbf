@@ -1,0 +1,11 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/conf/files.mips trunk-clean/sys/conf/files.mips
+--- 10.0.0-stripped/sys/conf/files.mips	2014-01-15 14:20:17.000000000 +0100
++++ trunk-clean/sys/conf/files.mips	2014-01-15 14:31:09.000000000 +0100
+@@ -46,6 +46,7 @@ mips/mips/trap.c			standard
+ mips/mips/uio_machdep.c			standard
+ mips/mips/uma_machdep.c			standard
+ mips/mips/vm_machdep.c			standard
++mips/mips/vps_machdep.c			optional	vps
+ 
+ # misc opt-in bits
+ kern/kern_clocksource.c			standard

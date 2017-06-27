@@ -1,0 +1,19 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/modules/Makefile trunk-clean/sys/modules/Makefile
+--- 10.0.0-stripped/sys/modules/Makefile	2014-01-15 14:19:27.000000000 +0100
++++ trunk-clean/sys/modules/Makefile	2014-01-15 14:31:15.000000000 +0100
+@@ -348,6 +348,15 @@ SUBDIR=	\
+ 	${_vmm} \
+ 	${_vmware} \
+ 	${_vpo} \
++	vps_dev \
++	vps_suspend \
++	vps_account \
++	vps_snapst \
++	vps_restore \
++	vps_libdump \
++	if_vps \
++	vps_ddb \
++	vpsfs \
+ 	vr \
+ 	vte \
+ 	vx \

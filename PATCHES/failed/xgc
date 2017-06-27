@@ -1,0 +1,15 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netinet/raw_ip.c trunk-clean/sys/netinet/raw_ip.c
+--- 10.0.0-stripped/sys/netinet/raw_ip.c	2014-01-15 14:19:26.000000000 +0100
++++ trunk-clean/sys/netinet/raw_ip.c	2014-01-15 14:31:12.000000000 +0100
+@@ -205,7 +205,11 @@ rip_init(void)
+ {
+ 
+ 	in_pcbinfo_init(&V_ripcbinfo, "rip", &V_ripcb, INP_PCBHASH_RAW_SIZE,
++#ifdef VIMAGE
++	    1, "ripcb", rip_inpcb_init, NULL, 0,
++#else
+ 	    1, "ripcb", rip_inpcb_init, NULL, UMA_ZONE_NOFREE,
++#endif
+ 	    IPI_HASHFIELDS_NONE);
+ 	EVENTHANDLER_REGISTER(maxsockets_change, rip_zone_change, NULL,
+ 	    EVENTHANDLER_PRI_ANY);

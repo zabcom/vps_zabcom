@@ -1,0 +1,90 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_linker.c trunk-clean/sys/kern/kern_linker.c
+--- 10.0.0-stripped/sys/kern/kern_linker.c	2014-01-15 14:20:22.000000000 +0100
++++ trunk-clean/sys/kern/kern_linker.c	2014-01-15 14:31:10.000000000 +0100
+@@ -56,6 +56,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ 
+ #include <net/vnet.h>
+ 
++#include <vps/vps.h>
++
+ #include <security/mac/mac_framework.h>
+ 
+ #include "linker_if.h"
+@@ -384,7 +386,7 @@ linker_load_file(const char *filename, l
+ 	int foundfile, error, modules;
+ 
+ 	/* Refuse to load modules if securelevel raised */
+-	if (prison0.pr_securelevel > 0)
++	if (V_prison0->pr_securelevel > 0)
+ 		return (EPERM);
+ 
+ 	sx_assert(&kld_sx, SA_XLOCKED);
+@@ -597,7 +599,7 @@ linker_file_unload(linker_file_t file, i
+ 	int error, i;
+ 
+ 	/* Refuse to unload modules if securelevel raised. */
+-	if (prison0.pr_securelevel > 0)
++	if (V_prison0->pr_securelevel > 0)
+ 		return (EPERM);
+ 
+ 	sx_assert(&kld_sx, SA_XLOCKED);
+@@ -1144,6 +1146,11 @@ sys_kldfind(struct thread *td, struct kl
+ 	linker_file_t lf;
+ 	int error;
+ 
++#ifdef VPS
++	if ((error = priv_check(td, PRIV_KLD_LOAD)) != 0)
++		return (error);
++#endif
++
+ #ifdef MAC
+ 	error = mac_kld_check_stat(td->td_ucred);
+ 	if (error)
+@@ -1175,6 +1182,11 @@ sys_kldnext(struct thread *td, struct kl
+ 	linker_file_t lf;
+ 	int error = 0;
+ 
++#ifdef VPS
++	if ((error = priv_check(td, PRIV_KLD_LOAD)) != 0)
++		return (error);
++#endif
++
+ #ifdef MAC
+ 	error = mac_kld_check_stat(td->td_ucred);
+ 	if (error)
+@@ -1212,6 +1224,11 @@ sys_kldstat(struct thread *td, struct kl
+ 	struct kld_file_stat stat;
+ 	int error, version;
+ 
++#ifdef VPS
++	if ((error = priv_check(td, PRIV_KLD_LOAD)) != 0)
++		return (error);
++#endif
++
+ 	/*
+ 	 * Check the version of the user's structure.
+ 	 */
+@@ -1275,6 +1292,11 @@ sys_kldfirstmod(struct thread *td, struc
+ 	module_t mp;
+ 	int error = 0;
+ 
++#ifdef VPS
++	if ((error = priv_check(td, PRIV_KLD_LOAD)) != 0)
++		return (error);
++#endif
++
+ #ifdef MAC
+ 	error = mac_kld_check_stat(td->td_ucred);
+ 	if (error)
+@@ -1307,6 +1329,11 @@ sys_kldsym(struct thread *td, struct kld
+ 	struct kld_sym_lookup lookup;
+ 	int error = 0;
+ 
++#ifdef VPS
++	if ((error = priv_check(td, PRIV_KLD_LOAD)) != 0)
++		return (error);
++#endif
++
+ #ifdef MAC
+ 	error = mac_kld_check_stat(td->td_ucred);
+ 	if (error)

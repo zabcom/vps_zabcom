@@ -1,0 +1,11 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/usr.sbin/Makefile trunk-clean/usr.sbin/Makefile
+--- 10.0.0-stripped/usr.sbin/Makefile	2014-01-15 14:18:40.000000000 +0100
++++ trunk-clean/usr.sbin/Makefile	2014-01-15 14:31:06.000000000 +0100
+@@ -93,6 +93,7 @@ SUBDIR=	adduser \
+ 	tzsetup \
+ 	ugidfw \
+ 	vipw \
++	vpsctl \
+ 	wake \
+ 	watch \
+ 	watchdogd \

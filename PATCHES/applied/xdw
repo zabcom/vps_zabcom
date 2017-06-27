@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_uuid.c trunk-clean/sys/kern/kern_uuid.c
+--- 10.0.0-stripped/sys/kern/kern_uuid.c	2014-01-15 14:20:23.000000000 +0100
++++ trunk-clean/sys/kern/kern_uuid.c	2014-01-15 14:31:10.000000000 +0100
+@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <net/if_types.h>
+ #include <net/vnet.h>
+ 
++#include <vps/vps.h>
++
+ /*
+  * See also:
+  *	http://www.opengroup.org/dce/info/draft-leach-uuids-guids-01.txt

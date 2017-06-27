@@ -1,0 +1,29 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/i386/ibcs2/ibcs2_sysvec.c trunk-clean/sys/i386/ibcs2/ibcs2_sysvec.c
+--- 10.0.0-stripped/sys/i386/ibcs2/ibcs2_sysvec.c	2014-01-15 14:19:23.000000000 +0100
++++ trunk-clean/sys/i386/ibcs2/ibcs2_sysvec.c	2014-01-15 14:31:35.000000000 +0100
+@@ -47,6 +47,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/i
+ #include <vm/pmap.h>
+ #include <vm/vm_param.h>
+ 
++#include <vps/vps.h>
++
+ #include <i386/ibcs2/ibcs2_syscall.h>
+ #include <i386/ibcs2/ibcs2_signal.h>
+ 
+@@ -113,14 +115,14 @@ ibcs2_modevent(module_t mod, int type, v
+ 		break;
+ 	case MOD_UNLOAD:
+ 		/* if this was an ELF module we'd use elf_brand_inuse()... */
+-		sx_slock(&allproc_lock);
++		sx_slock(&V_allproc_lock);
+ 		FOREACH_PROC_IN_SYSTEM(p) {
+ 			if (p->p_sysent == &ibcs2_svr3_sysvec) {
+ 				rval = EBUSY;
+ 				break;
+ 			}
+ 		}
+-		sx_sunlock(&allproc_lock);
++		sx_sunlock(&V_allproc_lock);
+ 		break;
+ 	default:
+ 	        rval = EOPNOTSUPP;

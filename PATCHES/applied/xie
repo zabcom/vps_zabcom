@@ -1,0 +1,20 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/vm/vm_kern.c trunk-clean/sys/vm/vm_kern.c
+--- 10.0.0-stripped/sys/vm/vm_kern.c	2014-01-15 14:19:22.000000000 +0100
++++ trunk-clean/sys/vm/vm_kern.c	2014-01-15 14:31:32.000000000 +0100
+@@ -76,6 +76,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/v
+ #include <sys/sysctl.h>
+ #include <sys/vmem.h>
+ 
++#include <vps/vps_account.h>
++
+ #include <vm/vm.h>
+ #include <vm/vm_param.h>
+ #include <vm/vm_kern.h>
+@@ -462,6 +464,7 @@ kmap_alloc_wait(map, size)
+ 	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_ALL,
+ 	    VM_PROT_ALL, MAP_ACC_CHARGED);
+ 	vm_map_unlock(map);
++
+ 	return (addr);
+ }
+ 

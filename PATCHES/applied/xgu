@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/nfs/nfs_diskless.c trunk-clean/sys/nfs/nfs_diskless.c
+--- 10.0.0-stripped/sys/nfs/nfs_diskless.c	2014-01-15 14:19:22.000000000 +0100
++++ trunk-clean/sys/nfs/nfs_diskless.c	2014-01-15 14:31:09.000000000 +0100
+@@ -45,6 +45,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/n
+ #include <sys/mount.h>
+ #include <sys/socket.h>
+ 
++#include <vps/vps.h>
++
+ #include <net/if.h>
+ #include <net/if_dl.h>
+ #include <net/if_types.h>

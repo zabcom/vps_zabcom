@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/ddb/db_command.c trunk-clean/sys/ddb/db_command.c
+--- 10.0.0-stripped/sys/ddb/db_command.c	2014-01-15 14:20:21.000000000 +0100
++++ trunk-clean/sys/ddb/db_command.c	2014-01-15 14:31:35.000000000 +0100
+@@ -56,6 +56,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/d
+ #include <machine/cpu.h>
+ #include <machine/setjmp.h>
+ 
++#include <vps/vps.h>
++
+ /*
+  * Exported global variables
+  */

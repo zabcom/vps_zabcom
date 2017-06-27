@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/cddl/compat/opensolaris/kern/opensolaris_sunddi.c trunk-clean/sys/cddl/compat/opensolaris/kern/opensolaris_sunddi.c
+--- 10.0.0-stripped/sys/cddl/compat/opensolaris/kern/opensolaris_sunddi.c	2014-01-15 14:19:25.000000000 +0100
++++ trunk-clean/sys/cddl/compat/opensolaris/kern/opensolaris_sunddi.c	2014-01-15 14:31:46.000000000 +0100
+@@ -53,7 +53,7 @@ ddi_strtoul(const char *str, char **nptr
+ {
+ 
+ 	if (str == hw_serial) {
+-		*result = prison0.pr_hostid;
++		*result = V_prison0->pr_hostid;
+ 		return (0);
+ 	}
+ 

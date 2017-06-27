@@ -1,0 +1,23 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/net/if_var.h trunk-clean/sys/net/if_var.h
+--- 10.0.0-stripped/sys/net/if_var.h	2014-01-15 14:20:21.000000000 +0100
++++ trunk-clean/sys/net/if_var.h	2014-01-15 14:31:33.000000000 +0100
+@@ -216,7 +216,7 @@ struct ifnet {
+ 	 */
+ 	char	if_cspare[3];
+ 	int	if_ispare[4];
+-	void	*if_pspare[8];		/* 1 netmap, 7 TDB */
++	void	*if_pspare[8];		/* 1 netmap, 7 TDB, 2 VPS */
+ };
+ 
+ typedef void if_init_f_t(void *);
+@@ -965,6 +965,10 @@ int    ether_poll_register(poll_handler_
+ int    ether_poll_deregister(struct ifnet *ifp);
+ #endif /* DEVICE_POLLING */
+ 
++#ifdef VPS
++int if_vmove_vps(struct thread *td, char *ifname, size_t ifname_size, struct vps *vps, char *);
++#endif
++
+ #endif /* _KERNEL */
+ 
+ #endif /* !_NET_IF_VAR_H_ */

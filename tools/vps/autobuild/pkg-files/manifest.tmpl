@@ -1,0 +1,40 @@
+name: vps
+origin: misc/vps
+www: http://www.7he.at/freebsd/vps/
+maintainer: freebsd-vps@7he.at
+comment: VPS - OS Level Virtualization
+desc: |-
+  OS Level Virtualization
+  See vps(4) for more information.
+
+  This package will backup your previously installed
+  kernel to /boot/kernel.GENERIC upon install.
+
+  WWW: http://www.7he.at/freebsd/vps/
+scripts:
+  pre-install: |-
+    #!/bin/sh
+
+    if [ ! -d /boot/kernel.GENERIC ]
+    then
+            mv /boot/kernel /boot/kernel.GENERIC
+            echo "Moved currently installed kernel to /boot/kernel.GENERIC"
+    fi
+    mkdir -p /etc/vps
+    mkdir -p /usr/vps
+
+    exit 0
+    ;
+  post-deinstall: |-
+    #!/bin/sh
+
+    if [ -d /boot/kernel.GENERIC ]
+    then
+            rmdir /boot/kernel
+            mv /boot/kernel.GENERIC /boot/kernel
+    fi
+    rmdir /etc/vps
+    rmdir /usr/vps
+
+    exit 0
+    ;

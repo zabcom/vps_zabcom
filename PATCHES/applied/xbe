@@ -1,0 +1,11 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/conf/files.i386 trunk-clean/sys/conf/files.i386
+--- 10.0.0-stripped/sys/conf/files.i386	2014-01-15 14:20:17.000000000 +0100
++++ trunk-clean/sys/conf/files.i386	2014-01-15 14:31:09.000000000 +0100
+@@ -486,6 +486,7 @@ i386/i386/trap.c		standard
+ i386/i386/uio_machdep.c		standard
+ i386/i386/vm86.c		standard
+ i386/i386/vm_machdep.c		standard
++i386/i386/vps_machdep.c		optional vps
+ i386/ibcs2/ibcs2_errno.c	optional ibcs2
+ i386/ibcs2/ibcs2_fcntl.c	optional ibcs2
+ i386/ibcs2/ibcs2_ioctl.c	optional ibcs2

@@ -1,0 +1,20 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/i386/i386/mp_machdep.c trunk-clean/sys/i386/i386/mp_machdep.c
+--- 10.0.0-stripped/sys/i386/i386/mp_machdep.c	2014-01-15 14:19:23.000000000 +0100
++++ trunk-clean/sys/i386/i386/mp_machdep.c	2014-01-15 14:31:35.000000000 +0100
+@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/i
+ 
+ #include <x86/apicreg.h>
+ #include <machine/clock.h>
++#include <machine/cpu.h>
+ #include <machine/cputypes.h>
+ #include <x86/mca.h>
+ #include <machine/md_var.h>
+@@ -1374,6 +1375,8 @@ ipi_bitmap_handler(struct trapframe fram
+ #ifdef COUNT_IPIS
+ 		(*ipi_preempt_counts[cpu])++;
+ #endif
++		if (TRAPF_USERMODE(&frame) == 0)
++			curthread->td_flags |= TDF_PREEMPTED;
+ 		sched_preempt(td);
+ 	}
+ 	if (ipi_bitmap & (1 << IPI_AST)) {

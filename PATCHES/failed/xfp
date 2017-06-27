@@ -1,0 +1,11 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/net/flowtable.h trunk-clean/sys/net/flowtable.h
+--- 10.0.0-stripped/sys/net/flowtable.h	2014-01-15 14:20:21.000000000 +0100
++++ trunk-clean/sys/net/flowtable.h	2014-01-15 14:31:33.000000000 +0100
+@@ -57,6 +57,7 @@ VNET_DECLARE(struct flowtable *, ip6_ft)
+ #define	V_ip6_ft		VNET(ip6_ft)
+ 
+ struct flowtable *flowtable_alloc(char *name, int nentry, int flags);
++void flowtable_destroy(struct flowtable *);
+ 
+ /*
+  * Given a flow table, look up the L3 and L2 information and

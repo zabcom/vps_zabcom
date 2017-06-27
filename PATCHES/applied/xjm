@@ -1,0 +1,44 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/tools/vps/autobuild/pkg-files/manifest.tmpl trunk-clean/tools/vps/autobuild/pkg-files/manifest.tmpl
+--- 10.0.0-stripped/tools/vps/autobuild/pkg-files/manifest.tmpl	1970-01-01 01:00:00.000000000 +0100
++++ trunk-clean/tools/vps/autobuild/pkg-files/manifest.tmpl	2014-01-15 14:31:05.000000000 +0100
+@@ -0,0 +1,40 @@
++name: vps
++origin: misc/vps
++www: http://www.7he.at/freebsd/vps/
++maintainer: freebsd-vps@7he.at
++comment: VPS - OS Level Virtualization
++desc: |-
++  OS Level Virtualization
++  See vps(4) for more information.
++
++  This package will backup your previously installed
++  kernel to /boot/kernel.GENERIC upon install.
++
++  WWW: http://www.7he.at/freebsd/vps/
++scripts:
++  pre-install: |-
++    #!/bin/sh
++
++    if [ ! -d /boot/kernel.GENERIC ]
++    then
++            mv /boot/kernel /boot/kernel.GENERIC
++            echo "Moved currently installed kernel to /boot/kernel.GENERIC"
++    fi
++    mkdir -p /etc/vps
++    mkdir -p /usr/vps
++
++    exit 0
++    ;
++  post-deinstall: |-
++    #!/bin/sh
++
++    if [ -d /boot/kernel.GENERIC ]
++    then
++            rmdir /boot/kernel
++            mv /boot/kernel.GENERIC /boot/kernel
++    fi
++    rmdir /etc/vps
++    rmdir /usr/vps
++
++    exit 0
++    ;

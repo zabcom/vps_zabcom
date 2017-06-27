@@ -1,0 +1,13 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netinet6/in6_ifattach.c trunk-clean/sys/netinet6/in6_ifattach.c
+--- 10.0.0-stripped/sys/netinet6/in6_ifattach.c	2014-01-15 14:19:24.000000000 +0100
++++ trunk-clean/sys/netinet6/in6_ifattach.c	2014-01-15 14:31:35.000000000 +0100
+@@ -276,6 +276,9 @@ found:
+ #ifdef IFT_IEEE80211
+ 	case IFT_IEEE80211:
+ #endif
++#ifdef VPS
++	case IFT_PROPVIRTUAL:
++#endif
+ 		/* IEEE802/EUI64 cases - what others? */
+ 		/* IEEE1394 uses 16byte length address starting with EUI64 */
+ 		if (addrlen > 8)

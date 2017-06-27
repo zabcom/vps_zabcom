@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/net/if_tun.c trunk-clean/sys/net/if_tun.c
+--- 10.0.0-stripped/sys/net/if_tun.c	2014-01-15 14:20:21.000000000 +0100
++++ trunk-clean/sys/net/if_tun.c	2014-01-15 14:31:33.000000000 +0100
+@@ -56,6 +56,8 @@
+ #include <net/bpf.h>
+ #include <net/if_tun.h>
+ 
++#include <vps/vps.h>
++
+ #include <sys/queue.h>
+ #include <sys/condvar.h>
+ 

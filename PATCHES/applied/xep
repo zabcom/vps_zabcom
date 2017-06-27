@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/uipc_socket.c trunk-clean/sys/kern/uipc_socket.c
+--- 10.0.0-stripped/sys/kern/uipc_socket.c	2014-01-15 14:20:22.000000000 +0100
++++ trunk-clean/sys/kern/uipc_socket.c	2014-01-15 14:31:10.000000000 +0100
+@@ -139,6 +139,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ 
+ #include <net/vnet.h>
+ 
++#include <vps/vps.h>
++
+ #include <security/mac/mac_framework.h>
+ 
+ #include <vm/uma.h>

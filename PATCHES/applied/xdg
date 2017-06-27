@@ -1,0 +1,72 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_module.c trunk-clean/sys/kern/kern_module.c
+--- 10.0.0-stripped/sys/kern/kern_module.c	2014-01-15 14:20:23.000000000 +0100
++++ trunk-clean/sys/kern/kern_module.c	2014-01-15 14:31:10.000000000 +0100
+@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/k
+ #include <sys/module.h>
+ #include <sys/linker.h>
+ 
++#include <vps/vps.h>
++
+ static MALLOC_DEFINE(M_MODULE, "module", "module data structures");
+ 
+ struct module {
+@@ -317,6 +319,11 @@ sys_modnext(struct thread *td, struct mo
+ 
+ 	td->td_retval[0] = -1;
+ 
++#ifdef VPS
++	if (td->td_vps != vps0)
++		return (ENOSYS);
++#endif
++
+ 	MOD_SLOCK;
+ 	if (uap->modid == 0) {
+ 		mod = TAILQ_FIRST(&modules);
+@@ -348,6 +355,11 @@ sys_modfnext(struct thread *td, struct m
+ 
+ 	td->td_retval[0] = -1;
+ 
++#ifdef VPS
++	if (td->td_vps != vps0)
++		return (ENOSYS);
++#endif
++
+ 	MOD_SLOCK;
+ 	mod = module_lookupbyid(uap->modid);
+ 	if (mod == NULL) {
+@@ -380,6 +392,11 @@ sys_modstat(struct thread *td, struct mo
+ 	struct module_stat *stat;
+ 	char *name;
+ 
++#ifdef VPS
++	if (td->td_vps != vps0)
++		return (ENOSYS);
++#endif
++
+ 	MOD_SLOCK;
+ 	mod = module_lookupbyid(uap->modid);
+ 	if (mod == NULL) {
+@@ -430,6 +447,11 @@ sys_modfind(struct thread *td, struct mo
+ 	char name[MAXMODNAME];
+ 	module_t mod;
+ 
++#ifdef VPS
++	if (td->td_vps != vps0)
++		return (ENOSYS);
++#endif
++
+ 	if ((error = copyinstr(uap->name, name, sizeof name, 0)) != 0)
+ 		return (error);
+ 
+@@ -477,6 +499,11 @@ freebsd32_modstat(struct thread *td, str
+ 	struct module_stat32 *stat32;
+ 	char *name;
+ 
++#ifdef VPS
++	if (td->td_vps != vps0)
++		return (ENOSYS);
++#endif
++
+ 	MOD_SLOCK;
+ 	mod = module_lookupbyid(uap->modid);
+ 	if (mod == NULL) {

@@ -1,0 +1,102 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/sys_procdesc.c trunk-clean/sys/kern/sys_procdesc.c
+--- 10.0.0-stripped/sys/kern/sys_procdesc.c	2014-01-15 14:20:23.000000000 +0100
++++ trunk-clean/sys/kern/sys_procdesc.c	2014-01-15 14:31:10.000000000 +0100
+@@ -153,13 +153,13 @@ procdesc_find(struct thread *td, int fd,
+ 		goto out;
+ 	}
+ 	pd = fp->f_data;
+-	sx_slock(&proctree_lock);
++	sx_slock(&V_proctree_lock);
+ 	if (pd->pd_proc != NULL) {
+ 		*p = pd->pd_proc;
+ 		PROC_LOCK(*p);
+ 	} else
+ 		error = ESRCH;
+-	sx_sunlock(&proctree_lock);
++	sx_sunlock(&V_proctree_lock);
+ out:
+ 	fdrop(fp, td);
+ 	return (error);
+@@ -289,14 +289,14 @@ procdesc_exit(struct proc *p)
+ {
+ 	struct procdesc *pd;
+ 
+-	sx_assert(&proctree_lock, SA_XLOCKED);
++	sx_assert(&V_proctree_lock, SA_XLOCKED);
+ 	PROC_LOCK_ASSERT(p, MA_OWNED);
+ 	KASSERT(p->p_procdesc != NULL, ("procdesc_exit: p_procdesc NULL"));
+ 
+ 	pd = p->p_procdesc;
+ 
+ 	PROCDESC_LOCK(pd);
+-	KASSERT((pd->pd_flags & PDF_CLOSED) == 0 || p->p_pptr == initproc,
++	KASSERT((pd->pd_flags & PDF_CLOSED) == 0 || p->p_pptr == V_initproc,
+ 	    ("procdesc_exit: closed && parent not init"));
+ 
+ 	pd->pd_flags |= PDF_EXITED;
+@@ -331,7 +331,7 @@ procdesc_reap(struct proc *p)
+ {
+ 	struct procdesc *pd;
+ 
+-	sx_assert(&proctree_lock, SA_XLOCKED);
++	sx_assert(&V_proctree_lock, SA_XLOCKED);
+ 	KASSERT(p->p_procdesc != NULL, ("procdesc_reap: p_procdesc == NULL"));
+ 
+ 	pd = p->p_procdesc;
+@@ -357,7 +357,7 @@ procdesc_close(struct file *fp, struct t
+ 	fp->f_ops = &badfileops;
+ 	fp->f_data = NULL;
+ 
+-	sx_xlock(&proctree_lock);
++	sx_xlock(&V_proctree_lock);
+ 	PROCDESC_LOCK(pd);
+ 	pd->pd_flags |= PDF_CLOSED;
+ 	PROCDESC_UNLOCK(pd);
+@@ -367,7 +367,7 @@ procdesc_close(struct file *fp, struct t
+ 		 * This is the case where process' exit status was already
+ 		 * collected and procdesc_reap() was already called.
+ 		 */
+-		sx_xunlock(&proctree_lock);
++		sx_xunlock(&V_proctree_lock);
+ 	} else if (p->p_state == PRS_ZOMBIE) {
+ 		/*
+ 		 * If the process is already dead and just awaiting reaping,
+@@ -396,11 +396,11 @@ procdesc_close(struct file *fp, struct t
+ 		 * pick up the pieces; finally, terminate with prejudice.
+ 		 */
+ 		p->p_sigparent = SIGCHLD;
+-		proc_reparent(p, initproc);
++		proc_reparent(p, V_initproc);
+ 		if ((pd->pd_flags & PDF_DAEMON) == 0)
+ 			kern_psignal(p, SIGKILL);
+ 		PROC_UNLOCK(p);
+-		sx_xunlock(&proctree_lock);
++		sx_xunlock(&V_proctree_lock);
+ 	}
+ 
+ 	/*
+@@ -483,13 +483,13 @@ procdesc_stat(struct file *fp, struct st
+ 	 */
+ 	bzero(sb, sizeof(*sb));
+ 	pd = fp->f_data;
+-	sx_slock(&proctree_lock);
++	sx_slock(&V_proctree_lock);
+ 	if (pd->pd_proc != NULL) {
+ 		PROC_LOCK(pd->pd_proc);
+ 
+ 		/* Set birth and [acm] times to process start time. */
+ 		pstart = pd->pd_proc->p_stats->p_start;
+-		timevaladd(&pstart, &boottime);
++		timevaladd(&pstart, &V_boottime);
+ 		TIMEVAL_TO_TIMESPEC(&pstart, &sb->st_birthtim);
+ 		sb->st_atim = sb->st_birthtim;
+ 		sb->st_ctim = sb->st_birthtim;
+@@ -503,7 +503,7 @@ procdesc_stat(struct file *fp, struct st
+ 		PROC_UNLOCK(pd->pd_proc);
+ 	} else
+ 		sb->st_mode = S_IFREG;
+-	sx_sunlock(&proctree_lock);
++	sx_sunlock(&V_proctree_lock);
+ 	return (0);
+ }
+ 

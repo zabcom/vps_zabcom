@@ -1,0 +1,12 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/etc/mtree/BSD.include.dist trunk-clean/etc/mtree/BSD.include.dist
+--- 10.0.0-stripped/etc/mtree/BSD.include.dist	2014-01-15 14:19:03.000000000 +0100
++++ trunk-clean/etc/mtree/BSD.include.dist	2014-01-15 14:31:06.000000000 +0100
+@@ -337,6 +337,8 @@
+     ..
+     vm
+     ..
++    vps
++    ..
+     xlocale
+     ..
+ ..

@@ -1,0 +1,30 @@
+diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/net/vnet.c trunk-clean/sys/net/vnet.c
+--- 10.0.0-stripped/sys/net/vnet.c	2014-01-15 14:20:21.000000000 +0100
++++ trunk-clean/sys/net/vnet.c	2014-01-15 14:31:33.000000000 +0100
+@@ -66,6 +66,8 @@ __FBSDID("$FreeBSD: release/10.0.0/sys/n
+ #include <net/if_var.h>
+ #include <net/vnet.h>
+ 
++extern struct prison prison0;
++
+ /*-
+  * This file implements core functions for virtual network stacks:
+  *
+@@ -505,6 +507,17 @@ vnet_sysctl_handle_uint(SYSCTL_HANDLER_A
+ 	return (sysctl_handle_int(oidp, arg1, arg2, req));
+ }
+ 
++#ifdef VPS
++int
++vnet_sysctl_handle_long(SYSCTL_HANDLER_ARGS)
++{
++
++	if (arg1 != NULL)
++		arg1 = (void *)(curvnet->vnet_data_base + (uintptr_t)arg1);
++	return (sysctl_handle_long(oidp, arg1, arg2, req));
++}
++#endif
++
+ /*
+  * Support for special SYSINIT handlers registered via VNET_SYSINIT()
+  * and VNET_SYSUNINIT().
