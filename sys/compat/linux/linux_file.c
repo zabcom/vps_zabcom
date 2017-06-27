@@ -53,6 +53,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/vnode.h>
 
+#include <vps/vps.h>
+
 #ifdef COMPAT_LINUX32
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
@@ -149,17 +151,17 @@ linux_common_open(struct thread *td, int dirfd, char *path, int l_flags, int mod
 			fdrop(fp, td);
 			goto done;
 		}
-		sx_slock(&proctree_lock);
+		sx_slock(&V_proctree_lock);
 		PROC_LOCK(p);
 		if (SESS_LEADER(p) && !(p->p_flag & P_CONTROLT)) {
 			PROC_UNLOCK(p);
-			sx_sunlock(&proctree_lock);
+			sx_sunlock(&V_proctree_lock);
 			/* XXXPJD: Verify if TIOCSCTTY is allowed. */
 			(void) fo_ioctl(fp, TIOCSCTTY, (caddr_t) 0,
 			    td->td_ucred, td);
 		} else {
 			PROC_UNLOCK(p);
-			sx_sunlock(&proctree_lock);
+			sx_sunlock(&V_proctree_lock);
 		}
 		fdrop(fp, td);
 	}

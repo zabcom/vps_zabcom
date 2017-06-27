@@ -78,6 +78,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/vnode.h>
 #include <sys/bus.h>
 
+#include <vps/vps.h>
+
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/if_types.h>
@@ -106,6 +108,9 @@ __FBSDID("$FreeBSD$");
 #include <compat/linux/linux_util.h>
 #include <fs/pseudofs/pseudofs.h>
 #include <fs/procfs/procfs.h>
+
+#define	V_msginfo	VPSV(msginfo)
+#define	V_seminfo	VPSV(seminfo)
 
 /*
  * Various conversion macros
@@ -617,8 +622,8 @@ linprocfs_doloadavg(PFS_FILL_ARGS)
 	    (int)(averunnable.ldavg[2] / averunnable.fscale),
 	    (int)(averunnable.ldavg[2] * 100 / averunnable.fscale % 100),
 	    1,				/* number of running tasks */
-	    nprocs,			/* number of tasks */
-	    lastpid			/* the last pid */
+	    VPSV(nprocs),		/* number of tasks */
+	    VPSV(lastpid)		/* the last pid */
 	);
 	return (0);
 }
@@ -1247,7 +1252,7 @@ static int
 linprocfs_domsgmni(PFS_FILL_ARGS)
 {
 
-	sbuf_printf(sb, "%d\n", msginfo.msgmni);
+	sbuf_printf(sb, "%d\n", V_msginfo.msgmni);
 	return (0);
 }
 
@@ -1269,8 +1274,8 @@ static int
 linprocfs_dosem(PFS_FILL_ARGS)
 {
 
-	sbuf_printf(sb, "%d %d %d %d\n", seminfo.semmsl, seminfo.semmns,
-	    seminfo.semopm, seminfo.semmni);
+	sbuf_printf(sb, "%d %d %d %d\n", V_seminfo.semmsl, V_seminfo.semmns,
+	    V_seminfo.semopm, V_seminfo.semmni);
 	return (0);
 }
 

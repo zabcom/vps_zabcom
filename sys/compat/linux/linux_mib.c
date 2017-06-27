@@ -41,6 +41,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/sx.h>
 
+#include <vps/vps.h>
+
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_misc.h>
 
@@ -171,7 +173,7 @@ linux_find_prison(struct prison *spr, struct prison **prp)
 
 	for (pr = spr;; pr = pr->pr_parent) {
 		mtx_lock(&pr->pr_mtx);
-		lpr = (pr == &prison0)
+		lpr = (pr == &V_prison0)
 		    ? &lprison0
 		    : osd_jail_get(pr, linux_osd_jail_slot);
 		if (lpr != NULL)
@@ -436,7 +438,7 @@ linux_osd_jail_register(void)
 	    osd_jail_register(linux_prison_destructor, methods);
 	/* Copy the system linux info to any current prisons. */
 	sx_slock(&allprison_lock);
-	TAILQ_FOREACH(pr, &allprison, pr_list)
+	TAILQ_FOREACH(pr, &V_allprison, pr_list)
 		linux_alloc_prison(pr, NULL);
 	sx_sunlock(&allprison_lock);
 }

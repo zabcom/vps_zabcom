@@ -50,6 +50,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 
+#include <vps/vps.h>
+
 #ifdef COMPAT_LINUX32
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
@@ -228,11 +230,11 @@ linux_clone_proc(struct thread *td, struct linux_clone_args *args)
 	 * the same as that of the calling process.
 	 */
 	if (args->flags & LINUX_CLONE_PARENT) {
-		sx_xlock(&proctree_lock);
+		sx_xlock(&V_proctree_lock);
 		PROC_LOCK(p2);
 		proc_reparent(p2, td->td_proc->p_pptr);
 		PROC_UNLOCK(p2);
-		sx_xunlock(&proctree_lock);
+		sx_xunlock(&V_proctree_lock);
 	}
 
 #ifdef DEBUG
