@@ -1,3 +1,6 @@
+!
+! Seems obsolete.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/fs/procfs/procfs_ctl.c trunk-clean/sys/fs/procfs/procfs_ctl.c
 --- 10.0.0-stripped/sys/fs/procfs/procfs_ctl.c	2014-01-15 14:19:15.000000000 +0100
 +++ trunk-clean/sys/fs/procfs/procfs_ctl.c	2014-01-15 14:31:12.000000000 +0100
@@ -36,6 +39,7 @@ diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-strippe
  		if (p->p_oppid != p->p_pptr->p_pid) {
  			struct proc *pp;
  
+
 @@ -236,7 +237,7 @@ out:
  			PROC_LOCK(p);
  		p->p_oppid = 0;

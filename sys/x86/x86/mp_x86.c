@@ -1127,6 +1127,8 @@ ipi_bitmap_handler(struct trapframe frame)
 #ifdef COUNT_IPIS
 		(*ipi_preempt_counts[cpu])++;
 #endif
+		if (TRAPF_USERMODE(&frame) == 0)
+			curthread->td_flags |= TDF_PREEMPTED;
 		sched_preempt(td);
 	}
 	if (ipi_bitmap & (1 << IPI_AST)) {

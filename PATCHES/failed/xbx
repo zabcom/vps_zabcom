@@ -1,3 +1,6 @@
+!
+! Seems obsolete.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/fs/procfs/procfs_status.c trunk-clean/sys/fs/procfs/procfs_status.c
 --- 10.0.0-stripped/sys/fs/procfs/procfs_status.c	2014-01-15 14:19:15.000000000 +0100
 +++ trunk-clean/sys/fs/procfs/procfs_status.c	2014-01-15 14:31:12.000000000 +0100

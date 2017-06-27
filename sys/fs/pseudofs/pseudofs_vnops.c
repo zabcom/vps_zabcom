@@ -49,6 +49,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/vnode.h>
 
+#include <vps/vps.h>
+
 #include <fs/pseudofs/pseudofs.h>
 #include <fs/pseudofs/pseudofs_internal.h>
 
@@ -703,7 +705,7 @@ pfs_iterate(struct thread *td, struct proc *proc, struct pfs_node *pd,
 {
 	int visible;
 
-	sx_assert(&allproc_lock, SX_SLOCKED);
+	sx_assert(&V_allproc_lock, SX_SLOCKED);
 	pfs_assert_owned(pd);
  again:
 	if (*pn == NULL) {
@@ -789,12 +791,12 @@ pfs_readdir(struct vop_readdir_args *va)
 	if (resid == 0)
 		PFS_RETURN (0);
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	pfs_lock(pd);
 
         /* check if the directory is visible to the caller */
         if (!pfs_visible(curthread, pd, pid, true, &proc)) {
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		pfs_unlock(pd);
                 PFS_RETURN (ENOENT);
 	}
@@ -808,7 +810,7 @@ pfs_readdir(struct vop_readdir_args *va)
 			if (proc != NULL)
 				PROC_UNLOCK(proc);
 			pfs_unlock(pd);
-			sx_sunlock(&allproc_lock);
+			sx_sunlock(&V_allproc_lock);
 			PFS_RETURN (0);
 		}
 	}
@@ -858,7 +860,7 @@ pfs_readdir(struct vop_readdir_args *va)
 	if (proc != NULL)
 		PROC_UNLOCK(proc);
 	pfs_unlock(pd);
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 	i = 0;
 	STAILQ_FOREACH_SAFE(pfsent, &lst, link, pfsent2) {
 		if (error == 0)

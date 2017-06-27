@@ -1,3 +1,6 @@
+!
+! SVR4 is gone from HEAD.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/compat/svr4/svr4_misc.c trunk-clean/sys/compat/svr4/svr4_misc.c
 --- 10.0.0-stripped/sys/compat/svr4/svr4_misc.c	2014-01-15 14:19:22.000000000 +0100
 +++ trunk-clean/sys/compat/svr4/svr4_misc.c	2014-01-15 14:31:32.000000000 +0100

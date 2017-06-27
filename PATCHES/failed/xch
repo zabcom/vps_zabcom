@@ -1,3 +1,6 @@
+!
+! Obsolete as it's in x86/x86 and amd64 one got merged.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/i386/i386/identcpu.c trunk-clean/sys/i386/i386/identcpu.c
 --- 10.0.0-stripped/sys/i386/i386/identcpu.c	2014-01-15 14:19:23.000000000 +0100
 +++ trunk-clean/sys/i386/i386/identcpu.c	2014-01-15 14:31:35.000000000 +0100

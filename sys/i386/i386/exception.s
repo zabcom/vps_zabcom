@@ -233,7 +233,11 @@ IDTVEC(lcall_syscall)
 	pushfl				/* save eflags */
 	popl	8(%esp)			/* shuffle into tf_eflags */
 	pushl	$7			/* sizeof "lcall 7,0" */
+#ifdef VPS
+	pushl	$0x80
+#else
 	pushl	$0			/* tf_trapno */
+#endif
 	pushal
 	pushl	$0
 	movw	%ds,(%esp)
@@ -262,7 +266,11 @@ IDTVEC(lcall_syscall)
 	SUPERALIGN_TEXT
 IDTVEC(int0x80_syscall)
 	pushl	$2			/* sizeof "int 0x80" */
+#ifdef VPS
+	pushl	$0x80
+#else
 	pushl	$0			/* tf_trapno */
+#endif
 	pushal
 	pushl	$0
 	movw	%ds,(%esp)

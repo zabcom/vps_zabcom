@@ -45,6 +45,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
 
+#include <vps/vps.h>
+
 #include <ddb/ddb.h>
 
 static void	dumpthread(volatile struct proc *p, volatile struct thread *td,
@@ -87,10 +89,10 @@ db_ps(db_expr_t addr, bool hasaddr, db_expr_t count, char *modif)
 	char state[9];
 	int np, rflag, sflag, dflag, lflag, wflag;
 
-	np = nprocs;
+	np = V_nprocs;
 
-	if (!LIST_EMPTY(&allproc))
-		p = LIST_FIRST(&allproc);
+	if (!LIST_EMPTY(&V_allproc))
+		p = LIST_FIRST(&V_allproc);
 	else
 		p = &proc0;
 
@@ -214,7 +216,7 @@ db_ps(db_expr_t addr, bool hasaddr, db_expr_t count, char *modif)
 
 		p = LIST_NEXT(p, p_list);
 		if (p == NULL && np > 0)
-			p = LIST_FIRST(&zombproc);
+			p = LIST_FIRST(&V_zombproc);
 	}
 }
 
@@ -394,6 +396,11 @@ DB_SHOW_COMMAND(thread, db_show_thread)
 		db_printf(" last involuntary switch: %d ms ago\n",
 		    1000 * delta / hz);
 	}
+#ifdef VPS
+	db_printf(" td_vps: %p\n", td->td_vps);
+	if (td->td_ucred)
+		db_printf(" td_ucred->cr_vps: %p\n", td->td_ucred->cr_vps);
+#endif
 }
 
 DB_SHOW_COMMAND(proc, db_show_proc)
