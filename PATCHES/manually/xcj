@@ -1,3 +1,6 @@
+!
+! Contains lots of whitespace changes noise; only merged the G_.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/i386/i386/pmap.c trunk-clean/sys/i386/i386/pmap.c
 --- 10.0.0-stripped/sys/i386/i386/pmap.c	2014-01-15 14:19:23.000000000 +0100
 +++ trunk-clean/sys/i386/i386/pmap.c	2014-01-15 14:31:35.000000000 +0100

@@ -96,10 +96,19 @@ TASKQUEUE_DEFINE_THREAD(kqueue_ctx);
 
 static int	kevent_copyout(void *arg, struct kevent *kevp, int count);
 static int	kevent_copyin(void *arg, struct kevent *kevp, int count);
-static int	kqueue_register(struct kqueue *kq, struct kevent *kev,
+#ifndef VPS
+static
+#endif
+int		kqueue_register(struct kqueue *kq, struct kevent *kev,
 		    struct thread *td, int waitok);
-static int	kqueue_acquire(struct file *fp, struct kqueue **kqp);
-static void	kqueue_release(struct kqueue *kq, int locked);
+#ifndef VPS
+static
+#endif
+int		kqueue_acquire(struct file *fp, struct kqueue **kqp);
+#ifndef VPS
+static
+#endif
+void		kqueue_release(struct kqueue *kq, int locked);
 static void	kqueue_destroy(struct kqueue *kq);
 static void	kqueue_drain(struct kqueue *kq, struct thread *td);
 static int	kqueue_expand(struct kqueue *kq, struct filterops *fops,
@@ -1300,7 +1309,10 @@ kqueue_fo_release(int filt)
  * influence if memory allocation should wait.  Make sure it is 0 if you
  * hold any mutexes.
  */
-static int
+#ifndef VPS
+static
+#endif
+int
 kqueue_register(struct kqueue *kq, struct kevent *kev, struct thread *td, int waitok)
 {
 	struct filterops *fops;
@@ -1555,7 +1567,10 @@ done:
 	return (error);
 }
 
-static int
+#ifndef VPS
+static
+#endif
+int
 kqueue_acquire(struct file *fp, struct kqueue **kqp)
 {
 	int error;
@@ -1578,7 +1593,10 @@ kqueue_acquire(struct file *fp, struct kqueue **kqp)
 	return error;
 }
 
-static void
+#ifndef VPS
+static
+#endif
+void
 kqueue_release(struct kqueue *kq, int locked)
 {
 	if (locked)

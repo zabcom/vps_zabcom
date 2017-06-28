@@ -87,6 +87,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/vm.h>
 
+#include <vps/vps.h>
+
 #include <ddb/ddb.h>
 
 static MALLOC_DEFINE(M_FILEDESC, "filedesc", "Open file descriptor table");
@@ -104,10 +106,17 @@ static int	closefp(struct filedesc *fdp, int fd, struct file *fp,
 		    struct thread *td, int holdleaders);
 static int	fd_first_free(struct filedesc *fdp, int low, int size);
 static int	fd_last_used(struct filedesc *fdp, int size);
+#ifdef VPS
+void		fdgrowtable(struct filedesc *fdp, int nfd);
+static void	fdgrowtable_exp(struct filedesc *fdp, int nfd);
+void		fdunused(struct filedesc *fdp, int fd);
+void		fdused(struct filedesc *fdp, int fd);
+#else
 static void	fdgrowtable(struct filedesc *fdp, int nfd);
 static void	fdgrowtable_exp(struct filedesc *fdp, int nfd);
 static void	fdunused(struct filedesc *fdp, int fd);
 static void	fdused(struct filedesc *fdp, int fd);
+#endif /* !VPS */
 static int	getmaxfd(struct thread *td);
 
 /*
@@ -246,7 +255,10 @@ fdused_init(struct filedesc *fdp, int fd)
 	fdp->fd_map[NDSLOT(fd)] |= NDBIT(fd);
 }
 
-static void
+#ifndef VPS
+static
+#endif
+void
 fdused(struct filedesc *fdp, int fd)
 {
 
@@ -262,7 +274,10 @@ fdused(struct filedesc *fdp, int fd)
 /*
  * Mark a file descriptor as unused.
  */
-static void
+#ifndef VPS
+static
+#endif
+void
 fdunused(struct filedesc *fdp, int fd)
 {
 
@@ -1056,7 +1071,7 @@ fsetown(pid_t pgid, struct sigio **sigiop)
 	sigio->sio_ucred = crhold(curthread->td_ucred);
 	sigio->sio_myref = sigiop;
 
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 	if (pgid > 0) {
 		proc = pfind(pgid);
 		if (proc == NULL) {
@@ -1124,14 +1139,14 @@ fsetown(pid_t pgid, struct sigio **sigiop)
 		sigio->sio_pgrp = pgrp;
 		PGRP_UNLOCK(pgrp);
 	}
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 	SIGIO_LOCK();
 	*sigiop = sigio;
 	SIGIO_UNLOCK();
 	return (0);
 
 fail:
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 	crfree(sigio->sio_ucred);
 	free(sigio, M_SIGIO);
 	return (ret);
@@ -1562,7 +1577,10 @@ fdgrowtable_exp(struct filedesc *fdp, int nfd)
 /*
  * Grow the file table to accommodate (at least) nfd descriptors.
  */
-static void
+#ifndef VPS
+static
+#endif
+void
 fdgrowtable(struct filedesc *fdp, int nfd)
 {
 	struct filedesc0 *fdp0;
@@ -3129,7 +3147,7 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 	if (vrefcnt(olddp) == 1)
 		return;
 	nrele = 0;
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		PROC_LOCK(p);
 		fdp = fdhold(p);
@@ -3155,21 +3173,21 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 		FILEDESC_XUNLOCK(fdp);
 		fddrop(fdp);
 	}
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 	if (rootvnode == olddp) {
 		vrefact(newdp);
 		rootvnode = newdp;
 		nrele++;
 	}
-	mtx_lock(&prison0.pr_mtx);
-	if (prison0.pr_root == olddp) {
+	mtx_lock(&V_prison0.pr_mtx);
+	if (V_prison0.pr_root == olddp) {
 		vrefact(newdp);
-		prison0.pr_root = newdp;
+		V_prison0.pr_root = newdp;
 		nrele++;
 	}
-	mtx_unlock(&prison0.pr_mtx);
-	sx_slock(&allprison_lock);
-	TAILQ_FOREACH(pr, &allprison, pr_list) {
+	mtx_unlock(&V_prison0.pr_mtx);
+	sx_slock(&V_allprison_lock);
+	TAILQ_FOREACH(pr, &V_allprison, pr_list) {
 		mtx_lock(&pr->pr_mtx);
 		if (pr->pr_root == olddp) {
 			vrefact(newdp);
@@ -3178,7 +3196,7 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 		}
 		mtx_unlock(&pr->pr_mtx);
 	}
-	sx_sunlock(&allprison_lock);
+	sx_sunlock(&V_allprison_lock);
 	while (nrele--)
 		vrele(olddp);
 }
@@ -3249,7 +3267,7 @@ sysctl_kern_file(SYSCTL_HANDLER_ARGS)
 		return (error);
 	if (req->oldptr == NULL) {
 		n = 0;
-		sx_slock(&allproc_lock);
+		sx_slock(&V_allproc_lock);
 		FOREACH_PROC_IN_SYSTEM(p) {
 			PROC_LOCK(p);
 			if (p->p_state == PRS_NEW) {
@@ -3265,13 +3283,13 @@ sysctl_kern_file(SYSCTL_HANDLER_ARGS)
 				n += fdp->fd_lastfile;
 			fddrop(fdp);
 		}
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (SYSCTL_OUT(req, 0, n * sizeof(xf)));
 	}
 	error = 0;
 	bzero(&xf, sizeof(xf));
 	xf.xf_size = sizeof(xf);
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		PROC_LOCK(p);
 		if (p->p_state == PRS_NEW) {
@@ -3310,7 +3328,7 @@ sysctl_kern_file(SYSCTL_HANDLER_ARGS)
 		if (error)
 			break;
 	}
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 	return (error);
 }
 

@@ -1,3 +1,7 @@
+!
+! Line 149 of the patch contains a bug; needs {}
+! Contains whitespace noise.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/kern/kern_exit.c trunk-clean/sys/kern/kern_exit.c
 --- 10.0.0-stripped/sys/kern/kern_exit.c	2014-01-15 14:20:25.000000000 +0100
 +++ trunk-clean/sys/kern/kern_exit.c	2014-01-15 14:31:10.000000000 +0100

@@ -83,6 +83,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/vm_domain.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+#include <vps/vps_account.h>
+
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
 dtrace_fork_func_t	dtrace_fasttrap_fork;
@@ -181,10 +185,23 @@ sys_rfork(struct thread *td, struct rfork_args *uap)
 	return (error);
 }
 
-int	nprocs = 1;		/* process 0 */
-int	lastpid = 0;
-SYSCTL_INT(_kern, OID_AUTO, lastpid, CTLFLAG_RD, &lastpid, 0, 
-    "Last used PID");
+VPS_DEFINE(int, nprocs) = 1;	/* process 0 */
+VPS_DEFINE(int, lastpid) = 0;
+#define V_lastpid 	VPSV(lastpid)
+
+VPS_DEFINE(int, pidchecked) = 0;
+#define V_pidchecked	VPSV(pidchecked)
+
+VPS_DEFINE(int, curfail) = 0;
+VPS_DEFINE(struct timeval, lastfail) = { 0, 0 };
+#define V_curfail  	VPSV(curfail)
+#define V_lastfail	VPSV(lastfail)
+
+VPS_DEFINE(int, nprocs_zomb) = 0;
+
+SYSCTL_VPS_INT(_kern, OID_AUTO, lastpid, CTLFLAG_RD, &VPS_NAME(lastpid),
+      0, "Last used PID");
+
 
 /*
  * Random component to lastpid generation.  We mix in a random factor to make
@@ -194,7 +211,8 @@ SYSCTL_INT(_kern, OID_AUTO, lastpid, CTLFLAG_RD, &lastpid, 0,
  * modulus that is too big causes a LOT more process table scans and slows
  * down fork processing as the pidchecked caching is defeated.
  */
-static int randompid = 0;
+VPS_DEFINE(int, randompid) = 0;
+#define V_randompid	VPSV(randompid)
 
 static int
 sysctl_kern_randompid(SYSCTL_HANDLER_ARGS)
@@ -204,8 +222,8 @@ sysctl_kern_randompid(SYSCTL_HANDLER_ARGS)
 	error = sysctl_wire_old_buffer(req, sizeof(int));
 	if (error != 0)
 		return(error);
-	sx_xlock(&allproc_lock);
-	pid = randompid;
+	sx_xlock(&V_allproc_lock);
+	pid = V_randompid;
 	error = sysctl_handle_int(oidp, &pid, 0, req);
 	if (error == 0 && req->newptr != NULL) {
 		if (pid < 0 || pid > pid_max - 100)	/* out of range */
@@ -214,9 +232,9 @@ sysctl_kern_randompid(SYSCTL_HANDLER_ARGS)
 			pid = 0;
 		else if (pid < 100)			/* Make it reasonable */
 			pid = 100;
-		randompid = pid;
+		V_randompid = pid;
 	}
-	sx_xunlock(&allproc_lock);
+	sx_xunlock(&V_allproc_lock);
 	return (error);
 }
 
@@ -228,14 +246,13 @@ fork_findpid(int flags)
 {
 	struct proc *p;
 	int trypid;
-	static int pidchecked = 0;
 
 	/*
 	 * Requires allproc_lock in order to iterate over the list
 	 * of processes, and proctree_lock to access p_pgrp.
 	 */
-	sx_assert(&allproc_lock, SX_LOCKED);
-	sx_assert(&proctree_lock, SX_LOCKED);
+	sx_assert(&V_allproc_lock, SX_LOCKED);
+	sx_assert(&V_proctree_lock, SX_LOCKED);
 
 	/*
 	 * Find an unused process ID.  We remember a range of unused IDs
@@ -244,13 +261,13 @@ fork_findpid(int flags)
 	 * If RFHIGHPID is set (used during system boot), do not allocate
 	 * low-numbered pids.
 	 */
-	trypid = lastpid + 1;
+	trypid = V_lastpid + 1;
 	if (flags & RFHIGHPID) {
 		if (trypid < 10)
 			trypid = 10;
 	} else {
-		if (randompid)
-			trypid += arc4random() % randompid;
+		if (V_randompid)
+			trypid += arc4random() % V_randompid;
 	}
 retry:
 	/*
@@ -262,12 +279,12 @@ retry:
 		trypid = trypid % pid_max;
 		if (trypid < 100)
 			trypid += 100;
-		pidchecked = 0;
+		V_pidchecked = 0;
 	}
-	if (trypid >= pidchecked) {
+	if (trypid >= V_pidchecked) {
 		int doingzomb = 0;
 
-		pidchecked = PID_MAX;
+		V_pidchecked = PID_MAX;
 		/*
 		 * Scan the active and zombie procs to check whether this pid
 		 * is in use.  Remember the lowest pid that's greater
@@ -282,7 +299,7 @@ retry:
 		 * reserved pids is limited by process limit times
 		 * two.
 		 */
-		p = LIST_FIRST(&allproc);
+		p = LIST_FIRST(&V_allproc);
 again:
 		for (; p != NULL; p = LIST_NEXT(p, p_list)) {
 			while (p->p_pid == trypid ||
@@ -292,24 +309,24 @@ again:
 			    (p->p_session != NULL &&
 			    p->p_session->s_sid == trypid)))) {
 				trypid++;
-				if (trypid >= pidchecked)
+				if (trypid >= V_pidchecked)
 					goto retry;
 			}
-			if (p->p_pid > trypid && pidchecked > p->p_pid)
-				pidchecked = p->p_pid;
+			if (p->p_pid > trypid && V_pidchecked > p->p_pid)
+				V_pidchecked = p->p_pid;
 			if (p->p_pgrp != NULL) {
 				if (p->p_pgrp->pg_id > trypid &&
-				    pidchecked > p->p_pgrp->pg_id)
-					pidchecked = p->p_pgrp->pg_id;
+				    V_pidchecked > p->p_pgrp->pg_id)
+					V_pidchecked = p->p_pgrp->pg_id;
 				if (p->p_session != NULL &&
 				    p->p_session->s_sid > trypid &&
-				    pidchecked > p->p_session->s_sid)
-					pidchecked = p->p_session->s_sid;
+				    V_pidchecked > p->p_session->s_sid)
+					V_pidchecked = p->p_session->s_sid;
 			}
 		}
 		if (!doingzomb) {
 			doingzomb = 1;
-			p = LIST_FIRST(&zombproc);
+			p = LIST_FIRST(&V_zombproc);
 			goto again;
 		}
 	}
@@ -318,9 +335,9 @@ again:
 	 * RFHIGHPID does not mess with the lastpid counter during boot.
 	 */
 	if (flags & RFHIGHPID)
-		pidchecked = 0;
+		V_pidchecked = 0;
 	else
-		lastpid = trypid;
+		V_lastpid = trypid;
 
 	return (trypid);
 }
@@ -385,26 +402,26 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	struct filedesc_to_leader *fdtol;
 	struct sigacts *newsigacts;
 
-	sx_assert(&proctree_lock, SX_SLOCKED);
-	sx_assert(&allproc_lock, SX_XLOCKED);
+	sx_assert(&V_proctree_lock, SX_SLOCKED);
+	sx_assert(&V_allproc_lock, SX_XLOCKED);
 
 	p1 = td->td_proc;
 
 	trypid = fork_findpid(fr->fr_flags);
 
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 
 	p2->p_state = PRS_NEW;		/* protect against others */
 	p2->p_pid = trypid;
 	AUDIT_ARG_PID(p2->p_pid);
-	LIST_INSERT_HEAD(&allproc, p2, p_list);
+	LIST_INSERT_HEAD(&V_allproc, p2, p_list);
 	allproc_gen++;
 	LIST_INSERT_HEAD(PIDHASH(p2->p_pid), p2, p_hash);
 	tidhash_add(td2);
 	PROC_LOCK(p2);
 	PROC_LOCK(p1);
 
-	sx_xunlock(&allproc_lock);
+	sx_xunlock(&V_allproc_lock);
 
 	bcopy(&p1->p_startcopy, &p2->p_startcopy,
 	    __rangeof(struct proc, p_startcopy, p_endcopy));
@@ -484,6 +501,10 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	td2->td_vnet = NULL;
 	td2->td_vnet_lpush = NULL;
 #endif
+#ifdef VPS
+	td2->td_vps = td->td_vps;
+	td2->td_vps_acc = td->td_vps->vps_acc;
+#endif
 
 	/*
 	 * Allow the scheduler to initialize the child.
@@ -553,11 +574,11 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	 * Set up linkage for kernel based threading.
 	 */
 	if ((fr->fr_flags & RFTHREAD) != 0) {
-		mtx_lock(&ppeers_lock);
+		mtx_lock(&V_ppeers_lock);
 		p2->p_peers = p1->p_peers;
 		p1->p_peers = p2;
 		p2->p_leader = p1->p_leader;
-		mtx_unlock(&ppeers_lock);
+		mtx_unlock(&V_ppeers_lock);
 		PROC_LOCK(p1->p_leader);
 		if ((p1->p_leader->p_flag & P_WEXIT) != 0) {
 			PROC_UNLOCK(p1->p_leader);
@@ -584,7 +605,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 		p2->p_leader = p2;
 	}
 
-	sx_xlock(&proctree_lock);
+	sx_xlock(&V_proctree_lock);
 	PGRP_LOCK(p1->p_pgrp);
 	PROC_LOCK(p2);
 	PROC_LOCK(p1);
@@ -647,7 +668,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	LIST_INSERT_HEAD(&p2->p_reaper->p_reaplist, p2, p_reapsibling);
 	if (p2->p_reaper == p1)
 		p2->p_reapsubtree = p2->p_pid;
-	sx_xunlock(&proctree_lock);
+	sx_xunlock(&V_proctree_lock);
 
 	/* Inform accounting that we have forked. */
 	p2->p_acflag = AFORK;
@@ -791,8 +812,6 @@ fork1(struct thread *td, struct fork_req *fr)
 	struct file *fp_procdesc;
 	vm_ooffset_t mem_charged;
 	int error, nprocs_new, ok;
-	static int curfail;
-	static struct timeval lastfail;
 	int flags, pages;
 
 	flags = fr->fr_flags;
@@ -862,17 +881,17 @@ fork1(struct thread *td, struct fork_req *fr)
 	 * Don't allow a nonprivileged user to use the last ten
 	 * processes; don't let root exceed the limit.
 	 */
-	nprocs_new = atomic_fetchadd_int(&nprocs, 1) + 1;
-	if ((nprocs_new >= maxproc - 10 && priv_check_cred(td->td_ucred,
-	    PRIV_MAXPROC, 0) != 0) || nprocs_new >= maxproc) {
+	nprocs_new = atomic_fetchadd_int(&V_nprocs, 1) + 1;
+	if ((nprocs_new >= V_maxproc - 10 && priv_check_cred(td->td_ucred,
+	    PRIV_MAXPROC, 0) != 0) || nprocs_new >= V_maxproc) {
 		error = EAGAIN;
-		sx_xlock(&allproc_lock);
-		if (ppsratecheck(&lastfail, &curfail, 1)) {
+		sx_xlock(&V_allproc_lock);
+		if (ppsratecheck(&V_lastfail, &V_curfail, 1)) {
 			printf("maxproc limit exceeded by uid %u (pid %d); "
 			    "see tuning(7) and login.conf(5)\n",
 			    td->td_ucred->cr_ruid, p1->p_pid);
 		}
-		sx_xunlock(&allproc_lock);
+		sx_xunlock(&V_allproc_lock);
 		goto fail2;
 	}
 
@@ -887,6 +906,19 @@ fork1(struct thread *td, struct fork_req *fr)
 		if (error != 0)
 			goto fail2;
 	}
+
+#ifdef VPS
+	if (vps_account(td->td_ucred->cr_vps, VPS_ACC_PROCS, VPS_ACC_ALLOC, 1)) {
+		error = ENOMEM;
+		goto fail2;
+	}
+	/* Assuming there will be only one thread. */
+	if (vps_account(td->td_ucred->cr_vps, VPS_ACC_THREADS, VPS_ACC_ALLOC, 1)) {
+		vps_account(td->td_ucred->cr_vps, VPS_ACC_PROCS, VPS_ACC_FREE, 1);
+		error = ENOMEM;
+		goto fail2;
+	}
+#endif
 
 	mem_charged = 0;
 	if (pages == 0)
@@ -954,8 +986,8 @@ fork1(struct thread *td, struct fork_req *fr)
 	STAILQ_INIT(&newproc->p_ktr);
 
 	/* We have to lock the process tree while we look for a pid. */
-	sx_slock(&proctree_lock);
-	sx_xlock(&allproc_lock);
+	sx_slock(&V_proctree_lock);
+	sx_xlock(&V_allproc_lock);
 
 	/*
 	 * Increment the count of procs running with this uid. Don't allow
@@ -972,12 +1004,16 @@ fork1(struct thread *td, struct fork_req *fr)
 	}
 	if (ok) {
 		do_fork(td, fr, newproc, td2, vm2, fp_procdesc);
+#ifdef VPS
+		if (td->td_flags & TDF_VPSSUSPEND)
+			return (EINTR);
+#endif
 		return (0);
 	}
 
 	error = EAGAIN;
-	sx_sunlock(&proctree_lock);
-	sx_xunlock(&allproc_lock);
+	sx_sunlock(&V_proctree_lock);
+	sx_xunlock(&V_allproc_lock);
 #ifdef MAC
 	mac_proc_destroy(newproc);
 #endif
@@ -993,7 +1029,7 @@ fail2:
 		fdclose(td, fp_procdesc, *fr->fr_pd_fd);
 		fdrop(fp_procdesc, td);
 	}
-	atomic_add_int(&nprocs, -1);
+	atomic_add_int(&V_nprocs, -1);
 	pause("fork", hz / 2);
 	return (error);
 }
@@ -1066,7 +1102,7 @@ fork_return(struct thread *td, struct trapframe *frame)
 
 	p = td->td_proc;
 	if (td->td_dbgflags & TDB_STOPATFORK) {
-		sx_xlock(&proctree_lock);
+		sx_xlock(&V_proctree_lock);
 		PROC_LOCK(p);
 		if (p->p_pptr->p_ptevents & PTRACE_FORK) {
 			/*
@@ -1079,7 +1115,7 @@ fork_return(struct thread *td, struct trapframe *frame)
 		    "fork_return: attaching to new child pid %d: oppid %d",
 			    p->p_pid, p->p_oppid);
 			proc_reparent(p, dbg);
-			sx_xunlock(&proctree_lock);
+			sx_xunlock(&V_proctree_lock);
 			td->td_dbgflags |= TDB_CHILD | TDB_SCX | TDB_FSTP;
 			ptracestop(td, SIGSTOP, NULL);
 			td->td_dbgflags &= ~(TDB_CHILD | TDB_SCX);
@@ -1087,7 +1123,7 @@ fork_return(struct thread *td, struct trapframe *frame)
 			/*
 			 * ... otherwise clear the request.
 			 */
-			sx_xunlock(&proctree_lock);
+			sx_xunlock(&V_proctree_lock);
 			td->td_dbgflags &= ~TDB_STOPATFORK;
 			cv_broadcast(&p->p_dbgwait);
 		}
