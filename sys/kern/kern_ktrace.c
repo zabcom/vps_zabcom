@@ -60,6 +60,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/syslog.h>
 #include <sys/sysproto.h>
 
+#include <vps/vps.h>
+
 #include <security/mac/mac_framework.h>
 
 /*
@@ -153,7 +155,10 @@ static void ktr_freerequest_locked(struct ktr_request *req);
 static void ktr_writerequest(struct thread *td, struct ktr_request *req);
 static int ktrcanset(struct thread *,struct proc *);
 static int ktrsetchildren(struct thread *,struct proc *,int,int,struct vnode *);
-static int ktrops(struct thread *,struct proc *,int,int,struct vnode *);
+#ifndef VPS
+static
+#endif
+int ktrops(struct thread *,struct proc *,int,int,struct vnode *);
 static void ktrprocctor_entered(struct thread *, struct proc *);
 
 /*
@@ -881,7 +886,7 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 		int vrele_count;
 
 		vrele_count = 0;
-		sx_slock(&allproc_lock);
+		sx_slock(&V_allproc_lock);
 		FOREACH_PROC_IN_SYSTEM(p) {
 			PROC_LOCK(p);
 			if (p->p_tracevp == vp) {
@@ -896,7 +901,7 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 			}
 			PROC_UNLOCK(p);
 		}
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		if (vrele_count > 0) {
 			while (vrele_count-- > 0)
 				vrele(vp);
@@ -906,14 +911,14 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 	/*
 	 * do it
 	 */
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 	if (uap->pid < 0) {
 		/*
 		 * by process group
 		 */
 		pg = pgfind(-uap->pid);
 		if (pg == NULL) {
-			sx_sunlock(&proctree_lock);
+			sx_sunlock(&V_proctree_lock);
 			error = ESRCH;
 			goto done;
 		}
@@ -937,7 +942,7 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 				ret |= ktrops(td, p, ops, facs, vp);
 		}
 		if (nfound == 0) {
-			sx_sunlock(&proctree_lock);
+			sx_sunlock(&V_proctree_lock);
 			error = ESRCH;
 			goto done;
 		}
@@ -953,7 +958,7 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 		if (error) {
 			if (p != NULL)
 				PROC_UNLOCK(p);
-			sx_sunlock(&proctree_lock);
+			sx_sunlock(&V_proctree_lock);
 			goto done;
 		}
 		if (descend)
@@ -961,7 +966,7 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 		else
 			ret |= ktrops(td, p, ops, facs, vp);
 	}
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 	if (!ret)
 		error = EPERM;
 done:
@@ -1009,7 +1014,10 @@ sys_utrace(struct thread *td, struct utrace_args *uap)
 }
 
 #ifdef KTRACE
-static int
+#ifndef VPS
+static
+#endif
+int
 ktrops(struct thread *td, struct proc *p, int ops, int facs, struct vnode *vp)
 {
 	struct vnode *tracevp = NULL;
@@ -1069,7 +1077,7 @@ ktrsetchildren(struct thread *td, struct proc *top, int ops, int facs,
 
 	p = top;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
-	sx_assert(&proctree_lock, SX_LOCKED);
+	sx_assert(&V_proctree_lock, SX_LOCKED);
 	for (;;) {
 		ret |= ktrops(td, p, ops, facs, vp);
 		/*
@@ -1196,7 +1204,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	 * credentials for the operation.
 	 */
 	cred = NULL;
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		PROC_LOCK(p);
 		if (p->p_tracevp == vp) {
@@ -1211,7 +1219,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 			cred = NULL;
 		}
 	}
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 
 	while (vrele_count-- > 0)
 		vrele(vp);

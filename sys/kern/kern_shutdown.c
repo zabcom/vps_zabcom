@@ -90,6 +90,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pager.h>
 #include <vm/swap_pager.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+
 #include <sys/signalvar.h>
 
 static MALLOC_DEFINE(M_DUMPER, "dumper", "dumper block buffer");
@@ -240,6 +243,17 @@ sys_reboot(struct thread *td, struct reboot_args *uap)
 #endif
 	if (error == 0)
 		error = priv_check(td, PRIV_REBOOT);
+#ifdef VPS
+	if (error == 0 && td->td_vps != vps0) {
+		error = vps_reboot(td, uap->opt);
+
+	} else if (error == 0) {
+		(void)vps_shutdown_all(td);
+		mtx_lock(&Giant);
+		kern_reboot(uap->opt);
+		mtx_unlock(&Giant);
+	}
+#else 
 	if (error == 0) {
 		if (uap->opt & RB_REROOT) {
 			error = kern_reroot();
@@ -249,6 +263,7 @@ sys_reboot(struct thread *td, struct reboot_args *uap)
 			mtx_unlock(&Giant);
 		}
 	}
+#endif
 	return (error);
 }
 
@@ -259,16 +274,16 @@ void
 shutdown_nice(int howto)
 {
 
-	if (initproc != NULL) {
+	if (V_initproc != NULL) {
 		/* Send a signal to init(8) and have it shutdown the world. */
-		PROC_LOCK(initproc);
+		PROC_LOCK(V_initproc);
 		if (howto & RB_POWEROFF)
-			kern_psignal(initproc, SIGUSR2);
+			kern_psignal(V_initproc, SIGUSR2);
 		else if (howto & RB_HALT)
-			kern_psignal(initproc, SIGUSR1);
+			kern_psignal(V_initproc, SIGUSR1);
 		else
-			kern_psignal(initproc, SIGINT);
-		PROC_UNLOCK(initproc);
+			kern_psignal(V_initproc, SIGINT);
+		PROC_UNLOCK(V_initproc);
 	} else {
 		/* No init(8) running, so simply reboot. */
 		kern_reboot(howto | RB_NOSYNC);
@@ -402,7 +417,7 @@ kern_reroot(void)
 	struct mount *mp, *devmp;
 	int error;
 
-	if (curproc != initproc)
+	if (curproc != V_initproc)
 		return (EPERM);
 
 	/*
@@ -1239,7 +1254,7 @@ mkdumpheader(struct kerneldumpheader *kdh, char *magic, uint32_t archver,
 	kdh->dumptime = htod64(time_second);
 	kdh->dumpkeysize = htod32(dumpkeysize);
 	kdh->blocksize = htod32(blksz);
-	strlcpy(kdh->hostname, prison0.pr_hostname, sizeof(kdh->hostname));
+	strlcpy(kdh->hostname, V_prison0.pr_hostname, sizeof(kdh->hostname));
 	strlcpy(kdh->versionstring, version, sizeof(kdh->versionstring));
 	if (panicstr != NULL)
 		strlcpy(kdh->panicstring, panicstr, sizeof(kdh->panicstring));

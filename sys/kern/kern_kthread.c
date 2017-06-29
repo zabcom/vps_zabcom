@@ -45,6 +45,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+
 #include <machine/stdarg.h>
 
 /*
@@ -154,11 +157,11 @@ kproc_exit(int ecode)
 	 * Reparent curthread from proc0 to init so that the zombie
 	 * is harvested.
 	 */
-	sx_xlock(&proctree_lock);
+	sx_xlock(&V_proctree_lock);
 	PROC_LOCK(p);
-	proc_reparent(p, initproc);
+	proc_reparent(p, V_initproc);
 	PROC_UNLOCK(p);
-	sx_xunlock(&proctree_lock);
+	sx_xunlock(&V_proctree_lock);
 
 	/*
 	 * Wakeup anyone waiting for us to exit.
@@ -289,6 +292,10 @@ kthread_add(void (*func)(void *), void *arg, struct proc *p,
 
 	newtd->td_pflags |= TDP_KTHREAD;
 	thread_cow_get_proc(newtd, p);
+#ifdef VPS
+	newtd->td_vps = newtd->td_ucred->cr_vps;
+	newtd->td_vps_acc = newtd->td_ucred->cr_vps->vps_acc;
+#endif
 
 	/* this code almost the same as create_thread() in kern_thr.c */
 	p->p_flag |= P_HADTHREADS;

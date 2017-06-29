@@ -70,6 +70,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+
 static MALLOC_DEFINE(M_SYSCTL, "sysctl", "sysctl internal magic");
 static MALLOC_DEFINE(M_SYSCTLOID, "sysctloid", "sysctl dynamic oids");
 static MALLOC_DEFINE(M_SYSCTLTMP, "sysctltmp", "sysctl temp output buffer");
@@ -696,7 +699,7 @@ struct sysctl_oid *
 sysctl_add_oid(struct sysctl_ctx_list *clist, struct sysctl_oid_list *parent,
 	int number, const char *name, int kind, void *arg1, intmax_t arg2,
 	int (*handler)(SYSCTL_HANDLER_ARGS), const char *fmt, const char *descr,
-	const char *label)
+	const char *label, u_int8_t vps0)
 {
 	struct sysctl_oid *oidp;
 
@@ -735,6 +738,9 @@ sysctl_add_oid(struct sysctl_ctx_list *clist, struct sysctl_oid_list *parent,
 		oidp->oid_descr = strdup(descr, M_SYSCTLOID);
 	if (label != NULL)
 		oidp->oid_label = strdup(label, M_SYSCTLOID);
+#ifdef VPS
+	oidp->vps0 = vps0;
+#endif
 	/* Update the context, if used */
 	if (clist != NULL)
 		sysctl_ctx_entry_add(clist, oidp);
@@ -957,8 +963,8 @@ sysctl_sysctl_name(SYSCTL_HANDLER_ARGS)
  * XXXRW/JA: Shouldn't return name data for nodes that we don't permit in
  * capability mode.
  */
-static SYSCTL_NODE(_sysctl, 1, name, CTLFLAG_RD | CTLFLAG_MPSAFE | CTLFLAG_CAPRD,
-    sysctl_sysctl_name, "");
+static _SYSCTL_NODE(_sysctl, 1, name, CTLFLAG_RD | CTLFLAG_MPSAFE | CTLFLAG_CAPRD,
+    sysctl_sysctl_name, "", VPS_PUBLIC);
 
 static int
 sysctl_sysctl_next_ls(struct sysctl_oid_list *lsp, int *name, u_int namelen, 
@@ -1044,8 +1050,8 @@ sysctl_sysctl_next(SYSCTL_HANDLER_ARGS)
  * XXXRW/JA: Shouldn't return next data for nodes that we don't permit in
  * capability mode.
  */
-static SYSCTL_NODE(_sysctl, 2, next, CTLFLAG_RD | CTLFLAG_MPSAFE | CTLFLAG_CAPRD,
-    sysctl_sysctl_next, "");
+static _SYSCTL_NODE(_sysctl, 2, next, CTLFLAG_RD | CTLFLAG_MPSAFE | CTLFLAG_CAPRD,
+    sysctl_sysctl_next, "", VPS_PUBLIC);
 
 static int
 name2oid(char *name, int *oid, int *len, struct sysctl_oid **oidpp)
@@ -1126,9 +1132,9 @@ sysctl_sysctl_name2oid(SYSCTL_HANDLER_ARGS)
  * XXXRW/JA: Shouldn't return name2oid data for nodes that we don't permit in
  * capability mode.
  */
-SYSCTL_PROC(_sysctl, 3, name2oid,
+_SYSCTL_PROC(_sysctl, 3, name2oid,
     CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_ANYBODY | CTLFLAG_MPSAFE
-    | CTLFLAG_CAPRW, 0, 0, sysctl_sysctl_name2oid, "I", "");
+    | CTLFLAG_CAPRW, 0, 0, sysctl_sysctl_name2oid, "I", "", VPS_PUBLIC);
 
 static int
 sysctl_sysctl_oidfmt(SYSCTL_HANDLER_ARGS)
@@ -1156,8 +1162,8 @@ sysctl_sysctl_oidfmt(SYSCTL_HANDLER_ARGS)
 }
 
 
-static SYSCTL_NODE(_sysctl, 4, oidfmt, CTLFLAG_RD|CTLFLAG_MPSAFE|CTLFLAG_CAPRD,
-    sysctl_sysctl_oidfmt, "");
+static _SYSCTL_NODE(_sysctl, 4, oidfmt, CTLFLAG_RD|CTLFLAG_MPSAFE|CTLFLAG_CAPRD,
+    sysctl_sysctl_oidfmt, "", VPS_PUBLIC);
 
 static int
 sysctl_sysctl_oiddescr(SYSCTL_HANDLER_ARGS)
@@ -1181,8 +1187,8 @@ sysctl_sysctl_oiddescr(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-static SYSCTL_NODE(_sysctl, 5, oiddescr, CTLFLAG_RD|CTLFLAG_MPSAFE|CTLFLAG_CAPRD,
-    sysctl_sysctl_oiddescr, "");
+static _SYSCTL_NODE(_sysctl, 5, oiddescr, CTLFLAG_RD|CTLFLAG_MPSAFE|CTLFLAG_CAPRD,
+    sysctl_sysctl_oiddescr, "", VPS_PUBLIC);
 
 static int
 sysctl_sysctl_oidlabel(SYSCTL_HANDLER_ARGS)
@@ -1823,6 +1829,16 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 	error = sysctl_find_oid(arg1, arg2, &oid, &indx, req);
 	if (error)
 		goto out;
+
+#ifdef VPS
+	if (req->td->td_vps != vps0 && oid->vps0 != 0) {
+
+		DBGCORE("%s: hiding [%s (%s)]\n",
+			__func__, oid->oid_name, oid->oid_descr);
+
+		return (ENOENT);
+	}
+#endif
 
 	if ((oid->oid_kind & CTLTYPE) == CTLTYPE_NODE) {
 		/*
