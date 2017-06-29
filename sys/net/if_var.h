@@ -714,6 +714,10 @@ int    ether_poll_register(poll_handler_t *h, if_t ifp);
 int    ether_poll_deregister(if_t ifp);
 #endif /* DEVICE_POLLING */
 
+#ifdef VPS
+int if_vmove_vps(struct thread *td, char *ifname, size_t ifname_size, struct vps *vps, char *);
+#endif
+
 #endif /* _KERNEL */
 
 #include <net/ifq.h>	/* XXXAO: temporary unconditional include */

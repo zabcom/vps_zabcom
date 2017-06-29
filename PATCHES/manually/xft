@@ -1,3 +1,6 @@
+!
+! Did not merge spares.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/net/if_var.h trunk-clean/sys/net/if_var.h
 --- 10.0.0-stripped/sys/net/if_var.h	2014-01-15 14:20:21.000000000 +0100
 +++ trunk-clean/sys/net/if_var.h	2014-01-15 14:31:33.000000000 +0100

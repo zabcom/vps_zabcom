@@ -93,6 +93,10 @@ extern void sctp_addr_change(struct ifaddr *ifa, int cmd);
 #endif /* SCTP */
 #endif
 
+#ifdef VPS
+void vnet_route_init(const void *);
+void vnet_route_uninit(const void *);
+#endif
 
 /* This is read-only.. */
 u_int rt_numfibs = RT_NUMFIBS;
@@ -188,6 +192,10 @@ rt_tables_get_rnh_ptr(int table, int fam)
 
 	/* rnh is [fib=0][af=0]. */
 	rnh = (struct rib_head **)V_rt_tables;
+#ifdef VPS
+	if (rnh == NULL)
+		return (NULL);
+#endif
 	/* Get the offset to the requested table and fam. */
 	rnh += table * (AF_MAX+1) + fam;
 
@@ -272,7 +280,10 @@ rtentry_dtor(void *mem, int size, void *arg)
 	RT_UNLOCK_COND(rt);
 }
 
-static void
+#ifndef VPS
+static
+#endif
+void
 vnet_route_init(const void *unused __unused)
 {
 	struct domain *dom;
@@ -306,7 +317,36 @@ VNET_SYSINIT(vnet_route_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_FOURTH,
     vnet_route_init, 0);
 
 #ifdef VIMAGE
-static void
+#ifdef VPS
+__unused
+static int
+vnet_route_uninit_rtdel(struct radix_node *rn, void *arg)
+{
+	struct rtentry  *rt = (struct rtentry *)rn;
+	int             err;
+
+	/*
+	 * Protect (sorta) against walktree recursion problems
+	 * with cloned routes
+	 */
+	if ((rt->rt_flags & RTF_UP) == 0)
+		return (0);
+
+	err = rtrequest_fib(RTM_DELETE, rt_key(rt), rt->rt_gateway,
+			rt_mask(rt), rt->rt_flags|RTF_RNH_LOCKED,
+			(struct rtentry **) NULL, rt->rt_fibnum);
+	if (err) {
+		log(LOG_WARNING, "%s: error %d\n", __func__, err);
+	}
+
+	return (0);
+}
+#endif /* VPS */
+
+#ifndef VPS
+static
+#endif
+void
 vnet_route_uninit(const void *unused __unused)
 {
 	int table;
@@ -315,6 +355,31 @@ vnet_route_uninit(const void *unused __unused)
 	struct rib_head **rnh;
 
 	for (dom = domains; dom; dom = dom->dom_next) {
+#if 0
+// old ...
+		if (dom->dom_rtdetach) {
+			for (table = 0; table < rt_numfibs; table++) {
+				if ( (fam = dom->dom_family) == AF_INET ||
+				    table == 0) {
+					/* For now only AF_INET has > 1 tbl. */
+					rnh = rt_tables_get_rnh_ptr(table, fam);
+					if (rnh == NULL)
+						panic("%s: rnh NULL", __func__);
+
+					/* XXX doesn't improve anything */
+					RADIX_NODE_HEAD_LOCK(*rnh);
+					(void) (*rnh)->rnh_walktree(*rnh,
+						vnet_route_uninit_rtdel, NULL);
+					RADIX_NODE_HEAD_UNLOCK(*rnh);
+
+					dom->dom_rtdetach((void **)rnh,
+					    dom->dom_rtoffset);
+				} else {
+					break;
+				}
+			}
+		}
+#else
 		if (dom->dom_rtdetach == NULL)
 			continue;
 
@@ -329,10 +394,14 @@ vnet_route_uninit(const void *unused __unused)
 				panic("%s: rnh NULL", __func__);
 			dom->dom_rtdetach((void **)rnh, 0);
 		}
+#endif
 	}
 
 	free(V_rt_tables, M_RTABLE);
 	uma_zdestroy(V_rtzone);
+#ifdef VPS
+	V_rt_tables = NULL;	/* XXX-BZ why?  also original patch had free after uma_zdestroy() */
+#endif
 }
 VNET_SYSUNINIT(vnet_route_uninit, SI_SUB_PROTO_DOMAIN, SI_ORDER_FIRST,
     vnet_route_uninit, 0);

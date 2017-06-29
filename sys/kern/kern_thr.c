@@ -57,6 +57,10 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm_domain.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+#include <vps/vps_account.h>
+
 #include <machine/frame.h>
 
 #include <security/audit/audit.h>
@@ -235,6 +239,11 @@ thread_create(struct thread *td, struct rtprio *rtp,
 	bcopy(&td->td_startcopy, &newtd->td_startcopy,
 	    __rangeof(struct thread, td_startcopy, td_endcopy));
 	newtd->td_proc = td->td_proc;
+#ifdef VPS
+	/* XXX-BZ is this right?  Should we not inherit from td? */
+	newtd->td_vps = newtd->td_ucred->cr_vps;
+	newtd->td_vps_acc = newtd->td_ucred->cr_vps->vps_acc;
+#endif
 	newtd->td_rb_list = newtd->td_rbp_list = newtd->td_rb_inact = 0;
 	thread_cow_get(newtd, td);
 
@@ -607,6 +616,11 @@ kern_thr_alloc(struct proc *p, int pages, struct thread **ntd)
 		++max_threads_hits;
 		return (EPROCLIM);
 	}
+
+#ifdef VPS
+	if (vps_account(p->p_ucred->cr_vps, VPS_ACC_THREADS, VPS_ACC_ALLOC, 1))
+		return (ENOMEM);
+#endif
 
 	*ntd = thread_alloc(pages);
 	if (*ntd == NULL)

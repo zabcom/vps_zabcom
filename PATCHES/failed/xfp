@@ -1,3 +1,6 @@
+!
+! Skipped as flowtable is going away soon in HEAD.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/net/flowtable.h trunk-clean/sys/net/flowtable.h
 --- 10.0.0-stripped/sys/net/flowtable.h	2014-01-15 14:20:21.000000000 +0100
 +++ trunk-clean/sys/net/flowtable.h	2014-01-15 14:31:33.000000000 +0100

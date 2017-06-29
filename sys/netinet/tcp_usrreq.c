@@ -104,6 +104,9 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <netipsec/ipsec_support.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+
 /*
  * TCP protocol interface to socket abstraction.
  */
@@ -119,6 +122,9 @@ static int	tcp6_connect(struct tcpcb *, struct sockaddr *,
 static void	tcp_disconnect(struct tcpcb *);
 static void	tcp_usrclosed(struct tcpcb *);
 static void	tcp_fill_info(struct tcpcb *, struct tcp_info *);
+#ifdef VPS
+static void	tcp_usr_abort(struct socket *);
+#endif
 
 #ifdef TCPDEBUG
 #define	TCPDEBUG0	int ostate = 0
@@ -668,6 +674,14 @@ tcp_usr_disconnect(struct socket *so)
 	int error = 0;
 
 	TCPDEBUG0;
+#ifdef VPS
+	if (so->so_vnet->vnet_vps_flags & VPS_VNET_ABORT) {
+		DBGCORE("%s: VPS_VNET_ABORT --> tcp_usr_abort(so=%p)\n",
+			__func__, so);
+		tcp_usr_abort(so);
+		return (0);
+	}
+#endif
 	INP_INFO_RLOCK(&V_tcbinfo);
 	inp = sotoinpcb(so);
 	KASSERT(inp != NULL, ("tcp_usr_disconnect: inp == NULL"));
@@ -1103,6 +1117,15 @@ tcp_usr_close(struct socket *so)
 	struct inpcb *inp;
 	struct tcpcb *tp = NULL;
 	TCPDEBUG0;
+
+#ifdef VPS
+	if (so->so_vnet->vnet_vps_flags & VPS_VNET_ABORT) {
+		DBGCORE("%s: VPS_VNET_ABORT --> tcp_usr_abort(so=%p)\n",
+			__func__, so);
+		tcp_usr_abort(so);
+		return;
+	}
+#endif
 
 	inp = sotoinpcb(so);
 	KASSERT(inp != NULL, ("tcp_usr_close: inp == NULL"));

@@ -406,7 +406,7 @@ export_cntr1_base(struct ip_fw *krule, struct ip_fw_bcounter *cntr)
 		cntr->timestamp = krule->timestamp;
 	}
 	if (cntr->timestamp > 0) {
-		getboottime(&boottime);
+		V_getboottime(&boottime);
 		cntr->timestamp += boottime.tv_sec;
 	}
 }
@@ -422,7 +422,7 @@ export_cntr0_base(struct ip_fw *krule, struct ip_fw_bcounter0 *cntr)
 		cntr->timestamp = krule->timestamp;
 	}
 	if (cntr->timestamp > 0) {
-		getboottime(&boottime);
+		V_getboottime(&boottime);
 		cntr->timestamp += boottime.tv_sec;
 	}
 }
@@ -2083,7 +2083,7 @@ ipfw_getrules(struct ip_fw_chain *chain, void *buf, size_t space)
 
 	warnflag = 0;
 
-	getboottime(&boottime);
+	V_getboottime(&boottime);
         boot_seconds = boottime.tv_sec;
 	for (i = 0; i < chain->n_rules; i++) {
 		rule = chain->map[i];

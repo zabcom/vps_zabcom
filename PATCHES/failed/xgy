@@ -1,3 +1,7 @@
+!
+! Unclear currently. Smells like:
+! ../sys/fs//nfs/nfsport.h:#define	NFSSETBOOTTIME(b)	(getboottime(&b))
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/nfsserver/nfs_serv.c trunk-clean/sys/nfsserver/nfs_serv.c
 --- 10.0.0-stripped/sys/nfsserver/nfs_serv.c	2014-01-15 14:19:38.000000000 +0100
 +++ trunk-clean/sys/nfsserver/nfs_serv.c	2014-01-15 14:31:18.000000000 +0100

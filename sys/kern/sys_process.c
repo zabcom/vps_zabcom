@@ -64,6 +64,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
 
+#include <vps/vps.h>
+
 #ifdef COMPAT_FREEBSD32
 #include <sys/procfs.h>
 #include <compat/freebsd32/freebsd32_signal.h>
@@ -746,7 +748,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 	case PT_SET_EVENT_MASK:
 	case PT_DETACH:
 	case PT_GET_SC_ARGS:
-		sx_xlock(&proctree_lock);
+		sx_xlock(&V_proctree_lock);
 		proctree_locked = 1;
 		break;
 	default:
@@ -760,14 +762,14 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		if (pid <= PID_MAX) {
 			if ((p = pfind(pid)) == NULL) {
 				if (proctree_locked)
-					sx_xunlock(&proctree_lock);
+					sx_xunlock(&V_proctree_lock);
 				return (ESRCH);
 			}
 		} else {
 			td2 = tdfind(pid, -1);
 			if (td2 == NULL) {
 				if (proctree_locked)
-					sx_xunlock(&proctree_lock);
+					sx_xunlock(&V_proctree_lock);
 				return (ESRCH);
 			}
 			p = td2->td_proc;
@@ -829,7 +831,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			error = EBUSY;
 			goto fail;
 		}
-		if (p->p_pptr == initproc) {
+		if (p->p_pptr == V_initproc) {
 			error = EPERM;
 			goto fail;
 		}
@@ -936,9 +938,20 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		 * on a "detach".
 		 */
 		proc_set_traced(p, true);
+#ifdef VPS
+		if (p->p_pptr == NULL) {
+			p->p_oppid = 0;
+			LIST_INSERT_HEAD(&td->td_proc->p_children, p, p_sibling);
+			p->p_pptr = td->td_proc;
+		} else {
+			if (p->p_pptr != td->td_proc)
+				proc_reparent(p, td->td_proc);
+		}
+#else
 		if (p->p_pptr != td->td_proc) {
 			proc_reparent(p, td->td_proc);
 		}
+#endif
 		data = SIGSTOP;
 		CTR2(KTR_PTRACE, "PT_ATTACH: pid %d, oppid %d", p->p_pid,
 		    p->p_oppid);
@@ -1108,6 +1121,16 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			 * as an orphan of the debugger.
 			 */
 			p->p_flag &= ~(P_TRACED | P_WAITED);
+#ifdef VPS
+			if (p->p_oppid == 0) {
+				PROC_LOCK(p->p_pptr);
+				sigqueue_take(p->p_ksi);
+				PROC_UNLOCK(p->p_pptr);
+
+				LIST_REMOVE(p, p_sibling);
+				p->p_pptr = NULL;
+			} else 
+#endif /* VPS */
 			if (p->p_oppid != p->p_pptr->p_pid) {
 				PROC_LOCK(p->p_pptr);
 				sigqueue_take(p->p_ksi);
@@ -1115,7 +1138,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 
 				pp = proc_realparent(p);
 				proc_reparent(p, pp);
-				if (pp == initproc)
+				if (pp == V_initproc)
 					p->p_sigparent = SIGCHLD;
 				CTR3(KTR_PTRACE,
 			    "PT_DETACH: pid %d reparented to pid %d, sig %d",
@@ -1144,7 +1167,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 
 	sendsig:
 		if (proctree_locked) {
-			sx_xunlock(&proctree_lock);
+			sx_xunlock(&V_proctree_lock);
 			proctree_locked = 0;
 		}
 		p->p_xsig = data;
@@ -1459,7 +1482,7 @@ out:
 fail:
 	PROC_UNLOCK(p);
 	if (proctree_locked)
-		sx_xunlock(&proctree_lock);
+		sx_xunlock(&V_proctree_lock);
 	return (error);
 }
 #undef PROC_READ

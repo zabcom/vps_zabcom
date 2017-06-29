@@ -82,6 +82,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_map.h>
 #include <vm/swap_pager.h>
+
+#include <vps/vps.h>
+#include <vps/vps_account.h>
+
 #include "opt_compat.h"
 #include "opt_swap.h"
 
@@ -147,11 +151,12 @@ SYSCTL_LONG(_vfs, OID_AUTO, runningbufspace, CTLFLAG_RD, &runningbufspace, 0,
 static long bufspace;
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-SYSCTL_PROC(_vfs, OID_AUTO, bufspace, CTLTYPE_LONG|CTLFLAG_MPSAFE|CTLFLAG_RD,
-    &bufspace, 0, sysctl_bufspace, "L", "Virtual memory used for buffers");
+_SYSCTL_PROC(_vfs, OID_AUTO, bufspace, CTLTYPE_LONG|CTLFLAG_MPSAFE|CTLFLAG_RD,
+    &bufspace, 0, sysctl_bufspace, "L", "Virtual memory used for buffers", VPS_PUBLIC);
 #else
-SYSCTL_LONG(_vfs, OID_AUTO, bufspace, CTLFLAG_RD, &bufspace, 0,
-    "Physical memory used for buffers");
+/* XXX */
+_SYSCTL_LONG(_vfs, OID_AUTO, bufspace, CTLFLAG_RD, &bufspace, 0,
+    "Physical memory used for buffers", VPS_PUBLIC);
 #endif
 static long bufkvaspace;
 SYSCTL_LONG(_vfs, OID_AUTO, bufkvaspace, CTLFLAG_RD, &bufkvaspace, 0,
@@ -387,6 +392,14 @@ sysctl_bufspace(SYSCTL_HANDLER_ARGS)
 {
 	long lvalue;
 	int ivalue;
+
+#ifdef VPS
+	/* XXX value */
+	if (req->td->td_vps != vps0) {
+		lvalue = 0;
+		return (sysctl_handle_long(oidp, &lvalue, 0, req));
+	}
+#endif
 
 	if (sizeof(int) == sizeof(long) || req->oldlen >= sizeof(long))
 		return (sysctl_handle_long(oidp, arg1, arg2, req));
@@ -816,6 +829,17 @@ waitrunningbufspace(void)
 	mtx_unlock(&rbreqlock);
 }
 
+#ifdef VPS
+int vps_bio_runningbufspace_high(void);
+int
+vps_bio_runningbufspace_high(void)
+{
+	if (runningbufspace > hirunningspace / 2)
+		return (1);
+	else
+		return (0);
+}
+#endif
 
 /*
  *	vfs_buf_test_cache:
@@ -1810,6 +1834,9 @@ breada(struct vnode * vp, daddr_t * rablkno, int * rabsize,
 					PROC_UNLOCK(curproc);
 				}
 #endif /* RACCT */
+#ifdef VPS
+				vps_account_bio(curthread);
+#endif
 				curthread->td_ru.ru_inblock++;
 			}
 			rabp->b_flags |= B_ASYNC;
@@ -1863,6 +1890,9 @@ breadn_flags(struct vnode *vp, daddr_t blkno, int size, daddr_t *rablkno,
 				PROC_UNLOCK(curproc);
 			}
 #endif /* RACCT */
+#ifdef VPS
+			vps_account_bio(curthread);
+#endif
 			curthread->td_ru.ru_inblock++;
 		}
 		bp->b_iocmd = BIO_READ;
@@ -1926,6 +1956,13 @@ bufwrite(struct buf *bp)
 
 	BUF_ASSERT_HELD(bp);
 
+#ifdef VPS
+#if 0
+	if (!TD_IS_IDLETHREAD(curthread))
+		vps_account_bio(curthread);
+#endif
+#endif
+
 	KASSERT(!(bp->b_vflags & BV_BKGRDINPROG),
 	    ("FFS background buffer should not get here %p", bp));
 
@@ -1965,6 +2002,12 @@ bufwrite(struct buf *bp)
 			PROC_UNLOCK(curproc);
 		}
 #endif /* RACCT */
+#ifdef VPS
+#if 0
+		//vps_account_bio(curthread);
+#endif
+		vps_account_bio(curthread);
+#endif
 		curthread->td_ru.ru_oublock++;
 	}
 	if (oldflags & B_ASYNC)

@@ -1,3 +1,6 @@
+!
+! Obsolete.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netinet/tcp_reass.c trunk-clean/sys/netinet/tcp_reass.c
 --- 10.0.0-stripped/sys/netinet/tcp_reass.c	2014-01-15 14:19:27.000000000 +0100
 +++ trunk-clean/sys/netinet/tcp_reass.c	2014-01-15 14:31:12.000000000 +0100

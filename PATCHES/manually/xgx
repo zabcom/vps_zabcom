@@ -1,3 +1,6 @@
+!
+! This looks just like noise.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/nfsclient/nfs_vnops.c trunk-clean/sys/nfsclient/nfs_vnops.c
 --- 10.0.0-stripped/sys/nfsclient/nfs_vnops.c	2014-01-15 14:19:22.000000000 +0100
 +++ trunk-clean/sys/nfsclient/nfs_vnops.c	2014-01-15 14:31:09.000000000 +0100

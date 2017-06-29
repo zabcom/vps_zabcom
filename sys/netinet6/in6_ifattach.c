@@ -272,6 +272,9 @@ found:
 	case IFT_BRIDGE:
 	case IFT_ETHER:
 	case IFT_L2VLAN:
+#ifdef VPS
+	case IFT_PROPVIRTUAL:
+#endif
 	case IFT_FDDI:
 	case IFT_ISO88025:
 	case IFT_ATM:

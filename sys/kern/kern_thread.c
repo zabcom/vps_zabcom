@@ -65,6 +65,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_domain.h>
 #include <sys/eventhandler.h>
 
+#include <vps/vps_account.h>
+
 /*
  * Asserts below verify the stability of struct thread and struct proc
  * layout, as exposed by KBI to modules.  On head, the KBI is allowed
@@ -336,7 +338,7 @@ threadinit(void)
 	thread_zone = uma_zcreate("THREAD", sched_sizeof_thread(),
 	    thread_ctor, thread_dtor, thread_init, thread_fini,
 	    32 - 1, UMA_ZONE_NOFREE);
-	tidhashtbl = hashinit(maxproc / 2, M_TIDHASH, &tidhash);
+	tidhashtbl = hashinit(V_maxproc / 2, M_TIDHASH, &tidhash);
 	rw_init(&tidhash_lock, "tidhash");
 }
 
@@ -428,6 +430,10 @@ thread_alloc_stack(struct thread *td, int pages)
 void
 thread_free(struct thread *td)
 {
+	/* THREAD_CAN_MIGRATE() check for lock_profile_thread_exit() */
+	KASSERT(td->td_pinned == 0,
+		("%s: td=%p td->td_pinned=%d\n",
+		__func__, td, td->td_pinned));
 
 	lock_profile_thread_exit(td);
 	if (td->td_cpuset)
@@ -527,7 +533,9 @@ thread_exit(void)
 	    (long)p->p_pid, td->td_name);
 	SDT_PROBE0(proc, , , lwp__exit);
 	KASSERT(TAILQ_EMPTY(&td->td_sigqueue.sq_list), ("signal pending"));
-
+#ifdef VPS
+	vps_account(p->p_ucred->cr_vps, VPS_ACC_THREADS, VPS_ACC_FREE, 1);
+#endif
 #ifdef AUDIT
 	AUDIT_SYSCALL_EXIT(0, td);
 #endif
@@ -1257,4 +1265,11 @@ tidhash_remove(struct thread *td)
 	rw_wlock(&tidhash_lock);
 	LIST_REMOVE(td, td_hash);
 	rw_wunlock(&tidhash_lock);
+}
+
+void
+thread_zone_reclaim(void)
+{
+
+	uma_zone_reclaim(thread_zone);
 }

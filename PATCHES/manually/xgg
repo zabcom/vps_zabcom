@@ -1,3 +1,7 @@
+!
+! Some changes in here are obsolete as done by VIMAGE work 2016.
+! Merged last line for now.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netinet/tcp_subr.c trunk-clean/sys/netinet/tcp_subr.c
 --- 10.0.0-stripped/sys/netinet/tcp_subr.c	2014-01-15 14:19:26.000000000 +0100
 +++ trunk-clean/sys/netinet/tcp_subr.c	2014-01-15 14:31:12.000000000 +0100

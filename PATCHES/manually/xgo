@@ -1,3 +1,6 @@
+!
+! Skipped.  Flowtable will be removed from HEAD soon; not that this would do anything anyway.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netinet6/ip6_input.c trunk-clean/sys/netinet6/ip6_input.c
 --- 10.0.0-stripped/sys/netinet6/ip6_input.c	2014-01-15 14:19:24.000000000 +0100
 +++ trunk-clean/sys/netinet6/ip6_input.c	2014-01-15 14:31:36.000000000 +0100

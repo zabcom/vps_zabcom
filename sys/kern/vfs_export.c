@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mbuf.h>
 #include <sys/mount.h>
 #include <sys/mutex.h>
+#include <sys/proc.h>
 #include <sys/rwlock.h>
 #include <sys/refcount.h>
 #include <sys/signalvar.h>
@@ -58,6 +59,9 @@ __FBSDID("$FreeBSD$");
 
 #include <netinet/in.h>
 #include <net/radix.h>
+
+#include <vps/vps.h>
+#include <vps/vps2.h>
 
 static MALLOC_DEFINE(M_NETADDR, "export_host", "Export host address structure");
 
@@ -135,8 +139,12 @@ vfs_hang_addrlist(struct mount *mp, struct netexport *nep,
 		np->netc_anon->cr_uid = argp->ex_anon.cr_uid;
 		crsetgroups(np->netc_anon, argp->ex_anon.cr_ngroups,
 		    argp->ex_anon.cr_groups);
-		np->netc_anon->cr_prison = &prison0;
+		np->netc_anon->cr_prison = V_prison0;
 		prison_hold(np->netc_anon->cr_prison);
+#ifdef VPS
+		np->netc_anon->cr_vps = curthread->td_vps;
+		vps_ref(np->netc_anon->cr_vps, np->netc_anon);
+#endif
 		np->netc_numsecflavors = argp->ex_numsecflavors;
 		bcopy(argp->ex_secflavors, np->netc_secflavors,
 		    sizeof(np->netc_secflavors));
@@ -214,8 +222,12 @@ vfs_hang_addrlist(struct mount *mp, struct netexport *nep,
 	np->netc_anon->cr_uid = argp->ex_anon.cr_uid;
 	crsetgroups(np->netc_anon, argp->ex_anon.cr_ngroups,
 	    argp->ex_anon.cr_groups);
-	np->netc_anon->cr_prison = &prison0;
+	np->netc_anon->cr_prison = V_prison0;
 	prison_hold(np->netc_anon->cr_prison);
+#ifdef VPS
+	np->netc_anon->cr_vps = curthread->td_vps;
+	vps_ref(np->netc_anon->cr_vps, np->netc_anon);
+#endif
 	np->netc_numsecflavors = argp->ex_numsecflavors;
 	bcopy(argp->ex_secflavors, np->netc_secflavors,
 	    sizeof(np->netc_secflavors));

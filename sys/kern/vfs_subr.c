@@ -94,6 +94,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_kern.h>
 #include <vm/uma.h>
 
+#include <vps/vps.h>
+
 #ifdef DDB
 #include <ddb/ddb.h>
 #endif
@@ -449,7 +451,7 @@ vntblinit(void *dummy __unused)
 	 * size.  The memory required by desiredvnodes vnodes and vm objects
 	 * must not exceed 1/10th of the kernel's heap size.
 	 */
-	physvnodes = maxproc + pgtok(vm_cnt.v_page_count) / 64 +
+	physvnodes = V_maxproc + pgtok(vm_cnt.v_page_count) / 64 +
 	    3 * min(98304 * 16, pgtok(vm_cnt.v_page_count)) / 64;
 	virtvnodes = vm_kmem_size / (10 * (sizeof(struct vm_object) +
 	    sizeof(struct vnode) + NC_SZ * ncsizefactor + NFS_NCLNODE_SZ));
@@ -3820,9 +3822,9 @@ sysctl_vfs_conflist(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_vfs, OID_AUTO, conflist, CTLTYPE_OPAQUE | CTLFLAG_RD |
+_SYSCTL_PROC(_vfs, OID_AUTO, conflist, CTLTYPE_OPAQUE | CTLFLAG_RD |
     CTLFLAG_MPSAFE, NULL, 0, sysctl_vfs_conflist,
-    "S,xvfsconf", "List of all configured filesystems");
+    "S,xvfsconf", "List of all configured filesystems", VPS_PUBLIC);
 
 #ifndef BURN_BRIDGES
 static int	sysctl_ovfs_conf(SYSCTL_HANDLER_ARGS);

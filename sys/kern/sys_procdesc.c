@@ -151,13 +151,13 @@ procdesc_find(struct thread *td, int fd, cap_rights_t *rightsp,
 		goto out;
 	}
 	pd = fp->f_data;
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 	if (pd->pd_proc != NULL) {
 		*p = pd->pd_proc;
 		PROC_LOCK(*p);
 	} else
 		error = ESRCH;
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 out:
 	fdrop(fp, td);
 	return (error);
@@ -305,14 +305,14 @@ procdesc_exit(struct proc *p)
 {
 	struct procdesc *pd;
 
-	sx_assert(&proctree_lock, SA_XLOCKED);
+	sx_assert(&V_proctree_lock, SA_XLOCKED);
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	KASSERT(p->p_procdesc != NULL, ("procdesc_exit: p_procdesc NULL"));
 
 	pd = p->p_procdesc;
 
 	PROCDESC_LOCK(pd);
-	KASSERT((pd->pd_flags & PDF_CLOSED) == 0 || p->p_pptr == initproc,
+	KASSERT((pd->pd_flags & PDF_CLOSED) == 0 || p->p_pptr == V_initproc,
 	    ("procdesc_exit: closed && parent not init"));
 
 	pd->pd_flags |= PDF_EXITED;
@@ -349,7 +349,7 @@ procdesc_reap(struct proc *p)
 {
 	struct procdesc *pd;
 
-	sx_assert(&proctree_lock, SA_XLOCKED);
+	sx_assert(&V_proctree_lock, SA_XLOCKED);
 	KASSERT(p->p_procdesc != NULL, ("procdesc_reap: p_procdesc == NULL"));
 
 	pd = p->p_procdesc;
@@ -375,7 +375,7 @@ procdesc_close(struct file *fp, struct thread *td)
 	fp->f_ops = &badfileops;
 	fp->f_data = NULL;
 
-	sx_xlock(&proctree_lock);
+	sx_xlock(&V_proctree_lock);
 	PROCDESC_LOCK(pd);
 	pd->pd_flags |= PDF_CLOSED;
 	PROCDESC_UNLOCK(pd);
@@ -385,7 +385,7 @@ procdesc_close(struct file *fp, struct thread *td)
 		 * This is the case where process' exit status was already
 		 * collected and procdesc_reap() was already called.
 		 */
-		sx_xunlock(&proctree_lock);
+		sx_xunlock(&V_proctree_lock);
 	} else {
 		PROC_LOCK(p);
 		AUDIT_ARG_PROCESS(p);
@@ -416,11 +416,11 @@ procdesc_close(struct file *fp, struct thread *td)
 			 * prejudice.
 			 */
 			p->p_sigparent = SIGCHLD;
-			proc_reparent(p, initproc);
+			proc_reparent(p, V_initproc);
 			if ((pd->pd_flags & PDF_DAEMON) == 0)
 				kern_psignal(p, SIGKILL);
 			PROC_UNLOCK(p);
-			sx_xunlock(&proctree_lock);
+			sx_xunlock(&V_proctree_lock);
 		}
 	}
 
@@ -532,7 +532,7 @@ procdesc_stat(struct file *fp, struct stat *sb, struct ucred *active_cred,
 	 */
 	bzero(sb, sizeof(*sb));
 	pd = fp->f_data;
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 	if (pd->pd_proc != NULL) {
 		PROC_LOCK(pd->pd_proc);
 		AUDIT_ARG_PROCESS(pd->pd_proc);
@@ -554,7 +554,7 @@ procdesc_stat(struct file *fp, struct stat *sb, struct ucred *active_cred,
 		PROC_UNLOCK(pd->pd_proc);
 	} else
 		sb->st_mode = S_IFREG;
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 	return (0);
 }
 

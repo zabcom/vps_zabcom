@@ -1,3 +1,7 @@
+!
+! Apart from the rnh == NULL check which is unclear why needed,
+! this seems to be obsolete by now.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/netinet/in_rmx.c trunk-clean/sys/netinet/in_rmx.c
 --- 10.0.0-stripped/sys/netinet/in_rmx.c	2014-01-15 14:19:26.000000000 +0100
 +++ trunk-clean/sys/netinet/in_rmx.c	2014-01-15 14:31:12.000000000 +0100

@@ -86,6 +86,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/uma.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+
 #include <ufs/ufs/quota.h>
 
 MALLOC_DEFINE(M_FADVISE, "fadvise", "posix_fadvise(2) information");
@@ -127,6 +130,9 @@ sys_sync(struct thread *td, struct sync_args *uap)
 			continue;
 		}
 		if ((mp->mnt_flag & MNT_RDONLY) == 0 &&
+#ifdef VPS
+		    vps_canseemount(td->td_ucred, mp) == 0 &&
+#endif /*VPS*/
 		    vn_start_write(NULL, &mp, V_NOWAIT) == 0) {
 			save = curthread_pflags_set(TDP_SYNCIO);
 			vfs_msync(mp, MNT_NOWAIT);
@@ -172,6 +178,12 @@ sys_quotactl(struct thread *td, struct quotactl_args *uap)
 	mp = nd.ni_vp->v_mount;
 	vfs_ref(mp);
 	vput(nd.ni_vp);
+#ifdef VPS
+	if (td->td_vps != vps0 && td->td_vps != mp->mnt_vps) {
+		vfs_rel(mp);
+		return (EPERM);
+	}
+#endif
 	error = vfs_busy(mp, 0);
 	vfs_rel(mp);
 	if (error != 0)
@@ -263,7 +275,18 @@ kern_do_statfs(struct thread *td, struct mount *mp, struct statfs *buf)
 	if (error != 0)
 		goto out;
 	*buf = *sp;
+#ifdef VPS
+	if (td->td_ucred->cr_vps != vps0) {
+		bcopy(sp, &sb, sizeof(sb));
+		sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
+		vps_statfs(td->td_ucred, mp, &sb);
+		sp = &sb;
+	}
+#endif
 	if (priv_check(td, PRIV_VFS_GENERATION)) {
+		if (sp != &sb)
+			bcopy(sp, &sb, sizeof(sb));
+		sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
 		buf->f_fsid.val[0] = buf->f_fsid.val[1] = 0;
 		prison_enforce_statfs(td->td_ucred, mp, buf);
 	}
@@ -439,6 +462,12 @@ restart:
 			nmp = TAILQ_NEXT(mp, mnt_list);
 			continue;
 		}
+#ifdef VPS
+		if (vps_canseemount(td->td_ucred, mp) != 0) {
+			nmp = TAILQ_NEXT(mp, mnt_list);
+			continue;
+		}
+#endif
 #ifdef MAC
 		if (mac_mount_check_stat(td->td_ucred, mp) != 0) {
 			nmp = TAILQ_NEXT(mp, mnt_list);
@@ -4360,6 +4389,11 @@ kern_fhstatfs(struct thread *td, fhandle_t fh, struct statfs *buf)
 	error = prison_canseemount(td->td_ucred, mp);
 	if (error != 0)
 		goto out;
+#ifdef VPS
+	error = vps_canseemount(td->td_ucred, mp);
+	if (error != 0)
+		goto out;
+#endif
 #ifdef MAC
 	error = mac_mount_check_stat(td->td_ucred, mp);
 	if (error != 0)
