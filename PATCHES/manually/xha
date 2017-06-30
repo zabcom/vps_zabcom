@@ -1,3 +1,6 @@
+!
+! Now sys/compat/linuxkpi/common/include/linux/sysfs.h
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/ofed/include/linux/sysfs.h trunk-clean/sys/ofed/include/linux/sysfs.h
 --- 10.0.0-stripped/sys/ofed/include/linux/sysfs.h	2014-01-15 14:19:15.000000000 +0100
 +++ trunk-clean/sys/ofed/include/linux/sysfs.h	2014-01-15 14:31:18.000000000 +0100

@@ -66,6 +66,30 @@
 #include <sys/_vm_domain.h>
 #include <machine/proc.h>		/* Machine-dependent proc substruct. */
 
+#ifdef _KERNEL
+#include <vps/vps.h>
+
+#define	V_allproc_lock		VPSV(allproc_lock)
+#define	V_proctree_lock		VPSV(proctree_lock)
+#define	V_ppeers_lock		VPSV(ppeers_lock)
+#define	V_proc_lock_names	VPSV(proc_lock_names)
+#define	V_allproc		VPSV(allproc)
+#define	V_zombproc		VPSV(zombproc)
+#define	V_nprocs		VPSV(nprocs)
+#define	V_nprocs_zomb		VPSV(nprocs_zomb)
+#define	V_maxproc		VPSV(vmaxproc)
+#define	V_maxprocperuid		VPSV(vmaxprocperuid)
+#define	V_lastpid		VPSV(lastpid)
+#define	V_pidhashtbl		VPSV(pidhashtbl)
+#define	V_pidhash		VPSV(pidhash)
+#define	V_pgrphashtbl		VPSV(pgrphashtbl)
+#define	V_pgrphash		VPSV(pgrphash)
+#define	V_initproc		VPSV(initproc)
+#define	V_initpgrp		VPSV(initpgrp)
+
+#define	G_maxproc		maxproc
+#endif /* _KERNEL */
+
 /*
  * One structure allocated per session.
  *
@@ -232,6 +256,7 @@ struct thread {
 /* Cleared during fork1() */
 #define	td_startzero td_flags
 	int		td_flags;	/* (t) TDF_* flags. */
+	int		td_flags2;	/* (t) TDF_* flags. */
 	int		td_inhibitors;	/* (t) Why can not run. */
 	int		td_pflags;	/* (k) Private thread (TDP_*) flags. */
 	int		td_dupfd;	/* (k) Ret value from fdopen. XXX */
@@ -343,6 +368,10 @@ struct thread {
 	int		td_lastcpu;	/* (t) Last cpu we were on. */
 	int		td_oncpu;	/* (t) Which cpu we are on. */
 	void		*td_lkpi_task;	/* LinuxKPI task struct pointer */
+#ifdef VPS
+	struct vps	*td_vps;	/* (k) Effective VPS. */
+	struct vps_acc	*td_vps_acc;	/* (t) VPS accounting info. */
+#endif
 };
 
 struct thread0_storage {
@@ -378,7 +407,7 @@ do {									\
 #endif
 
 /*
- * Flags kept in td_flags:
+ * Flags kept in td_flags & td_flags2:
  * To change these you MUST have the scheduler lock.
  */
 #define	TDF_BORROWING	0x00000001 /* Thread is borrowing pri from another. */
@@ -412,6 +441,10 @@ do {									\
 #define	TDF_ALRMPEND	0x10000000 /* Pending SIGVTALRM needs to be posted. */
 #define	TDF_PROFPEND	0x20000000 /* Pending SIGPROF needs to be posted. */
 #define	TDF_MACPEND	0x40000000 /* AST-based MAC event pending. */
+
+#define	TDF2_VPSLIMIT	0x20000000 /* Thread is suspended by VPS resource limits. */
+#define	TDF2_PREEMPTED	0x40000000 /* Thread was preempted */
+#define	TDF2_VPSSUSPEND	0x80000000 /* VPS suspend pending */
 
 /* Userland debug flags */
 #define	TDB_SUSPEND	0x00000001 /* Thread is suspended by debugger */
@@ -788,7 +821,7 @@ MALLOC_DECLARE(M_SUBPROC);
 #endif
 
 #define	FOREACH_PROC_IN_SYSTEM(p)					\
-	LIST_FOREACH((p), &allproc, p_list)
+	LIST_FOREACH((p), &V_allproc, p_list)
 #define	FOREACH_THREAD_IN_PROC(p, td)					\
 	TAILQ_FOREACH((td), &(p)->p_threads, td_plist)
 
@@ -918,38 +951,64 @@ extern pid_t pid_max;
 
 #define	THREAD_CAN_SLEEP()		((curthread)->td_no_sleeping == 0)
 
-#define	PIDHASH(pid)	(&pidhashtbl[(pid) & pidhash])
+#define	PIDHASH(pid)	(&V_pidhashtbl[(pid) & V_pidhash])
+#if 0
+//delete
+#ifndef VPS
 extern LIST_HEAD(pidhashhead, proc) *pidhashtbl;
 extern u_long pidhash;
+#endif
+#endif
+LIST_HEAD(pidhashhead, proc);
+VPS_DECLARE(struct pidhashhead *, pidhashtbl);
+VPS_DECLARE(u_long, pidhash);
+
 #define	TIDHASH(tid)	(&tidhashtbl[(tid) & tidhash])
 extern LIST_HEAD(tidhashhead, thread) *tidhashtbl;
 extern u_long tidhash;
 extern struct rwlock tidhash_lock;
 
-#define	PGRPHASH(pgid)	(&pgrphashtbl[(pgid) & pgrphash])
-extern LIST_HEAD(pgrphashhead, pgrp) *pgrphashtbl;
-extern u_long pgrphash;
+#define	PGRPHASH(pgid)	(&V_pgrphashtbl[(pgid) & V_pgrphash])
 
-extern struct sx allproc_lock;
+LIST_HEAD(pgrphashhead, pgrp);
+VPS_DECLARE(struct pgrphashhead *, pgrphashtbl);
+VPS_DECLARE(u_long, pgrphash);
+
+VPS_DECLARE(struct sx, allproc_lock);
+VPS_DECLARE(struct sx, proctree_lock);
+VPS_DECLARE(struct mtx, ppeers_lock);
+
 extern int allproc_gen;
-extern struct sx proctree_lock;
-extern struct mtx ppeers_lock;
 extern struct proc proc0;		/* Process slot for swapper. */
 extern struct thread0_storage thread0_st;	/* Primary thread in proc0. */
 #define	thread0 (thread0_st.t0st_thread)
 extern struct vmspace vmspace0;		/* VM space for proc0. */
 extern int hogticks;			/* Limit on kernel cpu hogs. */
-extern int lastpid;
-extern int nprocs, maxproc;		/* Current and max number of procs. */
+
+VPS_DECLARE(int, lastpid);
+VPS_DECLARE(int, randompid);
+VPS_DECLARE(int, nprocs);		/* Current number of procs. */
+VPS_DECLARE(int, nprocs_zomb);
+VPS_DECLARE(int, vmaxproc);		/* Max number of procs. */
+VPS_DECLARE(int, vmaxprocperuid);	/* Max procs per uid. */
+VPS_DECLARE(int, pidchecked);
+VPS_DECLARE(struct timeval, lastfail);
+VPS_DECLARE(int, curfail);
+VPS_DECLARE(char *, proc_lock_names);
+
+extern int maxproc;			/* Max number of procs. */
 extern int maxprocperuid;		/* Max procs per uid. */
 extern u_long ps_arg_cache_limit;
 
 LIST_HEAD(proclist, proc);
 TAILQ_HEAD(procqueue, proc);
 TAILQ_HEAD(threadqueue, thread);
-extern struct proclist allproc;		/* List of all processes. */
-extern struct proclist zombproc;	/* List of zombie processes. */
-extern struct proc *initproc, *pageproc; /* Process slots for init, pager. */
+
+VPS_DECLARE(struct proclist, allproc);	/* List of all processes. */
+VPS_DECLARE(struct proclist, zombproc);	/* List of zombie processes. */
+VPS_DECLARE(struct proc *, initproc);	/* Process slot for init. */
+VPS_DECLARE(struct pgrp *, initpgrp);
+extern struct proc *pageproc;		/* Process slots for pager. */
 
 extern struct uma_zone *proc_zone;
 
@@ -1020,6 +1079,10 @@ int	proc_getargv(struct thread *td, struct proc *p, struct sbuf *sb);
 int	proc_getauxv(struct thread *td, struct proc *p, struct sbuf *sb);
 int	proc_getenvv(struct thread *td, struct proc *p, struct sbuf *sb);
 void	procinit(void);
+#ifdef VPS
+void	procuninit(void);
+#endif
+void	proc_zone_reclaim(void);
 void	proc_linkup0(struct proc *p, struct thread *td);
 void	proc_linkup(struct proc *p, struct thread *td);
 struct proc *proc_realparent(struct proc *child);
@@ -1094,6 +1157,7 @@ void	thread_unlink(struct thread *td);
 void	thread_unsuspend(struct proc *p);
 void	thread_wait(struct proc *p);
 struct thread	*thread_find(struct proc *p, lwpid_t tid);
+void	thread_zone_reclaim(void);
 
 void	stop_all_proc(void);
 void	resume_all_proc(void);

@@ -4,6 +4,7 @@ TODO
 getboottime()
 	- needs  G_ and V_ variant and applied correctly in the right places.
 	- failed/xdr
+	- xhr,  sys/sys/time.h
 
 _SYSCTL_ROOT_NODE
 hostid?
@@ -17,5 +18,7 @@ xes -> vfs_cache.c needs review;  just applied blindly so far.
 Lots of &prison0 vs. V_prison0  (no &)  but only in some places;  check that!
 
 failed/xfx	vnet.h changes *ouch*
+
+TDF2_*		need field editing all over the place.  Not enough spares anymore.
 
 # end

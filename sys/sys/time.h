@@ -37,6 +37,10 @@
 #include <sys/types.h>
 #include <sys/timespec.h>
 
+#ifdef _KERNEL
+#include <vps/vps.h>
+#endif
+
 struct timezone {
 	int	tz_minuteswest;	/* minutes west of Greenwich */
 	int	tz_dsttime;	/* type of dst correction */
@@ -442,6 +446,14 @@ void	getmicrotime(struct timeval *tvp);
 
 void	getboottime(struct timeval *boottime);
 void	getboottimebin(struct bintime *boottimebin);
+
+/* XXX-BZ resolve. */
+VPS_DECLARE(struct bintime, boottimebin);
+VPS_DECLARE(struct timeval, boottime);
+#define V_boottimebin   VPSV(boottimebin)
+#define V_boottime      VPSV(boottime)
+#define G_boottimebin   VPS_VPS(vps0, boottimebin)
+#define G_boottime      VPS_VPS(vps0, boottime)
 
 /* Other functions */
 int	itimerdecr(struct itimerval *itp, int usec);

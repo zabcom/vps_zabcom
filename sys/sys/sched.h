@@ -116,6 +116,9 @@ void	sched_add(struct thread *td, int flags);
 void	sched_clock(struct thread *td);
 void	sched_preempt(struct thread *td);
 void	sched_rem(struct thread *td);
+#ifdef VPS
+void	sched_rem_norunq(struct thread *td);
+#endif
 void	sched_relinquish(struct thread *td);
 struct thread *sched_choose(void);
 void	sched_idletd(void *);
