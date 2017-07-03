@@ -121,6 +121,26 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/md_var.h>
 
+#include <vps/vps_account.h>
+
+#ifdef VPS 
+#define VPS_ACCOUNT_RESIDENT(object, action, charge)      \
+                vps_account_resident(object, action, charge)
+                
+static __inline void
+vps_account_resident(vm_object_t object, int action, size_t charge)
+{
+         
+        if (object->cred == NULL)
+                return;
+        
+        vps_account(object->cred->cr_vps, VPS_ACC_PHYS,
+                action, charge << PAGE_SHIFT);
+}
+#else
+#define VPS_ACCOUNT_RESIDENT(object, action, charge)
+#endif /* !VPS */
+
 /*
  *	Associated with page of user-allocatable memory is a
  *	page structure.
@@ -1275,6 +1295,7 @@ vm_page_insert_radixdone(vm_page_t m, vm_object_t object, vm_page_t mpred)
 	 * Show that the object has one more resident page.
 	 */
 	object->resident_page_count++;
+	VPS_ACCOUNT_RESIDENT(object, VPS_ACC_ALLOC, 1);
 
 	/*
 	 * Hold the vnode until the last page is released.
@@ -1323,6 +1344,7 @@ vm_page_remove(vm_page_t m)
 	 * And show that the object has one fewer resident page.
 	 */
 	object->resident_page_count--;
+	VPS_ACCOUNT_RESIDENT(object, VPS_ACC_FREE, 1);
 
 	/*
 	 * The vnode may now be recycled.

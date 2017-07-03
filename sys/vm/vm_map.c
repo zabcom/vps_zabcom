@@ -96,6 +96,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/swap_pager.h>
 #include <vm/uma.h>
 
+#include <vps/vps.h>
+#include <vps/vps_account.h>
+#include <ddb/ddb.h>				/* XXX-BZ? */
+
 /*
  *	Virtual memory maps provide for the mapping, protection,
  *	and sharing of virtual memory objects.  In addition,
@@ -1219,6 +1223,14 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	if ((cow & MAP_CREATE_GUARD) != 0 && (object != NULL ||
 	    max != VM_PROT_NONE))
 		return (KERN_INVALID_ARGUMENT);
+
+#ifdef OBSOLETEDVPS
+	if (map != kmem_map && map != kernel_map && map != buffer_map) {
+		if ((vps_account(curthread->td_vps, VPS_ACC_VIRT,
+		   VPS_ACC_ALLOC, end - start)) != 0)
+			return (KERN_RESOURCE_SHORTAGE);
+	}
+#endif
 
 	protoeflags = 0;
 	if (cow & MAP_COPY_ON_WRITE)
@@ -2953,6 +2965,11 @@ vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry)
 	size = entry->end - entry->start;
 	map->size -= size;
 
+#ifdef OBSOLETEDVPS
+	if (map != kmem_map && map != kernel_map && map != buffer_map)
+		vps_account(curthread->td_vps, VPS_ACC_VIRT, VPS_ACC_FREE, size);
+#endif
+
 	if (entry->cred != NULL) {
 		swap_release_by_cred(size, entry->cred);
 		crfree(entry->cred);
@@ -3824,6 +3841,13 @@ retry:
 		}
 	} else {
 		grow_start = stack_entry->end;
+#ifdef OBSOLETEDVPS
+		if (map != kmem_map && map != kernel_map && map != buffer_map) {
+			if ((vps_account(curthread->td_vps, VPS_ACC_VIRT,
+			   VPS_ACC_ALLOC, grow_amount)) != 0)
+				return (KERN_RESOURCE_SHORTAGE);
+		}
+#endif
 		cred = stack_entry->cred;
 		if (cred == NULL && stack_entry->object.vm_object != NULL)
 			cred = stack_entry->object.vm_object->cred;
@@ -4235,6 +4259,13 @@ vm_map_lookup_done(vm_map_t map, vm_map_entry_t entry)
 	 * Unlock the main-level map
 	 */
 	vm_map_unlock_read(map);
+}
+
+void
+vmspace_zone_reclaim(void)
+{
+
+	uma_zone_reclaim(vmspace_zone);
 }
 
 #include "opt_ddb.h"

@@ -112,6 +112,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+
 /*
  * System initialization
  */
@@ -124,6 +127,9 @@ static int vm_pageout_cluster(vm_page_t m);
 static bool vm_pageout_scan(struct vm_domain *vmd, int pass);
 static void vm_pageout_mightbe_oom(struct vm_domain *vmd, int page_shortage,
     int starting_page_shortage);
+#ifdef VPS
+int vps_pager_put_object(vm_object_t, long);
+#endif
 
 SYSINIT(pagedaemon_init, SI_SUB_KTHREAD_PAGE, SI_ORDER_FIRST, vm_pageout_init,
     NULL);
@@ -757,7 +763,12 @@ vm_pageout_map_deactivate_pages(map, desired)
 	}
 
 	if (bigobj != NULL) {
-		vm_pageout_object_deactivate_pages(map->pmap, bigobj, desired);
+#ifdef VPS
+		if (bigobj->type == OBJT_VPS)
+			vps_pager_put_object(bigobj, desired);
+		else
+#endif
+			vm_pageout_object_deactivate_pages(map->pmap, bigobj, desired);
 		VM_OBJECT_RUNLOCK(bigobj);
 	}
 	/*
@@ -1854,6 +1865,9 @@ vm_pageout_oom(int shortage)
 	vm_offset_t size, bigsize;
 	struct thread *td;
 	struct vmspace *vm;
+#ifdef VPS
+	struct vps *vps, *save_vps;
+#endif  
 	bool breakout;
 
 	/*
@@ -1866,7 +1880,13 @@ vm_pageout_oom(int shortage)
 	 */
 	bigproc = NULL;
 	bigsize = 0;
-	sx_slock(&allproc_lock);
+#ifdef VPS
+	save_vps = curthread->td_vps;
+	sx_slock(&vps_all_lock);
+	LIST_FOREACH(vps, &vps_head, vps_all) {
+		curthread->td_vps = vps;
+#endif
+	sx_slock(&V_allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		PROC_LOCK(p);
 
@@ -1912,10 +1932,10 @@ vm_pageout_oom(int shortage)
 		}
 		_PHOLD_LITE(p);
 		PROC_UNLOCK(p);
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		if (!vm_map_trylock_read(&vm->vm_map)) {
 			vmspace_free(vm);
-			sx_slock(&allproc_lock);
+			sx_slock(&V_allproc_lock);
 			PRELE(p);
 			continue;
 		}
@@ -1924,7 +1944,7 @@ vm_pageout_oom(int shortage)
 			size += vm_pageout_oom_pagecount(vm);
 		vm_map_unlock_read(&vm->vm_map);
 		vmspace_free(vm);
-		sx_slock(&allproc_lock);
+		sx_slock(&V_allproc_lock);
 
 		/*
 		 * If this process is bigger than the biggest one,
@@ -1939,7 +1959,12 @@ vm_pageout_oom(int shortage)
 			PRELE(p);
 		}
 	}
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
+#ifdef VPS
+	}
+	sx_sunlock(&vps_all_lock);
+	curthread->td_vps = save_vps;
+#endif
 	if (bigproc != NULL) {
 		if (vm_panic_on_oom != 0)
 			panic("out of swap space");
@@ -2180,6 +2205,10 @@ vm_daemon(void)
 #ifdef RACCT
 	uint64_t rsize, ravailable;
 #endif
+#ifdef VPS
+	struct vps *vps, *save_vps;
+	save_vps = curthread->td_vps;
+#endif  
 
 	while (TRUE) {
 		mtx_lock(&vm_daemon_mtx);
@@ -2204,7 +2233,12 @@ vm_daemon(void)
 		attempts = 0;
 again:
 		attempts++;
-		sx_slock(&allproc_lock);
+#ifdef VPS
+		sx_slock(&vps_all_lock);
+		LIST_FOREACH(vps, &vps_head, vps_all) {
+			curthread->td_vps = vps;
+#endif
+		sx_slock(&V_allproc_lock);
 		FOREACH_PROC_IN_SYSTEM(p) {
 			vm_pindex_t limit, size;
 
@@ -2260,7 +2294,7 @@ again:
 				PRELE(p);
 				continue;
 			}
-			sx_sunlock(&allproc_lock);
+			sx_sunlock(&V_allproc_lock);
 
 			size = vmspace_resident_count(vm);
 			if (size >= limit) {
@@ -2308,10 +2342,15 @@ again:
 			}
 #endif
 			vmspace_free(vm);
-			sx_slock(&allproc_lock);
+			sx_slock(&V_allproc_lock);
 			PRELE(p);
 		}
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
+#ifdef VPS
+		}
+		sx_sunlock(&vps_all_lock);
+		curthread->td_vps = save_vps;
+#endif
 		if (tryagain != 0 && attempts <= 10)
 			goto again;
 	}

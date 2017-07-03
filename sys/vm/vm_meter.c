@@ -56,6 +56,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <sys/sysctl.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+
 struct vmmeter vm_cnt = {
 	.v_swtch = EARLY_COUNTER,
 	.v_trap = EARLY_COUNTER,
@@ -116,6 +119,35 @@ SYSCTL_UINT(_vm, VM_V_PAGEOUT_FREE_MIN, v_pageout_free_min,
 SYSCTL_UINT(_vm, OID_AUTO, v_free_severe,
 	CTLFLAG_RW, &vm_cnt.v_free_severe, 0, "Severe page depletion point");
 
+#ifdef VPS
+/* XXX calculate real per-vps load avg values */
+static int
+sysctl_vm_loadavg(SYSCTL_HANDLER_ARGS)
+{
+	struct loadavg lafake;
+#ifdef SCTL_MASK32
+	u_int32_t la[4];
+
+	if (req->flags & SCTL_MASK32) {
+		if (req->td->td_vps != vps0) {
+			memset(&la, 0, sizeof(la));
+		} else {
+			la[0] = averunnable.ldavg[0];
+			la[1] = averunnable.ldavg[1];
+			la[2] = averunnable.ldavg[2];
+			la[3] = averunnable.fscale;
+		}
+		return SYSCTL_OUT(req, la, sizeof(la));
+	} else
+#endif
+		if (req->td->td_vps != vps0) {
+			memset(&lafake, 0, sizeof(lafake));
+			return SYSCTL_OUT(req, &lafake, sizeof(lafake));
+		} else {
+			return SYSCTL_OUT(req, &averunnable, sizeof(averunnable));
+		}
+}
+#else
 static int
 sysctl_vm_loadavg(SYSCTL_HANDLER_ARGS)
 {
@@ -133,9 +165,10 @@ sysctl_vm_loadavg(SYSCTL_HANDLER_ARGS)
 #endif
 		return SYSCTL_OUT(req, &averunnable, sizeof(averunnable));
 }
-SYSCTL_PROC(_vm, VM_LOADAVG, loadavg, CTLTYPE_STRUCT | CTLFLAG_RD |
+#endif /* !VPS */
+_SYSCTL_PROC(_vm, VM_LOADAVG, loadavg, CTLTYPE_STRUCT | CTLFLAG_RD |
     CTLFLAG_MPSAFE, NULL, 0, sysctl_vm_loadavg, "S,loadavg",
-    "Machine loadaverage history");
+    "Machine loadaverage history", VPS_PUBLIC);
 
 /*
  * This function aims to determine if the object is mapped,
@@ -159,13 +192,22 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 	vm_object_t object;
 	struct proc *p;
 	struct thread *td;
+#ifdef VPS
+	struct vps *vps, *save_vps;
+#endif
 
 	bzero(&total, sizeof(total));
 
 	/*
 	 * Calculate process statistics.
 	 */
-	sx_slock(&allproc_lock);
+#ifdef VPS
+	save_vps = curthread->td_vps;
+	sx_slock(&vps_all_lock);
+	LIST_FOREACH(vps, &vps_head, vps_all) {
+		curthread->td_vps = vps;
+#endif
+	sx_slock(&V_allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		if ((p->p_flag & P_SYSTEM) != 0)
 			continue;
@@ -202,7 +244,12 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 		}
 		PROC_UNLOCK(p);
 	}
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
+#ifdef VPS
+	}
+	sx_sunlock(&vps_all_lock);
+	curthread->td_vps = save_vps;
+#endif
 	/*
 	 * Calculate object memory usage statistics.
 	 */
@@ -284,72 +331,72 @@ sysctl_handle_vmstat(SYSCTL_HANDLER_ARGS)
 	return (SYSCTL_OUT(req, &val, sizeof(val)));
 }
 
-#define	VM_STATS(parent, var, descr) \
-    SYSCTL_OID(parent, OID_AUTO, var, CTLTYPE_U64 | CTLFLAG_MPSAFE | \
-    CTLFLAG_RD, &vm_cnt.var, 0, sysctl_handle_vmstat, "QU", descr);
-#define	VM_STATS_VM(var, descr)		VM_STATS(_vm_stats_vm, var, descr)
-#define	VM_STATS_SYS(var, descr)	VM_STATS(_vm_stats_sys, var, descr)
+#define	VM_STATS(parent, var, descr, vps) \
+    _SYSCTL_OID(parent, OID_AUTO, var, CTLTYPE_U64 | CTLFLAG_MPSAFE | \
+    CTLFLAG_RD, &vm_cnt.var, 0, sysctl_handle_vmstat, "QU", descr, vps);
+#define	VM_STATS_VM(var, descr, vps)	VM_STATS(_vm_stats_vm, var, descr, vps)
+#define	VM_STATS_SYS(var, descr, vps)	VM_STATS(_vm_stats_sys, var, descr, vps)
 
-VM_STATS_SYS(v_swtch, "Context switches");
-VM_STATS_SYS(v_trap, "Traps");
-VM_STATS_SYS(v_syscall, "System calls");
-VM_STATS_SYS(v_intr, "Device interrupts");
-VM_STATS_SYS(v_soft, "Software interrupts");
-VM_STATS_VM(v_vm_faults, "Address memory faults");
-VM_STATS_VM(v_io_faults, "Page faults requiring I/O");
-VM_STATS_VM(v_cow_faults, "Copy-on-write faults");
-VM_STATS_VM(v_cow_optim, "Optimized COW faults");
-VM_STATS_VM(v_zfod, "Pages zero-filled on demand");
-VM_STATS_VM(v_ozfod, "Optimized zero fill pages");
-VM_STATS_VM(v_swapin, "Swap pager pageins");
-VM_STATS_VM(v_swapout, "Swap pager pageouts");
-VM_STATS_VM(v_swappgsin, "Swap pages swapped in");
-VM_STATS_VM(v_swappgsout, "Swap pages swapped out");
-VM_STATS_VM(v_vnodein, "Vnode pager pageins");
-VM_STATS_VM(v_vnodeout, "Vnode pager pageouts");
-VM_STATS_VM(v_vnodepgsin, "Vnode pages paged in");
-VM_STATS_VM(v_vnodepgsout, "Vnode pages paged out");
-VM_STATS_VM(v_intrans, "In transit page faults");
-VM_STATS_VM(v_reactivated, "Pages reactivated by pagedaemon");
-VM_STATS_VM(v_pdwakeups, "Pagedaemon wakeups");
-VM_STATS_VM(v_pdpages, "Pages analyzed by pagedaemon");
-VM_STATS_VM(v_pdshortfalls, "Page reclamation shortfalls");
-VM_STATS_VM(v_dfree, "Pages freed by pagedaemon");
-VM_STATS_VM(v_pfree, "Pages freed by exiting processes");
-VM_STATS_VM(v_tfree, "Total pages freed");
-VM_STATS_VM(v_forks, "Number of fork() calls");
-VM_STATS_VM(v_vforks, "Number of vfork() calls");
-VM_STATS_VM(v_rforks, "Number of rfork() calls");
-VM_STATS_VM(v_kthreads, "Number of fork() calls by kernel");
-VM_STATS_VM(v_forkpages, "VM pages affected by fork()");
-VM_STATS_VM(v_vforkpages, "VM pages affected by vfork()");
-VM_STATS_VM(v_rforkpages, "VM pages affected by rfork()");
-VM_STATS_VM(v_kthreadpages, "VM pages affected by fork() by kernel");
+VM_STATS_SYS(v_swtch, "Context switches", VPS_0);
+VM_STATS_SYS(v_trap, "Traps", VPS_0);
+VM_STATS_SYS(v_syscall, "System calls", VPS_0);
+VM_STATS_SYS(v_intr, "Device interrupts", VPS_0);
+VM_STATS_SYS(v_soft, "Software interrupts", VPS_0);
+VM_STATS_VM(v_vm_faults, "Address memory faults", VPS_0);
+VM_STATS_VM(v_io_faults, "Page faults requiring I/O", VPS_0);
+VM_STATS_VM(v_cow_faults, "Copy-on-write faults", VPS_0);
+VM_STATS_VM(v_cow_optim, "Optimized COW faults", VPS_0);
+VM_STATS_VM(v_zfod, "Pages zero-filled on demand", VPS_0);
+VM_STATS_VM(v_ozfod, "Optimized zero fill pages", VPS_0);
+VM_STATS_VM(v_swapin, "Swap pager pageins", VPS_0);
+VM_STATS_VM(v_swapout, "Swap pager pageouts", VPS_0);
+VM_STATS_VM(v_swappgsin, "Swap pages swapped in", VPS_PUBLIC);
+VM_STATS_VM(v_swappgsout, "Swap pages swapped out", VPS_PUBLIC);
+VM_STATS_VM(v_vnodein, "Vnode pager pageins", VPS_0);
+VM_STATS_VM(v_vnodeout, "Vnode pager pageouts", VPS_0);
+VM_STATS_VM(v_vnodepgsin, "Vnode pages paged in", VPS_0);
+VM_STATS_VM(v_vnodepgsout, "Vnode pages paged out", VPS_0);
+VM_STATS_VM(v_intrans, "In transit page faults", VPS_0);
+VM_STATS_VM(v_reactivated, "Pages reactivated from free list", VPS_0);
+VM_STATS_VM(v_pdwakeups, "Pagedaemon wakeups", VPS_0);
+VM_STATS_VM(v_pdpages, "Pages analyzed by pagedaemon", VPS_0);
+VM_STATS_VM(v_pdshortfalls, "Page reclamation shortfalls", VPS_0);
+VM_STATS_VM(v_dfree, "Pages freed by pagedaemon", VPS_0);
+VM_STATS_VM(v_pfree, "Pages freed by exiting processes", VPS_0);
+VM_STATS_VM(v_tfree, "Total pages freed", VPS_0);
+VM_STATS_VM(v_forks, "Number of fork() calls", VPS_0);
+VM_STATS_VM(v_vforks, "Number of vfork() calls", VPS_0);
+VM_STATS_VM(v_rforks, "Number of rfork() calls", VPS_0);
+VM_STATS_VM(v_kthreads, "Number of fork() calls by kernel", VPS_0);
+VM_STATS_VM(v_forkpages, "VM pages affected by fork()", VPS_0);
+VM_STATS_VM(v_vforkpages, "VM pages affected by vfork()", VPS_0);
+VM_STATS_VM(v_rforkpages, "VM pages affected by rfork()", VPS_0);
+VM_STATS_VM(v_kthreadpages, "VM pages affected by fork() by kernel", VPS_0);
 
-#define	VM_STATS_UINT(var, descr)	\
-    SYSCTL_UINT(_vm_stats_vm, OID_AUTO, var, CTLFLAG_RD, &vm_cnt.var, 0, descr)
-VM_STATS_UINT(v_page_size, "Page size in bytes");
-VM_STATS_UINT(v_page_count, "Total number of pages in system");
-VM_STATS_UINT(v_free_reserved, "Pages reserved for deadlock");
-VM_STATS_UINT(v_free_target, "Pages desired free");
-VM_STATS_UINT(v_free_min, "Minimum low-free-pages threshold");
-VM_STATS_UINT(v_free_count, "Free pages");
-VM_STATS_UINT(v_wire_count, "Wired pages");
-VM_STATS_UINT(v_active_count, "Active pages");
-VM_STATS_UINT(v_inactive_target, "Desired inactive pages");
-VM_STATS_UINT(v_inactive_count, "Inactive pages");
-VM_STATS_UINT(v_laundry_count, "Pages eligible for laundering");
-VM_STATS_UINT(v_pageout_free_min, "Min pages reserved for kernel");
-VM_STATS_UINT(v_interrupt_free_min, "Reserved pages for interrupt code");
-VM_STATS_UINT(v_free_severe, "Severe page depletion point");
+#define	VM_STATS_UINT(var, descr, vps)	\
+    SYSCTL_UINT(_vm_stats_vm, OID_AUTO, var, CTLFLAG_RD, &vm_cnt.var, 0, descr, vps)
+VM_STATS_UINT(v_page_size, "Page size in bytes", VPS_0);
+VM_STATS_UINT(v_page_count, "Total number of pages in system", VPS_0);
+VM_STATS_UINT(v_free_reserved, "Pages reserved for deadlock", VPS_0);
+VM_STATS_UINT(v_free_target, "Pages desired free", VPS_0);
+VM_STATS_UINT(v_free_min, "Minimum low-free-pages threshold", VPS_0);
+VM_STATS_UINT(v_free_count, "Free pages", VPS_PUBLIC);
+VM_STATS_UINT(v_wire_count, "Wired pages", VPS_PUBLIC);
+VM_STATS_UINT(v_active_count, "Active pages", VPS_PUBLIC);
+VM_STATS_UINT(v_inactive_target, "Desired inactive pages", VPS_0);
+VM_STATS_UINT(v_inactive_count, "Inactive pages", VPS_PUBLIC);
+VM_STATS_UINT(v_laundry_count, "Pages eligible for laundering", VPS_0);
+VM_STATS_UINT(v_pageout_free_min, "Min pages reserved for kernel", VPS_0);
+VM_STATS_UINT(v_interrupt_free_min, "Reserved pages for interrupt code", VPS_0);
+VM_STATS_UINT(v_free_severe, "Severe page depletion point", VPS_0);
 
 #ifdef COMPAT_FREEBSD11
 /*
  * Provide compatibility sysctls for the benefit of old utilities which exit
  * with an error if they cannot be found.
  */
-SYSCTL_UINT(_vm_stats_vm, OID_AUTO, v_cache_count, CTLFLAG_RD,
-    SYSCTL_NULL_UINT_PTR, 0, "Dummy for compatibility");
-SYSCTL_UINT(_vm_stats_vm, OID_AUTO, v_tcached, CTLFLAG_RD,
-    SYSCTL_NULL_UINT_PTR, 0, "Dummy for compatibility");
+_SYSCTL_UINT(_vm_stats_vm, OID_AUTO, v_cache_count, CTLFLAG_RD,
+    SYSCTL_NULL_UINT_PTR, 0, "Dummy for compatibility", VPS_PUBLIC);
+_SYSCTL_UINT(_vm_stats_vm, OID_AUTO, v_tcached, CTLFLAG_RD,
+    SYSCTL_NULL_UINT_PTR, 0, "Dummy for compatibility", VPS_0);
 #endif
