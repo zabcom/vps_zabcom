@@ -41,6 +41,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*-
+ * VPS adaption:
+ *
+ * Copyright (c) 2009-2013 Klaus P. Ohrhallinger <k@7he.at>
+ * All rights reserved.
+ *
+ * Development of this software was partly funded by:
+ *    TransIP.nl <http://www.transip.nl/>
+ *
+ * <BSD license>
+ *
+ * $Id: sysv_sem.c 212 2014-01-15 10:13:16Z klaus $
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -71,6 +84,12 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+#include <vps/vps_int.h>
+#include <vps/vps_libdump.h>
+#include <vps/vps_snapst.h>
+
 FEATURE(sysv_sem, "System V semaphores support");
 
 static MALLOC_DEFINE(M_SEM, "sem", "SVID compatible semaphores");
@@ -82,6 +101,7 @@ static MALLOC_DEFINE(M_SEM, "sem", "SVID compatible semaphores");
 #endif
 
 static int seminit(void);
+static int seminit2(void);
 static int sysvsem_modload(struct module *, int, void *);
 static int semunload(void);
 static void semexit_myhook(void *arg, struct proc *p);
@@ -111,6 +131,7 @@ static int semundo_adjust(struct thread *td, struct sem_undo **supptr,
     int semid, int semseq, int semnum, int adjval);
 static void semundo_clear(int semid, int semnum);
 
+#if 0
 static struct mtx	sem_mtx;	/* semaphore global lock */
 static struct mtx sem_undo_mtx;
 static int	semtot = 0;
@@ -120,10 +141,44 @@ static struct sem *sem;		/* semaphore pool */
 LIST_HEAD(, sem_undo) semu_list;	/* list of active undo structures */
 LIST_HEAD(, sem_undo) semu_free_list;	/* list of free undo structures */
 static int	*semu;		/* undo structure pool */
-static eventhandler_tag semexit_tag;
 static unsigned sem_prison_slot;	/* prison OSD slot */
+#endif
+static eventhandler_tag semexit_tag;
 
-#define SEMUNDO_MTX		sem_undo_mtx
+#ifdef VPS
+static int semtot_global = 0;
+#endif
+
+VPS_DEFINE(struct mtx, sem_mtx);
+VPS_DEFINE(struct mtx, sem_undo_mtx);
+VPS_DEFINE(int, semtot) = 0;
+VPS_DEFINE(struct semid_kernel *, sema);
+VPS_DEFINE(struct mtx *, sema_mtx);
+VPS_DEFINE(struct sem *, sem);
+VPS_DEFINE(LIST_HEAD(, sem_undo), semu_list);
+VPS_DEFINE(LIST_HEAD(, sem_undo), semu_free_list);
+VPS_DEFINE(int *, semu);
+VPS_DEFINE(unsigned, sem_prison_slot);
+VPS_DEFINE(struct seminfo, seminfo);
+
+#define	V_sem_mtx		VPSV(sem_mtx)
+#define	V_sem_undo_mtx		VPSV(sem_undo_mtx)
+#define	V_semtot		VPSV(semtot)
+#define	V_sema			VPSV(sema)
+#define	V_sema_mtx		VPSV(sema_mtx)
+#define	V_sem			VPSV(sem)
+#define	V_semu_list		VPSV(semu_list)
+#define	V_semu_free_list	VPSV(semu_free_list)
+#define	V_semu			VPSV(semu)
+#define	V_sem_prison_slot	VPSV(sem_prison_slot)
+#define V_seminfo		VPSV(seminfo)
+
+#ifdef VPS
+static eventhandler_tag sem_vpsalloc_tag;
+static eventhandler_tag sem_vpsfree_tag;
+#endif
+
+#define SEMUNDO_MTX		V_sem_undo_mtx
 #define SEMUNDO_LOCK()		mtx_lock(&SEMUNDO_MTX);
 #define SEMUNDO_UNLOCK()	mtx_unlock(&SEMUNDO_MTX);
 #define SEMUNDO_LOCKASSERT(how)	mtx_assert(&SEMUNDO_MTX, (how));
@@ -191,8 +246,9 @@ struct sem_undo {
  * Macro to find a particular sem_undo vector
  */
 #define SEMU(ix) \
-	((struct sem_undo *)(((intptr_t)semu)+ix * seminfo.semusz))
+	((struct sem_undo *)(((intptr_t)semu)+ix * V_seminfo.semusz))
 
+#if 0
 /*
  * semaphore info struct
  */
@@ -207,26 +263,27 @@ struct seminfo seminfo = {
                 SEMVMX,         /* semaphore maximum value */
                 SEMAEM          /* adjust on exit max value */
 };
+#endif
 
-SYSCTL_INT(_kern_ipc, OID_AUTO, semmni, CTLFLAG_RDTUN, &seminfo.semmni, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semmni, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semmni), 0,
     "Number of semaphore identifiers");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semmns, CTLFLAG_RDTUN, &seminfo.semmns, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semmns, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semmns), 0,
     "Maximum number of semaphores in the system");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semmnu, CTLFLAG_RDTUN, &seminfo.semmnu, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semmnu, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semmnu), 0,
     "Maximum number of undo structures in the system");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semmsl, CTLFLAG_RWTUN, &seminfo.semmsl, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semmsl, CTLFLAG_RWTUN, &VPS_NAME(seminfo.semmsl), 0,
     "Max semaphores per id");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semopm, CTLFLAG_RDTUN, &seminfo.semopm, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semopm, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semopm), 0,
     "Max operations per semop call");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semume, CTLFLAG_RDTUN, &seminfo.semume, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semume, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semume), 0,
     "Max undo entries per process");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semusz, CTLFLAG_RDTUN, &seminfo.semusz, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semusz, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semusz), 0,
     "Size in bytes of undo structure");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semvmx, CTLFLAG_RWTUN, &seminfo.semvmx, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semvmx, CTLFLAG_RWTUN, &VPS_NAME(seminfo.semvmx), 0,
     "Semaphore maximum value");
-SYSCTL_INT(_kern_ipc, OID_AUTO, semaem, CTLFLAG_RWTUN, &seminfo.semaem, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semaem, CTLFLAG_RWTUN, &VPS_NAME(seminfo.semaem), 0,
     "Adjust on exit max value");
-SYSCTL_PROC(_kern_ipc, OID_AUTO, sema,
+SYSCTL_VPS_PROC(_kern_ipc, OID_AUTO, sema,
     CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE,
     NULL, 0, sysctl_sema, "", "Semaphore id pool");
 
@@ -264,11 +321,14 @@ static struct syscall_helper_data sem32_syscalls[] = {
 #endif
 
 static int
-seminit(void)
+seminit2(void)
 {
 	struct prison *pr;
 	void **rsv;
-	int i, error;
+	int i;
+#ifndef VPS
+	int error;
+#endif
 	osd_method_t methods[PR_MAXMETHOD] = {
 	    [PR_METHOD_CHECK] =		sem_prison_check,
 	    [PR_METHOD_SET] =		sem_prison_set,
@@ -276,50 +336,54 @@ seminit(void)
 	    [PR_METHOD_REMOVE] =	sem_prison_remove,
 	};
 
-	sem = malloc(sizeof(struct sem) * seminfo.semmns, M_SEM, M_WAITOK);
-	sema = malloc(sizeof(struct semid_kernel) * seminfo.semmni, M_SEM,
+	V_sem = malloc(sizeof(struct sem) * V_seminfo.semmns, M_SEM, M_WAITOK);
+	V_sema = malloc(sizeof(struct semid_kernel) * V_seminfo.semmni, M_SEM,
 	    M_WAITOK);
-	sema_mtx = malloc(sizeof(struct mtx) * seminfo.semmni, M_SEM,
+	V_sema_mtx = malloc(sizeof(struct mtx) * V_seminfo.semmni, M_SEM,
 	    M_WAITOK | M_ZERO);
-	semu = malloc(seminfo.semmnu * seminfo.semusz, M_SEM, M_WAITOK);
+	V_semu = malloc(V_seminfo.semmnu * V_seminfo.semusz, M_SEM, M_WAITOK);
 
-	for (i = 0; i < seminfo.semmni; i++) {
-		sema[i].u.sem_base = 0;
-		sema[i].u.sem_perm.mode = 0;
-		sema[i].u.sem_perm.seq = 0;
+	for (i = 0; i < V_seminfo.semmni; i++) {
+		V_sema[i].u.sem_base = 0;
+		V_sema[i].u.sem_perm.mode = 0;
+		V_sema[i].u.sem_perm.seq = 0;
+		V_sema[i].cred = NULL;
 #ifdef MAC
-		mac_sysvsem_init(&sema[i]);
+		mac_sysvsem_init(&V_sema[i]);
 #endif
 	}
-	for (i = 0; i < seminfo.semmni; i++)
-		mtx_init(&sema_mtx[i], "semid", NULL, MTX_DEF);
-	LIST_INIT(&semu_free_list);
-	for (i = 0; i < seminfo.semmnu; i++) {
+	for (i = 0; i < V_seminfo.semmni; i++)
+		mtx_init(&V_sema_mtx[i], "semid", NULL, MTX_DEF);
+	LIST_INIT(&V_semu_free_list);
+	for (i = 0; i < V_seminfo.semmnu; i++) {
 		struct sem_undo *suptr = SEMU(i);
 		suptr->un_proc = NULL;
-		LIST_INSERT_HEAD(&semu_free_list, suptr, un_next);
+		LIST_INSERT_HEAD(&V_semu_free_list, suptr, un_next);
 	}
-	LIST_INIT(&semu_list);
-	mtx_init(&sem_mtx, "sem", NULL, MTX_DEF);
-	mtx_init(&sem_undo_mtx, "semu", NULL, MTX_DEF);
+	LIST_INIT(&V_semu_list);
+	mtx_init(&V_sem_mtx, "sem", NULL, MTX_DEF);
+	mtx_init(&V_sem_undo_mtx, "semu", NULL, MTX_DEF);
+#ifndef VPS
 	semexit_tag = EVENTHANDLER_REGISTER(process_exit, semexit_myhook, NULL,
 	    EVENTHANDLER_PRI_ANY);
+#endif
 
 	/* Set current prisons according to their allow.sysvipc. */
-	sem_prison_slot = osd_jail_register(NULL, methods);
-	rsv = osd_reserve(sem_prison_slot);
-	prison_lock(&prison0);
-	(void)osd_jail_set_reserved(&prison0, sem_prison_slot, rsv, &prison0);
-	prison_unlock(&prison0);
+/* XXX-BZ safe/restore doesn't work that way, will it? Sigh. */
+	V_sem_prison_slot = osd_jail_register(NULL, methods);
+	rsv = osd_reserve(V_sem_prison_slot);
+	prison_lock(&V_prison0);
+	(void)osd_jail_set_reserved(V_prison0, sem_prison_slot, rsv, V_prison0);
+	prison_unlock(&V_prison0);
 	rsv = NULL;
 	sx_slock(&allprison_lock);
 	TAILQ_FOREACH(pr, &allprison, pr_list) {
 		if (rsv == NULL)
-			rsv = osd_reserve(sem_prison_slot);
+			rsv = osd_reserve(V_sem_prison_slot);
 		prison_lock(pr);
 		if ((pr->pr_allow & PR_ALLOW_SYSVIPC) && pr->pr_ref > 0) {
-			(void)osd_jail_set_reserved(pr, sem_prison_slot, rsv,
-			    &prison0);
+			(void)osd_jail_set_reserved(pr, V_sem_prison_slot, rsv,
+			    V_prison0);
 			rsv = NULL;
 		}
 		prison_unlock(pr);
@@ -328,6 +392,7 @@ seminit(void)
 		osd_free_reserved(rsv);
 	sx_sunlock(&allprison_lock);
 
+#ifndef VPS
 	error = syscall_helper_register(sem_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
 		return (error);
@@ -336,7 +401,25 @@ seminit(void)
 	if (error != 0)
 		return (error);
 #endif
+#endif /* VPS */
 	return (0);
+}
+
+static int
+seminit(void)
+{
+
+	V_seminfo.semmni = SEMMNI;
+	V_seminfo.semmns = SEMMNS;
+	V_seminfo.semmnu = SEMMNU;
+	V_seminfo.semmsl = SEMMSL;
+	V_seminfo.semopm = SEMOPM;
+	V_seminfo.semume = SEMUME;
+	V_seminfo.semusz = SEMUSZ;
+	V_seminfo.semvmx = SEMVMX;
+	V_seminfo.semaem = SEMAEM;
+
+	return (seminit2());
 }
 
 static int
@@ -344,31 +427,159 @@ semunload(void)
 {
 	int i;
 
+#ifdef VPS
+	semtot_global -= V_semtot;
+#else
 	/* XXXKIB */
-	if (semtot != 0)
+	if (V_semtot != 0)
 		return (EBUSY);
+#endif
 
+#ifndef VPS
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(sem32_syscalls);
 #endif
 	syscall_helper_unregister(sem_syscalls);
 	EVENTHANDLER_DEREGISTER(process_exit, semexit_tag);
-	if (sem_prison_slot != 0)
-		osd_jail_deregister(sem_prison_slot);
-#ifdef MAC
-	for (i = 0; i < seminfo.semmni; i++)
-		mac_sysvsem_destroy(&sema[i]);
 #endif
-	free(sem, M_SEM);
-	free(sema, M_SEM);
-	free(semu, M_SEM);
-	for (i = 0; i < seminfo.semmni; i++)
-		mtx_destroy(&sema_mtx[i]);
-	free(sema_mtx, M_SEM);
-	mtx_destroy(&sem_mtx);
-	mtx_destroy(&sem_undo_mtx);
+	if (V_sem_prison_slot != 0)
+		osd_jail_deregister(V_sem_prison_slot);
+#ifdef MAC
+	for (i = 0; i < V_seminfo.semmni; i++)
+		mac_sysvsem_destroy(&V_sema[i]);
+#endif
+	for (i = 0; i < V_seminfo.semmni; i++) {
+		if (V_sema[i].cred != NULL)
+			crfree(V_sema[i].cred);
+	free(V_sem, M_SEM);
+	free(V_sema, M_SEM);
+	free(V_semu, M_SEM);
+	for (i = 0; i < V_seminfo.semmni; i++)
+		mtx_destroy(&V_sema_mtx[i]);
+	free(V_sema_mtx, M_SEM);
+	mtx_destroy(&V_sem_mtx);
+	mtx_destroy(&V_sem_undo_mtx);
 	return (0);
 }
+
+
+#ifdef VPS
+int sem_snapshot_vps(struct vps_snapst_ctx *ctx, struct vps *vps);
+int sem_snapshot_proc(struct vps_snapst_ctx *ctx, struct vps *vps, struct proc* proc);
+int sem_restore_vps(struct vps_snapst_ctx *ctx, struct vps *vps);
+int sem_restore_proc(struct vps_snapst_ctx *ctx, struct vps *vps, struct proc* proc);
+int sem_restore_fixup(struct vps_snapst_ctx *ctx, struct vps *vps);
+
+static void
+sem_vpsalloc_hook(void *arg, struct vps *vps)
+{
+        DPRINTF(("%s: vps=%p\n", __func__, vps));
+
+        vps_ref(vps, NULL);
+
+        seminit();
+}
+
+static void
+sem_vpsfree_hook(void *arg, struct vps *vps)
+{
+        DPRINTF(("%s: vps=%p\n", __func__, vps));
+
+        /* 
+         * Since they can be left over after processes vanished,
+         * just kill everything silently.
+         *
+         * KASSERT(V_semtot == 0, ("%s: vps=%p V_semtot=%d\n", __func__, vps, V_semtot));
+         */
+
+        if (semunload())
+                printf("%s: semunload() error\n", __func__);
+
+        vps_deref(vps, NULL);
+}
+
+static int
+seminit_global(void)
+{
+        struct vps *vps, *save_vps;
+	int error;
+
+        save_vps = curthread->td_vps;
+
+        semtot_global = 0;
+
+        sx_slock(&vps_all_lock);
+        LIST_FOREACH(vps, &vps_head, vps_all) {
+                curthread->td_vps = vps;
+                sem_vpsalloc_hook(NULL, vps);
+                curthread->td_vps = save_vps;
+        }
+        sx_sunlock(&vps_all_lock);
+
+        semexit_tag = EVENTHANDLER_REGISTER(process_exit, semexit_myhook, NULL,
+                EVENTHANDLER_PRI_ANY);
+        sem_vpsalloc_tag = EVENTHANDLER_REGISTER(vps_alloc, sem_vpsalloc_hook, NULL,
+                EVENTHANDLER_PRI_ANY);
+        sem_vpsfree_tag = EVENTHANDLER_REGISTER(vps_free, sem_vpsfree_hook, NULL,
+                EVENTHANDLER_PRI_ANY);
+
+        vps_func->sem_snapshot_vps = sem_snapshot_vps;
+        vps_func->sem_snapshot_proc = sem_snapshot_proc;
+        vps_func->sem_restore_vps = sem_restore_vps;
+        vps_func->sem_restore_proc = sem_restore_proc;
+        vps_func->sem_restore_fixup = sem_restore_fixup;
+
+	error = syscall_helper_register(sem_syscalls);
+	if (error != 0)
+		return (error);
+#ifdef COMPAT_FREEBSD32
+	error = syscall32_helper_register(sem32_syscalls);
+	if (error != 0)
+		return (error);
+#endif
+
+	return (0);
+}
+ 
+static int
+semunload_global(void)
+{
+        struct vps *vps, *save_vps;
+
+        save_vps = curthread->td_vps;
+
+        if (semtot_global != 0)
+                return (EBUSY);
+
+#ifdef COMPAT_FREEBSD32
+	syscall32_helper_unregister(sem32_syscalls);
+#endif
+	syscall_helper_unregister(sem_syscalls);
+
+        vps_func->sem_snapshot_vps = NULL;
+        vps_func->sem_snapshot_proc = NULL;
+        vps_func->sem_restore_vps = NULL;
+        vps_func->sem_restore_proc = NULL;
+        vps_func->sem_restore_fixup = NULL;
+
+        EVENTHANDLER_DEREGISTER(process_exit, semexit_tag);
+
+        EVENTHANDLER_DEREGISTER(vps_alloc, sem_vpsalloc_tag);
+        EVENTHANDLER_DEREGISTER(vps_free, sem_vpsfree_tag);
+
+        sx_slock(&vps_all_lock);
+        LIST_FOREACH(vps, &vps_head, vps_all) {
+                curthread->td_vps = vps;
+                /* Unless semtot_global is fucked up we got no error here. */
+                if (VPS_VPS(vps, sem))
+                        sem_vpsfree_hook(NULL, vps);
+                curthread->td_vps = save_vps;
+        }       
+        sx_sunlock(&vps_all_lock);
+
+        return (0);
+}
+#endif /* VPS */
 
 static int
 sysvsem_modload(struct module *module, int cmd, void *arg)
@@ -377,12 +588,22 @@ sysvsem_modload(struct module *module, int cmd, void *arg)
 
 	switch (cmd) {
 	case MOD_LOAD:
+#ifdef VPS
+		error = seminit_global();
+		if (error != 0)
+			semunload_global();
+#else
 		error = seminit();
 		if (error != 0)
 			semunload();
+#endif
 		break;
 	case MOD_UNLOAD:
+#ifdef VPS
+		error = semunload_global();
+#else
 		error = semunload();
+#endif
 		break;
 	case MOD_SHUTDOWN:
 		break;
@@ -413,10 +634,10 @@ semu_alloc(struct thread *td)
 	struct sem_undo *suptr;
 
 	SEMUNDO_LOCKASSERT(MA_OWNED);
-	if ((suptr = LIST_FIRST(&semu_free_list)) == NULL)
+	if ((suptr = LIST_FIRST(&V_semu_free_list)) == NULL)
 		return (NULL);
 	LIST_REMOVE(suptr, un_next);
-	LIST_INSERT_HEAD(&semu_list, suptr, un_next);
+	LIST_INSERT_HEAD(&V_semu_list, suptr, un_next);
 	suptr->un_cnt = 0;
 	suptr->un_proc = td->td_proc;
 	return (suptr);
@@ -431,7 +652,7 @@ semu_try_free(struct sem_undo *suptr)
 	if (suptr->un_cnt != 0)
 		return (0);
 	LIST_REMOVE(suptr, un_next);
-	LIST_INSERT_HEAD(&semu_free_list, suptr, un_next);
+	LIST_INSERT_HEAD(&V_semu_free_list, suptr, un_next);
 	return (1);
 }
 
@@ -454,7 +675,7 @@ semundo_adjust(struct thread *td, struct sem_undo **supptr, int semid,
 
 	suptr = *supptr;
 	if (suptr == NULL) {
-		LIST_FOREACH(suptr, &semu_list, un_next) {
+		LIST_FOREACH(suptr, &V_semu_list, un_next) {
 			if (suptr->un_proc == p) {
 				*supptr = suptr;
 				break;
@@ -480,7 +701,7 @@ semundo_adjust(struct thread *td, struct sem_undo **supptr, int semid,
 			continue;
 		if (adjval != 0) {
 			adjval += sunptr->un_adjval;
-			if (adjval > seminfo.semaem || adjval < -seminfo.semaem)
+			if (adjval > V_seminfo.semaem || adjval < -V_seminfo.semaem)
 				return (ERANGE);
 		}
 		sunptr->un_adjval = adjval;
@@ -498,9 +719,9 @@ semundo_adjust(struct thread *td, struct sem_undo **supptr, int semid,
 	/* Didn't find the right entry - create it */
 	if (adjval == 0)
 		return (0);
-	if (adjval > seminfo.semaem || adjval < -seminfo.semaem)
+	if (adjval > V_seminfo.semaem || adjval < -V_seminfo.semaem)
 		return (ERANGE);
-	if (suptr->un_cnt != seminfo.semume) {
+	if (suptr->un_cnt != V_seminfo.semume) {
 		sunptr = &suptr->un_ent[suptr->un_cnt];
 		suptr->un_cnt++;
 		sunptr->un_adjval = adjval;
@@ -520,7 +741,7 @@ semundo_clear(int semid, int semnum)
 	int i;
 
 	SEMUNDO_LOCKASSERT(MA_OWNED);
-	LIST_FOREACH_SAFE(suptr, &semu_list, un_next, suptr1) {
+	LIST_FOREACH_SAFE(suptr, &V_semu_list, un_next, suptr1) {
 		sunptr = &suptr->un_ent[0];
 		for (i = 0; i < suptr->un_cnt; i++, sunptr++) {
 			if (sunptr->un_id != semid)
@@ -555,9 +776,9 @@ sem_remove(int semidx, struct ucred *cred)
 	struct semid_kernel *semakptr;
 	int i;
 
-	KASSERT(semidx >= 0 && semidx < seminfo.semmni,
+	KASSERT(semidx >= 0 && semidx < V_seminfo.semmni,
 		("semidx out of bounds"));
-	semakptr = &sema[semidx];
+	semakptr = &V_sema[semidx];
 	semakptr->u.sem_perm.cuid = cred ? cred->cr_uid : 0;
 	semakptr->u.sem_perm.uid = cred ? cred->cr_uid : 0;
 	semakptr->u.sem_perm.mode = 0;
@@ -571,21 +792,24 @@ sem_remove(int semidx, struct ucred *cred)
 	mac_sysvsem_cleanup(semakptr);
 #endif
 	wakeup(semakptr);
-	for (i = 0; i < seminfo.semmni; i++) {
-		if ((sema[i].u.sem_perm.mode & SEM_ALLOC) &&
-		    sema[i].u.sem_base > semakptr->u.sem_base)
-			mtx_lock_flags(&sema_mtx[i], LOP_DUPOK);
+	for (i = 0; i < V_seminfo.semmni; i++) {
+		if ((V_sema[i].u.sem_perm.mode & SEM_ALLOC) &&
+		    V_sema[i].u.sem_base > semakptr->u.sem_base)
+			mtx_lock_flags(&V_sema_mtx[i], LOP_DUPOK);
 	}
 	for (i = semakptr->u.sem_base - sem; i < semtot; i++)
 		sem[i] = sem[i + semakptr->u.sem_nsems];
-	for (i = 0; i < seminfo.semmni; i++) {
-		if ((sema[i].u.sem_perm.mode & SEM_ALLOC) &&
-		    sema[i].u.sem_base > semakptr->u.sem_base) {
-			sema[i].u.sem_base -= semakptr->u.sem_nsems;
-			mtx_unlock(&sema_mtx[i]);
+	for (i = 0; i < V_seminfo.semmni; i++) {
+		if ((V_sema[i].u.sem_perm.mode & SEM_ALLOC) &&
+		    V_sema[i].u.sem_base > semakptr->u.sem_base) {
+			V_sema[i].u.sem_base -= semakptr->u.sem_nsems;
+			mtx_unlock(&V_sema_mtx[i]);
 		}
 	}
-	semtot -= semakptr->u.sem_nsems;
+	V_semtot -= semakptr->u.sem_nsems;
+#ifdef VPS
+		atomic_subtract_int(&semtot_global, semakptr->u.sem_nsems);
+#endif
 }
 
 static struct prison *
@@ -595,7 +819,7 @@ sem_find_prison(struct ucred *cred)
 
 	pr = cred->cr_prison;
 	prison_lock(pr);
-	rpr = osd_jail_get(pr, sem_prison_slot);
+	rpr = osd_jail_get(pr, V_sem_prison_slot);
 	prison_unlock(pr);
 	return rpr;
 }
@@ -712,10 +936,10 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		 * For this command we assume semid is an array index
 		 * rather than an IPC id.
 		 */
-		if (semid < 0 || semid >= seminfo.semmni)
+		if (semid < 0 || semid >= V_seminfo.semmni)
 			return (EINVAL);
-		semakptr = &sema[semid];
-		sema_mtxp = &sema_mtx[semid];
+		semakptr = &V_sema[semid];
+		sema_mtxp = &V_sema_mtx[semid];
 		mtx_lock(sema_mtxp);
 		if ((semakptr->u.sem_perm.mode & SEM_ALLOC) == 0) {
 			error = EINVAL;
@@ -739,13 +963,13 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	}
 
 	semidx = IPCID_TO_IX(semid);
-	if (semidx < 0 || semidx >= seminfo.semmni)
+	if (semidx < 0 || semidx >= V_seminfo.semmni)
 		return (EINVAL);
 
-	semakptr = &sema[semidx];
-	sema_mtxp = &sema_mtx[semidx];
+	semakptr = &V_sema[semidx];
+	sema_mtxp = &V_sema_mtx[semidx];
 	if (cmd == IPC_RMID)
-		mtx_lock(&sem_mtx);
+		mtx_lock(&V_sem_mtx);
 	mtx_lock(sema_mtxp);
 
 #ifdef MAC
@@ -884,7 +1108,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 			error = EINVAL;
 			goto done2;
 		}
-		if (arg->val < 0 || arg->val > seminfo.semvmx) {
+		if (arg->val < 0 || arg->val > V_seminfo.semvmx) {
 			error = ERANGE;
 			goto done2;
 		}
@@ -914,7 +1138,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 			goto done2;
 		for (i = 0; i < semakptr->u.sem_nsems; i++) {
 			usval = array[i];
-			if (usval > seminfo.semvmx) {
+			if (usval > V_seminfo.semvmx) {
 				error = ERANGE;
 				break;
 			}
@@ -934,7 +1158,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 done2:
 	mtx_unlock(sema_mtxp);
 	if (cmd == IPC_RMID)
-		mtx_unlock(&sem_mtx);
+		mtx_unlock(&V_sem_mtx);
 	if (array != NULL)
 		free(array, M_TEMP);
 	return(error);
@@ -963,16 +1187,16 @@ sys_semget(struct thread *td, struct semget_args *uap)
 	if (sem_find_prison(cred) == NULL)
 		return (ENOSYS);
 
-	mtx_lock(&sem_mtx);
+	mtx_lock(&V_sem_mtx);
 	if (key != IPC_PRIVATE) {
-		for (semid = 0; semid < seminfo.semmni; semid++) {
-			if ((sema[semid].u.sem_perm.mode & SEM_ALLOC) &&
-			    sema[semid].cred != NULL &&
-			    sema[semid].cred->cr_prison == cred->cr_prison &&
-			    sema[semid].u.sem_perm.key == key)
+		for (semid = 0; semid < V_seminfo.semmni; semid++) {
+			if ((V_sema[semid].u.sem_perm.mode & SEM_ALLOC) &&
+			    V_sema[semid].cred != NULL &&
+			    V_sema[semid].cred->cr_prison == cred->cr_prison &&
+			    V_sema[semid].u.sem_perm.key == key)
 				break;
 		}
-		if (semid < seminfo.semmni) {
+		if (semid < V_seminfo.semmni) {
 			AUDIT_ARG_SVIPC_ID(semid);
 			DPRINTF(("found public key\n"));
 			if ((semflg & IPC_CREAT) && (semflg & IPC_EXCL)) {
@@ -980,17 +1204,17 @@ sys_semget(struct thread *td, struct semget_args *uap)
 				error = EEXIST;
 				goto done2;
 			}
-			if ((error = ipcperm(td, &sema[semid].u.sem_perm,
+			if ((error = ipcperm(td, &V_sema[semid].u.sem_perm,
 			    semflg & 0700))) {
 				goto done2;
 			}
-			if (nsems > 0 && sema[semid].u.sem_nsems < nsems) {
+			if (nsems > 0 && V_sema[semid].u.sem_nsems < nsems) {
 				DPRINTF(("too small\n"));
 				error = EINVAL;
 				goto done2;
 			}
 #ifdef MAC
-			error = mac_sysvsem_check_semget(cred, &sema[semid]);
+			error = mac_sysvsem_check_semget(cred, &V_sema[semid]);
 			if (error != 0)
 				goto done2;
 #endif
@@ -1000,24 +1224,24 @@ sys_semget(struct thread *td, struct semget_args *uap)
 
 	DPRINTF(("need to allocate the semid_kernel\n"));
 	if (key == IPC_PRIVATE || (semflg & IPC_CREAT)) {
-		if (nsems <= 0 || nsems > seminfo.semmsl) {
+		if (nsems <= 0 || nsems > V_seminfo.semmsl) {
 			DPRINTF(("nsems out of range (0<%d<=%d)\n", nsems,
-			    seminfo.semmsl));
+			    V_seminfo.semmsl));
 			error = EINVAL;
 			goto done2;
 		}
-		if (nsems > seminfo.semmns - semtot) {
+		if (nsems > V_seminfo.semmns - V_semtot) {
 			DPRINTF((
 			    "not enough semaphores left (need %d, got %d)\n",
-			    nsems, seminfo.semmns - semtot));
+			    nsems, V_seminfo.semmns - V_semtot));
 			error = ENOSPC;
 			goto done2;
 		}
-		for (semid = 0; semid < seminfo.semmni; semid++) {
-			if ((sema[semid].u.sem_perm.mode & SEM_ALLOC) == 0)
+		for (semid = 0; semid < V_seminfo.semmni; semid++) {
+			if ((V_sema[semid].u.sem_perm.mode & SEM_ALLOC) == 0)
 				break;
 		}
-		if (semid == seminfo.semmni) {
+		if (semid == V_seminfo.semmni) {
 			DPRINTF(("no more semid_kernel's available\n"));
 			error = ENOSPC;
 			goto done2;
@@ -1034,31 +1258,34 @@ sys_semget(struct thread *td, struct semget_args *uap)
 		}
 #endif
 		DPRINTF(("semid %d is available\n", semid));
-		mtx_lock(&sema_mtx[semid]);
-		KASSERT((sema[semid].u.sem_perm.mode & SEM_ALLOC) == 0,
+		mtx_lock(&V_sema_mtx[semid]);
+		KASSERT((V_sema[semid].u.sem_perm.mode & SEM_ALLOC) == 0,
 		    ("Lost semaphore %d", semid));
-		sema[semid].u.sem_perm.key = key;
-		sema[semid].u.sem_perm.cuid = cred->cr_uid;
-		sema[semid].u.sem_perm.uid = cred->cr_uid;
-		sema[semid].u.sem_perm.cgid = cred->cr_gid;
-		sema[semid].u.sem_perm.gid = cred->cr_gid;
-		sema[semid].u.sem_perm.mode = (semflg & 0777) | SEM_ALLOC;
-		sema[semid].cred = crhold(cred);
-		sema[semid].u.sem_perm.seq =
-		    (sema[semid].u.sem_perm.seq + 1) & 0x7fff;
-		sema[semid].u.sem_nsems = nsems;
-		sema[semid].u.sem_otime = 0;
-		sema[semid].u.sem_ctime = time_second;
-		sema[semid].u.sem_base = &sem[semtot];
-		semtot += nsems;
-		bzero(sema[semid].u.sem_base,
-		    sizeof(sema[semid].u.sem_base[0])*nsems);
-#ifdef MAC
-		mac_sysvsem_create(cred, &sema[semid]);
+		V_sema[semid].u.sem_perm.key = key;
+		V_sema[semid].u.sem_perm.cuid = cred->cr_uid;
+		V_sema[semid].u.sem_perm.uid = cred->cr_uid;
+		V_sema[semid].u.sem_perm.cgid = cred->cr_gid;
+		V_sema[semid].u.sem_perm.gid = cred->cr_gid;
+		V_sema[semid].u.sem_perm.mode = (semflg & 0777) | SEM_ALLOC;
+		V_sema[semid].cred = crhold(cred);
+		V_sema[semid].u.sem_perm.seq =
+		    (V_sema[semid].u.sem_perm.seq + 1) & 0x7fff;
+		V_sema[semid].u.sem_nsems = nsems;
+		V_sema[semid].u.sem_otime = 0;
+		V_sema[semid].u.sem_ctime = time_second;
+		V_sema[semid].u.sem_base = &sem[semtot];
+		V_semtot += nsems;
+#ifdef VPS
+		atomic_add_int(&semtot_global, nsems);
 #endif
-		mtx_unlock(&sema_mtx[semid]);
+		bzero(V_sema[semid].u.sem_base,
+		    sizeof(V_sema[semid].u.sem_base[0])*nsems);
+#ifdef MAC
+		mac_sysvsem_create(cred, &V_sema[semid]);
+#endif
+		mtx_unlock(&V_sema_mtx[semid]);
 		DPRINTF(("sembase = %p, next = %p\n",
-		    sema[semid].u.sem_base, &sem[semtot]));
+		    V_sema[semid].u.sem_base, &V_sem[semtot]));
 	} else {
 		DPRINTF(("didn't find it and wasn't asked to create it\n"));
 		error = ENOENT;
@@ -1066,9 +1293,9 @@ sys_semget(struct thread *td, struct semget_args *uap)
 	}
 
 found:
-	td->td_retval[0] = IXSEQ_TO_IPCID(semid, sema[semid].u.sem_perm);
+	td->td_retval[0] = IXSEQ_TO_IPCID(semid, V_sema[semid].u.sem_perm);
 done2:
-	mtx_unlock(&sem_mtx);
+	mtx_unlock(&V_sem_mtx);
 	return (error);
 }
 
@@ -1111,14 +1338,14 @@ sys_semop(struct thread *td, struct semop_args *uap)
 
 	semid = IPCID_TO_IX(semid);	/* Convert back to zero origin */
 
-	if (semid < 0 || semid >= seminfo.semmni)
+	if (semid < 0 || semid >= V_seminfo.semmni)
 		return (EINVAL);
 
 	/* Allocate memory for sem_ops */
 	if (nsops <= SMALL_SOPS)
 		sops = small_sops;
-	else if (nsops > seminfo.semopm) {
-		DPRINTF(("too many sops (max=%d, nsops=%d)\n", seminfo.semopm,
+	else if (nsops > V_seminfo.semopm) {
+		DPRINTF(("too many sops (max=%d, nsops=%d)\n", V_seminfo.semopm,
 		    nsops));
 		return (E2BIG);
 	} else {
@@ -1144,8 +1371,8 @@ sys_semop(struct thread *td, struct semop_args *uap)
 		return (error);
 	}
 
-	semakptr = &sema[semid];
-	sema_mtxp = &sema_mtx[semid];
+	semakptr = &V_sema[semid];
+	sema_mtxp = &V_sema_mtx[semid];
 	mtx_lock(sema_mtxp);
 	if ((semakptr->u.sem_perm.mode & SEM_ALLOC) == 0) {
 		error = EINVAL;
@@ -1227,7 +1454,7 @@ sys_semop(struct thread *td, struct semop_args *uap)
 					break;
 				}
 			} else if (semptr->semval + sopptr->sem_op >
-			    seminfo.semvmx) {
+			    V_seminfo.semvmx) {
 				error = ERANGE;
 				break;
 			} else {
@@ -1413,7 +1640,7 @@ semexit_myhook(void *arg, struct proc *p)
 	 * associated with this process.
 	 */
 	SEMUNDO_LOCK();
-	LIST_FOREACH(suptr, &semu_list, un_next) {
+	LIST_FOREACH(suptr, &V_semu_list, un_next) {
 		if (suptr->un_proc == p)
 			break;
 	}
@@ -1436,8 +1663,8 @@ semexit_myhook(void *arg, struct proc *p)
 			semnum = suptr->un_ent[ix].un_num;
 			adjval = suptr->un_ent[ix].un_adjval;
 			seq = suptr->un_ent[ix].un_seq;
-			semakptr = &sema[semid];
-			sema_mtxp = &sema_mtx[semid];
+			semakptr = &V_sema[semid];
+			sema_mtxp = &V_sema_mtx[semid];
 
 			mtx_lock(sema_mtxp);
 			if ((semakptr->u.sem_perm.mode & SEM_ALLOC) == 0 ||
@@ -1474,7 +1701,7 @@ semexit_myhook(void *arg, struct proc *p)
 	DPRINTF(("removing vector\n"));
 	suptr->un_proc = NULL;
 	suptr->un_cnt = 0;
-	LIST_INSERT_HEAD(&semu_free_list, suptr, un_next);
+	LIST_INSERT_HEAD(&V_semu_free_list, suptr, un_next);
 	SEMUNDO_UNLOCK();
 }
 
@@ -1488,17 +1715,17 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 	pr = req->td->td_ucred->cr_prison;
 	rpr = sem_find_prison(req->td->td_ucred);
 	error = 0;
-	for (i = 0; i < seminfo.semmni; i++) {
-		mtx_lock(&sema_mtx[i]);
-		if ((sema[i].u.sem_perm.mode & SEM_ALLOC) == 0 ||
-		    rpr == NULL || sem_prison_cansee(rpr, &sema[i]) != 0)
+	for (i = 0; i < V_seminfo.semmni; i++) {
+		mtx_lock(&V_sema_mtx[i]);
+		if ((V_sema[i].u.sem_perm.mode & SEM_ALLOC) == 0 ||
+		    rpr == NULL || sem_prison_cansee(rpr, &V_sema[i]) != 0)
 			bzero(&tsemak, sizeof(tsemak));
 		else {
-			tsemak = sema[i];
+			tsemak = V_sema[i];
 			if (tsemak.cred->cr_prison != pr)
 				tsemak.u.sem_perm.key = IPC_PRIVATE;
 		}
-		mtx_unlock(&sema_mtx[i]);
+		mtx_unlock(&V_sema_mtx[i]);
 		error = SYSCTL_OUT(req, &tsemak, sizeof(tsemak));
 		if (error != 0)
 			break;
@@ -1528,7 +1755,7 @@ sem_prison_check(void *obj, void *data)
 		case JAIL_SYS_NEW:
 		case JAIL_SYS_INHERIT:
 			prison_lock(pr->pr_parent);
-			prpr = osd_jail_get(pr->pr_parent, sem_prison_slot);
+			prpr = osd_jail_get(pr->pr_parent, V_sem_prison_slot);
 			prison_unlock(pr->pr_parent);
 			if (prpr == NULL)
 				return (EPERM);
@@ -1562,9 +1789,9 @@ sem_prison_set(void *obj, void *data)
 		    : -1;
 	if (jsys == JAIL_SYS_DISABLE) {
 		prison_lock(pr);
-		orpr = osd_jail_get(pr, sem_prison_slot);
+		orpr = osd_jail_get(pr, V_sem_prison_slot);
 		if (orpr != NULL)
-			osd_jail_del(pr, sem_prison_slot);
+			osd_jail_del(pr, V_sem_prison_slot);
 		prison_unlock(pr);
 		if (orpr != NULL) {
 			if (orpr == pr)
@@ -1572,9 +1799,9 @@ sem_prison_set(void *obj, void *data)
 			/* Disable all child jails as well. */
 			FOREACH_PRISON_DESCENDANT(pr, tpr, descend) {
 				prison_lock(tpr);
-				trpr = osd_jail_get(tpr, sem_prison_slot);
+				trpr = osd_jail_get(tpr, V_sem_prison_slot);
 				if (trpr != NULL) {
-					osd_jail_del(tpr, sem_prison_slot);
+					osd_jail_del(tpr, V_sem_prison_slot);
 					prison_unlock(tpr);
 					if (trpr == tpr)
 						sem_prison_cleanup(tpr);
@@ -1589,14 +1816,14 @@ sem_prison_set(void *obj, void *data)
 			nrpr = pr;
 		else {
 			prison_lock(pr->pr_parent);
-			nrpr = osd_jail_get(pr->pr_parent, sem_prison_slot);
+			nrpr = osd_jail_get(pr->pr_parent, V_sem_prison_slot);
 			prison_unlock(pr->pr_parent);
 		}
-		rsv = osd_reserve(sem_prison_slot);
+		rsv = osd_reserve(V_sem_prison_slot);
 		prison_lock(pr);
-		orpr = osd_jail_get(pr, sem_prison_slot);
+		orpr = osd_jail_get(pr, V_sem_prison_slot);
 		if (orpr != nrpr)
-			(void)osd_jail_set_reserved(pr, sem_prison_slot, rsv,
+			(void)osd_jail_set_reserved(pr, V_sem_prison_slot, rsv,
 			    nrpr);
 		else
 			osd_free_reserved(rsv);
@@ -1609,10 +1836,10 @@ sem_prison_set(void *obj, void *data)
 				FOREACH_PRISON_DESCENDANT(pr, tpr, descend) {
 					prison_lock(tpr);
 					trpr = osd_jail_get(tpr,
-					    sem_prison_slot);
+					    V_sem_prison_slot);
 					if (trpr == orpr) {
 						(void)osd_jail_set(tpr,
-						    sem_prison_slot, nrpr);
+						    V_sem_prison_slot, nrpr);
 						prison_unlock(tpr);
 						if (trpr == tpr)
 							sem_prison_cleanup(tpr);
@@ -1638,7 +1865,7 @@ sem_prison_get(void *obj, void *data)
 
 	/* Set sysvsem based on the jail's root prison. */
 	prison_lock(pr);
-	rpr = osd_jail_get(pr, sem_prison_slot);
+	rpr = osd_jail_get(pr, V_sem_prison_slot);
 	prison_unlock(pr);
 	jsys = rpr == NULL ? JAIL_SYS_DISABLE
 	    : rpr == pr ? JAIL_SYS_NEW : JAIL_SYS_INHERIT;
@@ -1655,7 +1882,7 @@ sem_prison_remove(void *obj, void *data __unused)
 	struct prison *rpr;
 
 	prison_lock(pr);
-	rpr = osd_jail_get(pr, sem_prison_slot);
+	rpr = osd_jail_get(pr, V_sem_prison_slot);
 	prison_unlock(pr);
 	if (rpr == pr)
 		sem_prison_cleanup(pr);
@@ -1668,19 +1895,265 @@ sem_prison_cleanup(struct prison *pr)
 	int i;
 
 	/* Remove any sems that belong to this jail. */
-	mtx_lock(&sem_mtx);
-	for (i = 0; i < seminfo.semmni; i++) {
-		if ((sema[i].u.sem_perm.mode & SEM_ALLOC) &&
-		    sema[i].cred != NULL && sema[i].cred->cr_prison == pr) {
-			mtx_lock(&sema_mtx[i]);
+	mtx_lock(&V_sem_mtx);
+	for (i = 0; i < V_seminfo.semmni; i++) {
+		if ((V_sema[i].u.sem_perm.mode & SEM_ALLOC) &&
+		    V_sema[i].cred != NULL && V_sema[i].cred->cr_prison == pr) {
+			mtx_lock(&V_sema_mtx[i]);
 			sem_remove(i, NULL);
-			mtx_unlock(&sema_mtx[i]);
+			mtx_unlock(&V_sema_mtx[i]);
 		}
 	}
-	mtx_unlock(&sem_mtx);
+	mtx_unlock(&V_sem_mtx);
 }
 
 SYSCTL_JAIL_PARAM_SYS_NODE(sysvsem, CTLFLAG_RW, "SYSV semaphores");
+
+#ifdef VPS
+
+__attribute__ ((noinline, unused))
+int
+sem_snapshot_vps(struct vps_snapst_ctx *ctx, struct vps *vps)
+{
+	struct vps_dumpobj *o1;
+	struct vps_dump_sysvsem_seminfo *vdseminfo;
+	struct vps_dump_sysvsem_semid *vdsema;
+	struct vps_dump_sysvsem_sem *vdsem;
+	struct vps_dump_sysvsem_sem_undo *vdsemu;
+	struct semid_kernel *sema;
+	struct seminfo *seminfo;
+	struct sem *sem;
+	struct sem_undo *semu;
+	int vdsemu_size;
+	int i;
+
+	o1 = vdo_create(ctx, VPS_DUMPOBJT_SYSVSEM_VPS, M_WAITOK);
+
+	seminfo = &VPS_VPS(vps, seminfo);
+	vdseminfo = vdo_space(ctx, sizeof(*vdseminfo), M_WAITOK);
+	vdseminfo->semmni = seminfo->semmni;
+	vdseminfo->semmns = seminfo->semmns;
+	vdseminfo->semmnu = seminfo->semmnu;
+	vdseminfo->semmsl = seminfo->semmsl;
+	vdseminfo->semopm = seminfo->semopm;
+	vdseminfo->semume = seminfo->semume;
+	vdseminfo->semusz = seminfo->semusz;
+	vdseminfo->semvmx = seminfo->semvmx;
+	vdseminfo->semaem = seminfo->semaem;
+	vdseminfo->semtot = VPS_VPS(vps, semtot);
+	vdseminfo->sem_prison_slot = VPS_VPS(vps, sem_prison_slot);
+
+	/* sema */
+	sema = VPS_VPS(vps, sema);
+	vdsema = vdo_space(ctx, sizeof(struct vps_dump_sysvsem_semid) *
+		seminfo->semmni, M_WAITOK);
+	for (i = 0; i < seminfo->semmni; i++) {
+		vdsema[i].sem_base = -1;
+		if (sema[i].u.sem_base != NULL)
+			vdsema[i].sem_base = sema[i].u.sem_base - VPS_VPS(vps, sem);
+		vdsema[i].sem_nsems = sema[i].u.sem_nsems;
+		vdsema[i].sem_otime = sema[i].u.sem_otime;
+		vdsema[i].sem_ctime = sema[i].u.sem_ctime;
+		/* XXX assert label == NULL */
+		vdsema[i].label = sema[i].label;
+		vdsema[i].cred = sema[i].cred;
+		vdsema[i].sem_perm.cuid = sema[i].u.sem_perm.cuid;
+		vdsema[i].sem_perm.cgid = sema[i].u.sem_perm.cgid;
+		vdsema[i].sem_perm.uid = sema[i].u.sem_perm.uid;
+		vdsema[i].sem_perm.gid = sema[i].u.sem_perm.gid;
+		vdsema[i].sem_perm.mode = sema[i].u.sem_perm.mode;
+		vdsema[i].sem_perm.seq = sema[i].u.sem_perm.seq;
+		vdsema[i].sem_perm.key = sema[i].u.sem_perm.key;
+	}
+
+	/* sem */
+	sem = VPS_VPS(vps, sem);
+	vdsem = vdo_space(ctx, sizeof(struct vps_dump_sysvsem_sem) *
+		seminfo->semmns, M_WAITOK);
+	for (i = 0; i < seminfo->semmns; i++) {
+		vdsem[i].semval = sem[i].semval;
+		vdsem[i].sempid = sem[i].sempid;
+		vdsem[i].semncnt = sem[i].semncnt;
+		vdsem[i].semzcnt = sem[i].semzcnt;
+	}
+
+	/* semu */
+	vdsemu_size = sizeof(*vdsemu) + (sizeof(vdsemu->un_ent[0]) * seminfo->semume);
+	vdseminfo->semundo_active = 0;
+	vdsemu = vdo_space(ctx, vdsemu_size * seminfo->semmnu, M_WAITOK);
+
+	LIST_FOREACH(semu, &VPS_VPS(vps, semu_list), un_next) {
+		vdsemu->un_cnt = semu->un_cnt;
+		for (i = 0; i < semu->un_cnt; i++) {
+			vdsemu->un_ent[i].un_adjval = semu->un_ent[i].un_adjval;
+			vdsemu->un_ent[i].un_num = semu->un_ent[i].un_num;
+			vdsemu->un_ent[i].un_id = semu->un_ent[i].un_id;
+			vdsemu->un_ent[i].un_seq = semu->un_ent[i].un_seq;
+		}
+		if (semu->un_proc != NULL)
+			vdsemu->un_proc = semu->un_proc->p_pid;
+
+		/* Next */
+		vdsemu = (struct vps_dump_sysvsem_sem_undo *)((caddr_t)vdsemu + vdsemu_size);
+		vdseminfo->semundo_active++;
+	}
+
+	for (i = 0; i < seminfo->semmni; i++) {
+		if (vdsema[i].cred != NULL)
+			vps_func->vps_snapshot_ucred(ctx, vps, vdsema[i].cred, M_WAITOK);
+	}
+
+	vdo_close(ctx);
+
+	return (0);
+}
+
+__attribute__ ((noinline, unused))
+int
+sem_snapshot_proc(struct vps_snapst_ctx *ctx, struct vps *vps, struct proc *p)
+{
+
+	return (0);
+}
+
+
+__attribute__ ((noinline, unused))
+int
+sem_restore_vps(struct vps_snapst_ctx *ctx, struct vps *vps)
+{
+	struct vps_dump_sysvsem_seminfo *vdseminfo;
+	struct vps_dump_sysvsem_semid *vdsema;
+	struct vps_dump_sysvsem_sem *vdsem;
+	struct vps_dump_sysvsem_sem_undo *vdsemu;
+	struct vps_dumpobj *o1;
+	struct vps *vps_save;
+	struct seminfo *seminfo;
+	struct semid_kernel *sema;
+	struct sem_undo *semu;
+	struct sem *sem;
+	caddr_t cpos;
+	int vdsemu_size;
+	int i;
+	int j;
+
+	o1 = vdo_next(ctx);
+	if (o1->type != VPS_DUMPOBJT_SYSVSEM_VPS) {
+		printf("%s: o1=%p is not VPS_DUMPOBJT_SYSVSEM_VPS\n",
+			__func__, o1);
+		return (EINVAL);
+	}
+	vdseminfo = (struct vps_dump_sysvsem_seminfo *)o1->data;
+
+	/* realloc in case seminfo is different */
+	vps_save = curthread->td_vps;
+	curthread->td_vps = vps;
+	semunload();
+	seminfo = &VPS_VPS(vps, seminfo);
+	seminfo->semmni = vdseminfo->semmni;
+	seminfo->semmns = vdseminfo->semmns;
+	seminfo->semmnu = vdseminfo->semmnu;
+	seminfo->semmsl = vdseminfo->semmsl;
+	seminfo->semopm = vdseminfo->semopm;
+	seminfo->semume = vdseminfo->semume;
+	seminfo->semusz = vdseminfo->semusz;
+	seminfo->semvmx = vdseminfo->semvmx;
+	seminfo->semaem = vdseminfo->semaem;
+	seminit2();
+	curthread->td_vps = vps_save;
+
+	VPS_VPS(vps, semtot) = vdseminfo->semtot;
+	cpos = (caddr_t)(vdseminfo + 1);
+
+	/* sema */
+	sema = VPS_VPS(vps, sema);
+	vdsema = (struct vps_dump_sysvsem_semid *)cpos;
+	cpos += sizeof(*vdsema) * seminfo->semmni;
+	for (i = 0; i < seminfo->semmni; i++) {
+		sema[i].u.sem_base = NULL;
+		if (vdsema[i].sem_base != -1)
+			sema[i].u.sem_base = VPS_VPS(vps, sem) + vdsema[i].sem_base;
+		sema[i].u.sem_nsems = vdsema[i].sem_nsems;
+		sema[i].u.sem_otime = vdsema[i].sem_otime;
+		sema[i].u.sem_ctime = vdsema[i].sem_ctime;
+		/* XXX assert label == NULL */
+		//sema[i].label = vdsema[i].label;
+		sema[i].label = NULL;
+		sema[i].cred = vdsema[i].cred;
+		sema[i].u.sem_perm.cuid = vdsema[i].sem_perm.cuid;
+		sema[i].u.sem_perm.cgid = vdsema[i].sem_perm.cgid;
+		sema[i].u.sem_perm.uid = vdsema[i].sem_perm.uid;
+		sema[i].u.sem_perm.gid = vdsema[i].sem_perm.gid;
+		sema[i].u.sem_perm.mode = vdsema[i].sem_perm.mode;
+		sema[i].u.sem_perm.seq = vdsema[i].sem_perm.seq;
+		sema[i].u.sem_perm.key = vdsema[i].sem_perm.key;
+	}
+
+	/* sem */
+	sem = VPS_VPS(vps, sem);
+	vdsem = (struct vps_dump_sysvsem_sem *)cpos;
+	cpos += sizeof(*vdsem) * seminfo->semmns;
+	for (i = 0; i < seminfo->semmns; i++) {
+		sem[i].semval = vdsem[i].semval;
+		sem[i].sempid = vdsem[i].sempid;
+		sem[i].semncnt = vdsem[i].semncnt;
+		sem[i].semzcnt = vdsem[i].semzcnt;
+	}
+
+	/* sem undo */
+	vdsemu_size = sizeof(*vdsemu) + (sizeof(vdsemu->un_ent[0]) * seminfo->semume);
+	vdsemu = (struct vps_dump_sysvsem_sem_undo *)cpos;
+	for (i = 0; i < vdseminfo->semundo_active; i++) {
+		if ((semu = LIST_FIRST(&VPS_VPS(vps, semu_free_list))) == NULL)
+			panic("nothing on semu_free_list\n");
+		LIST_REMOVE(semu, un_next);
+		LIST_INSERT_HEAD(&VPS_VPS(vps, semu_list), semu, un_next);
+		semu->un_cnt = vdsemu->un_cnt;
+		/* proc pointers fixup happens later */
+		semu->un_proc = (void *)(size_t)vdsemu->un_proc;
+		for (j = 0; j < semu->un_cnt; j++) {
+			semu->un_ent[j].un_adjval = vdsemu->un_ent[j].un_adjval;
+			semu->un_ent[j].un_num = vdsemu->un_ent[j].un_num;
+			semu->un_ent[j].un_id = vdsemu->un_ent[j].un_id;
+			semu->un_ent[j].un_seq = vdsemu->un_ent[j].un_seq;
+		}
+	}
+
+	while (vdo_typeofnext(ctx) == VPS_DUMPOBJT_UCRED)
+		vdo_next(ctx);//vps_func->vps_restore_ucred(ctx, vps);
+
+	for (i = 0; i < seminfo->semmni; i++) {
+		if (sema[i].cred != NULL)
+			sema[i].cred = vps_func->vps_restore_ucred_lookup(ctx,
+					vps, sema[i].cred);
+	}
+
+	return (0);
+}
+
+__attribute__ ((noinline, unused))
+int
+sem_restore_proc(struct vps_snapst_ctx *ctx, struct vps *vps, struct proc *p)
+{
+
+	return (0);
+}
+
+__attribute__ ((noinline, unused))
+int
+sem_restore_fixup(struct vps_snapst_ctx *ctx, struct vps *vps)
+{
+	struct sem_undo *suptr;
+
+	/* Fixup sem undo proc pointers. */
+	LIST_FOREACH(suptr, &VPS_VPS(vps, semu_list), un_next) {
+		suptr->un_proc = pfind((pid_t)(size_t)suptr->un_proc);
+		KASSERT(suptr->un_proc != NULL,
+			("%s: suptr->un_proc == NULL\n", __func__));
+	}
+
+	return (0);
+}
+#endif
 
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)

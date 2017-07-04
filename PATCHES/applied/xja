@@ -981,7 +981,7 @@ diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-strippe
 +	sint32 _pad0;
 +
 +        sint32 semtot;
-+        sint32 semundo_active;
++        sint32 semundo_active;		/* XXX-BZ unsigned sem_prison_slot. */
 +};
 +
 +struct vps_dump_sysvsem_semid {
