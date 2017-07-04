@@ -1046,7 +1046,7 @@ diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-strippe
 +	sint32 shmalloced;
 +	sint32 _pad0;
 +	uint64 shm_committed;
-+
++ /* XXX-BZ unsigned shm_prison_slot; */
 +	struct vps_dump_sysvshm_shmid shmsegs[0];
 +};
 +

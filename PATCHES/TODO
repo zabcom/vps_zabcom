@@ -12,6 +12,7 @@ hostid?
 failed/xej	sysv_msg ... skipped
 failed/xek	sysv_sem ... skipped
 failed/xel	sysy_shm ... skipped
+	vps_dump_sysvshm_shminfo -> needs the extra prison field.
 
 xes -> vfs_cache.c needs review;  just applied blindly so far.
 
