@@ -935,7 +935,7 @@ diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-strippe
 +
 +	sint32 nfree_msgmaps;
 +	sint32 free_msgmaps;
-+	uint64 free_msghdrs_idx;
++	uint64 free_msghdrs_idx;		/* XXX-BZ unsigned msg_prison_slot */
 +};
 +
 +struct vps_dump_sysvmsg_msg {

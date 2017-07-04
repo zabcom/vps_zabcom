@@ -10,9 +10,12 @@ _SYSCTL_ROOT_NODE
 hostid?
 
 failed/xej	sysv_msg ... skipped
+	xja -> msg_prison_slot
 failed/xek	sysv_sem ... skipped
+	xja -> sem_prison_slot
 failed/xel	sysy_shm ... skipped
 	vps_dump_sysvshm_shminfo -> needs the extra prison field.
+	}}} all three need proper OSD save/restore if we keep it?
 
 xes -> vfs_cache.c needs review;  just applied blindly so far.
 

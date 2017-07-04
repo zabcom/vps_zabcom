@@ -52,6 +52,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*-
+ * VPS adaption:
+ *
+ * Copyright (c) 2009-2013 Klaus P. Ohrhallinger <k@7he.at>
+ * All rights reserved.
+ *
+ * Development of this software was partly funded by:
+ *    TransIP.nl <http://www.transip.nl/>
+ *
+ * <BSD license>
+ *
+ * $Id: sysv_msg.c 212 2014-01-15 10:13:16Z klaus $
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -78,15 +91,23 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
 #include <sys/jail.h>
+#include <sys/eventhandler.h>
 
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
+
+#include <vps/vps.h>
+#include <vps/vps2.h>
+#include <vps/vps_int.h>
+#include <vps/vps_libdump.h>
+#include <vps/vps_snapst.h>
 
 FEATURE(sysv_msg, "System V message queues support");
 
 static MALLOC_DEFINE(M_MSG, "msg", "SVID compatible message queues");
 
 static int msginit(void);
+static int msginit2(void);
 static int msgunload(void);
 static int sysvmsg_modload(struct module *, int, void *);
 static void msq_remove(struct msqid_kernel *);
@@ -134,6 +155,7 @@ static void msg_freehdr(struct msg *msghdr);
  * Consequently, msginit in kern/sysv_msg.c checks that msgssz is a power of
  * two between 8 and 1024 inclusive (and panic's if it isn't).
  */
+#if 0
 struct msginfo msginfo = {
                 MSGMAX,         /* max chars in a message */
                 MSGMNI,         /* # of message queue identifiers */
@@ -143,6 +165,7 @@ struct msginfo msginfo = {
                 		/* (must be small power of 2 greater than 4) */
                 MSGSEG          /* number of message segments */
 };
+#endif
 
 /*
  * macros to convert between msqid_ds's and msqid's.
@@ -164,6 +187,7 @@ struct msgmap {
 
 #define MSG_LOCKED	01000	/* Is this msqid_ds locked? */
 
+#if 0
 static int nfree_msgmaps;	/* # of free map entries */
 static short free_msgmaps;	/* head of linked list of free map entries */
 static struct msg *free_msghdrs;/* list of free msg headers */
@@ -173,6 +197,29 @@ static struct msg *msghdrs;	/* MSGTQL msg headers */
 static struct msqid_kernel *msqids;	/* MSGMNI msqid_kernel struct's */
 static struct mtx msq_mtx;	/* global mutex for message queues. */
 static unsigned msg_prison_slot;/* prison OSD slot */
+#endif
+
+VPS_DEFINE(int, nfree_msgmaps);
+VPS_DEFINE(short, free_msgmaps);
+VPS_DEFINE(struct msg *, free_msghdrs);
+VPS_DEFINE(char *, msgpool);
+VPS_DEFINE(struct msgmap *, msgmaps);
+VPS_DEFINE(struct msg *, msghdrs);
+VPS_DEFINE(struct msqid_kernel *, msqids);
+VPS_DEFINE(struct mtx, msq_mtx);
+VPS_DEFINE(unsigned, msg_prison_slot);
+VPS_DEFINE(struct msginfo, msginfo);
+
+#define	V_nfree_msgmaps		VPSV(nfree_msgmaps)
+#define	V_free_msgmaps		VPSV(free_msgmaps)
+#define	V_free_msghdrs		VPSV(free_msghdrs)
+#define	V_msgpool		VPSV(msgpool)
+#define	V_msgmaps		VPSV(msgmaps)
+#define	V_msghdrs		VPSV(msghdrs)
+#define	V_msqids		VPSV(msqids)
+#define	V_msq_mtx		VPSV(msq_mtx)
+#define	V_msg_prison_slot	VPSV(msg_prison_slot)
+#define	V_msginfo		VPSV(msginfo)
 
 static struct syscall_helper_data msg_syscalls[] = {
 	SYSCALL_INIT_HELPER(msgctl),
@@ -209,12 +256,126 @@ static struct syscall_helper_data msg32_syscalls[] = {
 };
 #endif
 
+#ifdef VPS
+static u_int nmsgmaps_global;
+static eventhandler_tag msg_vpsalloc_tag;
+static eventhandler_tag msg_vpsfree_tag;
+
+int msg_snapshot_vps(struct vps_snapst_ctx *ctx, struct vps *vps);
+int msg_snapshot_proc(struct vps_snapst_ctx *ctx, struct vps *vps, struct proc* proc);
+int msg_restore_vps(struct vps_snapst_ctx *ctx, struct vps *vps);
+int msg_restore_proc(struct vps_snapst_ctx *ctx, struct vps *vps, struct proc* proc);
+int msg_restore_fixup(struct vps_snapst_ctx *ctx, struct vps *vps);
+
+static void
+msg_vpsalloc_hook(void *arg, struct vps *vps)
+{
+
+	DPRINTF(("%s: vps=%p\n", __func__, vps));
+
+	vps_ref(vps, NULL);
+
+	msginit();
+}
+
+static void
+msg_vpsfree_hook(void *arg, struct vps *vps)
+{
+
+	DPRINTF(("%s: vps=%p\n", __func__, vps));
+
+	if (msgunload())
+		printf("%s: msgunload() error\n", __func__);
+
+	vps_deref(vps, NULL);
+}
+
 static int
-msginit()
+msginit_global(void)
+{
+	struct vps *vps, *save_vps;
+	int error;
+
+	save_vps = curthread->td_vps;
+
+	nmsgmaps_global = 0;
+
+	sx_slock(&vps_all_lock);
+	LIST_FOREACH(vps, &vps_head, vps_all) {
+		curthread->td_vps = vps;
+		msg_vpsalloc_hook(NULL, vps);
+		curthread->td_vps = save_vps;
+	}
+	sx_sunlock(&vps_all_lock);
+
+	msg_vpsalloc_tag = EVENTHANDLER_REGISTER(vps_alloc, msg_vpsalloc_hook, NULL,
+		EVENTHANDLER_PRI_ANY);
+	msg_vpsfree_tag = EVENTHANDLER_REGISTER(vps_free, msg_vpsfree_hook, NULL,
+		EVENTHANDLER_PRI_ANY);
+
+	vps_func->msg_snapshot_vps = msg_snapshot_vps;
+	vps_func->msg_snapshot_proc = msg_snapshot_proc;
+	vps_func->msg_restore_vps = msg_restore_vps;
+	vps_func->msg_restore_proc = msg_restore_proc;
+	vps_func->msg_restore_fixup = msg_restore_fixup;
+
+	error = syscall_helper_register(msg_syscalls);
+	if (error != 0)
+		return (error);
+#ifdef COMPAT_FREEBSD32
+	error = syscall32_helper_register(msg32_syscalls);
+	if (error != 0)
+		return (error);
+#endif
+	return (error);
+}
+
+static int
+msgunload_global(void)
+{
+	struct vps *vps, *save_vps;
+
+	save_vps = curthread->td_vps;
+
+	if (nmsgmaps_global > 0)
+		return (EBUSY);
+
+	syscall_helper_unregister(msg_syscalls);
+#ifdef COMPAT_FREEBSD32
+	syscall32_helper_unregister(msg32_syscalls);
+#endif
+
+	vps_func->msg_snapshot_vps = NULL;
+	vps_func->msg_snapshot_proc = NULL;
+	vps_func->msg_restore_vps = NULL;
+	vps_func->msg_restore_proc = NULL;
+	vps_func->msg_restore_fixup = NULL;
+
+	EVENTHANDLER_DEREGISTER(vps_alloc, msg_vpsalloc_tag);
+	EVENTHANDLER_DEREGISTER(vps_free, msg_vpsfree_tag);
+
+	sx_slock(&vps_all_lock);
+	LIST_FOREACH(vps, &vps_head, vps_all) {
+		curthread->td_vps = vps;
+		if (VPS_VPS(vps, msgpool))
+			msg_vpsfree_hook(NULL, vps);
+		curthread->td_vps = save_vps;
+	}
+	sx_sunlock(&vps_all_lock);
+
+	return (0);
+}
+#endif /* VPS */
+
+static int
+msginit2()
 {
 	struct prison *pr;
 	void **rsv;
-	int i, error;
+	int i;
+#ifndef VPS
+	int error;
+#endif
 	osd_method_t methods[PR_MAXMETHOD] = {
 	    [PR_METHOD_CHECK] =		msg_prison_check,
 	    [PR_METHOD_SET] =		msg_prison_set,
@@ -222,11 +383,11 @@ msginit()
 	    [PR_METHOD_REMOVE] =	msg_prison_remove,
 	};
 
-	msginfo.msgmax = msginfo.msgseg * msginfo.msgssz;
-	msgpool = malloc(msginfo.msgmax, M_MSG, M_WAITOK);
-	msgmaps = malloc(sizeof(struct msgmap) * msginfo.msgseg, M_MSG, M_WAITOK);
-	msghdrs = malloc(sizeof(struct msg) * msginfo.msgtql, M_MSG, M_WAITOK);
-	msqids = malloc(sizeof(struct msqid_kernel) * msginfo.msgmni, M_MSG,
+	V_msginfo.msgmax = V_msginfo.msgseg * V_msginfo.msgssz;
+	V_msgpool = malloc(V_msginfo.msgmax, M_MSG, M_WAITOK);
+	V_msgmaps = malloc(sizeof(struct msgmap) * V_msginfo.msgseg, M_MSG, M_WAITOK);
+	V_msghdrs = malloc(sizeof(struct msg) * V_msginfo.msgtql, M_MSG, M_WAITOK);
+	V_msqids = malloc(sizeof(struct msqid_kernel) * V_msginfo.msgmni, M_MSG,
 	    M_WAITOK);
 
 	/*
@@ -236,54 +397,55 @@ msginit()
 	 */
 
 	i = 8;
-	while (i < 1024 && i != msginfo.msgssz)
+	while (i < 1024 && i != V_msginfo.msgssz)
 		i <<= 1;
-    	if (i != msginfo.msgssz) {
-		DPRINTF(("msginfo.msgssz=%d (0x%x)\n", msginfo.msgssz,
-		    msginfo.msgssz));
-		panic("msginfo.msgssz not a small power of 2");
+    	if (i != V_msginfo.msgssz) {
+		DPRINTF(("V_msginfo.msgssz=%d (0x%x)\n", V_msginfo.msgssz,
+		    V_msginfo.msgssz));
+		panic("V_msginfo.msgssz not a small power of 2");
 	}
 
-	if (msginfo.msgseg > 32767) {
-		DPRINTF(("msginfo.msgseg=%d\n", msginfo.msgseg));
-		panic("msginfo.msgseg > 32767");
+	if (V_msginfo.msgseg > 32767) {
+		DPRINTF(("V_msginfo.msgseg=%d\n", V_msginfo.msgseg));
+		panic("V_msginfo.msgseg > 32767");
 	}
 
-	for (i = 0; i < msginfo.msgseg; i++) {
+	for (i = 0; i < V_msginfo.msgseg; i++) {
 		if (i > 0)
-			msgmaps[i-1].next = i;
-		msgmaps[i].next = -1;	/* implies entry is available */
+			V_msgmaps[i-1].next = i;
+		V_msgmaps[i].next = -1;	/* implies entry is available */
 	}
-	free_msgmaps = 0;
-	nfree_msgmaps = msginfo.msgseg;
+	V_free_msgmaps = 0;
+	V_nfree_msgmaps = V_msginfo.msgseg;
 
-	for (i = 0; i < msginfo.msgtql; i++) {
-		msghdrs[i].msg_type = 0;
+	for (i = 0; i < V_msginfo.msgtql; i++) {
+		V_msghdrs[i].msg_type = 0;
 		if (i > 0)
-			msghdrs[i-1].msg_next = &msghdrs[i];
-		msghdrs[i].msg_next = NULL;
+			V_msghdrs[i-1].msg_next = &V_msghdrs[i];
+		V_msghdrs[i].msg_next = NULL;
 #ifdef MAC
-		mac_sysvmsg_init(&msghdrs[i]);
+		mac_sysvmsg_init(&V_msghdrs[i]);
 #endif
     	}
-	free_msghdrs = &msghdrs[0];
+	V_free_msghdrs = &V_msghdrs[0];
 
-	for (i = 0; i < msginfo.msgmni; i++) {
-		msqids[i].u.msg_qbytes = 0;	/* implies entry is available */
-		msqids[i].u.msg_perm.seq = 0;	/* reset to a known value */
-		msqids[i].u.msg_perm.mode = 0;
+	for (i = 0; i < V_msginfo.msgmni; i++) {
+		V_msqids[i].u.msg_qbytes = 0;	/* implies entry is available */
+		V_msqids[i].u.msg_perm.seq = 0;	/* reset to a known value */
+		V_msqids[i].u.msg_perm.mode = 0;
+		V_msqids[i].cred = NULL;
 #ifdef MAC
-		mac_sysvmsq_init(&msqids[i]);
+		mac_sysvmsq_init(&V_msqids[i]);
 #endif
 	}
-	mtx_init(&msq_mtx, "msq", NULL, MTX_DEF);
+	mtx_init(&V_msq_mtx, "msq", NULL, MTX_DEF);
 
 	/* Set current prisons according to their allow.sysvipc. */
-	msg_prison_slot = osd_jail_register(NULL, methods);
-	rsv = osd_reserve(msg_prison_slot);
-	prison_lock(&prison0);
-	(void)osd_jail_set_reserved(&prison0, msg_prison_slot, rsv, &prison0);
-	prison_unlock(&prison0);
+	V_msg_prison_slot = osd_jail_register(NULL, methods);
+	rsv = osd_reserve(V_msg_prison_slot);
+	prison_lock(&V_prison0);
+	(void)osd_jail_set_reserved(V_prison0, msg_prison_slot, rsv, V_prison0);
+	prison_unlock(&V_prison0);
 	rsv = NULL;
 	sx_slock(&allprison_lock);
 	TAILQ_FOREACH(pr, &allprison, pr_list) {
@@ -291,7 +453,7 @@ msginit()
 			rsv = osd_reserve(msg_prison_slot);
 		prison_lock(pr);
 		if ((pr->pr_allow & PR_ALLOW_SYSVIPC) && pr->pr_ref > 0) {
-			(void)osd_jail_set_reserved(pr, msg_prison_slot, rsv,
+			(void)osd_jail_set_reserved(pr, V_msg_prison_slot, rsv,
 			    &prison0);
 			rsv = NULL;
 		}
@@ -301,6 +463,7 @@ msginit()
 		osd_free_reserved(rsv);
 	sx_sunlock(&allprison_lock);
 
+#ifndef VPS
 	error = syscall_helper_register(msg_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
 		return (error);
@@ -309,7 +472,22 @@ msginit()
 	if (error != 0)
 		return (error);
 #endif
+#endif
 	return (0);
+}
+
+static int
+msginit()
+{
+
+	V_msginfo.msgmax = MSGMAX;
+	V_msginfo.msgmni = MSGMNI;
+	V_msginfo.msgmnb = MSGMNB;
+	V_msginfo.msgtql = MSGTQL;
+	V_msginfo.msgssz = MSGSSZ;
+	V_msginfo.msgseg = MSGSEG;
+
+	return (msginit2());
 }
 
 static int
@@ -321,33 +499,38 @@ msgunload()
 	int i;
 #endif
 
+#ifndef VPS
 	syscall_helper_unregister(msg_syscalls);
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(msg32_syscalls);
 #endif
+#endif /* VPS */
 
-	for (msqid = 0; msqid < msginfo.msgmni; msqid++) {
-		msqkptr = &msqids[msqid];
+	for (msqid = 0; msqid < V_msginfo.msgmni; msqid++) {
+		msqkptr = &V_msqids[msqid];
 		if (msqkptr->u.msg_qbytes != 0 ||
 		    (msqkptr->u.msg_perm.mode & MSG_LOCKED) != 0)
 			break;
 	}
-	if (msqid != msginfo.msgmni)
+#ifndef VPS
+	/* For VPS, just kill everything silently. */
+	if (msqid != V_msginfo.msgmni)
 		return (EBUSY);
-
-	if (msg_prison_slot != 0)
-		osd_jail_deregister(msg_prison_slot);
-#ifdef MAC
-	for (i = 0; i < msginfo.msgtql; i++)
-		mac_sysvmsg_destroy(&msghdrs[i]);
-	for (msqid = 0; msqid < msginfo.msgmni; msqid++)
-		mac_sysvmsq_destroy(&msqids[msqid]);
 #endif
-	free(msgpool, M_MSG);
-	free(msgmaps, M_MSG);
-	free(msghdrs, M_MSG);
-	free(msqids, M_MSG);
-	mtx_destroy(&msq_mtx);
+
+	if (V_msg_prison_slot != 0)
+		osd_jail_deregister(V_msg_prison_slot);
+#ifdef MAC
+	for (i = 0; i < V_msginfo.msgtql; i++)
+		mac_sysvmsg_destroy(&V_msghdrs[i]);
+	for (msqid = 0; msqid < V_msginfo.msgmni; msqid++)
+		mac_sysvmsq_destroy(&V_msqids[msqid]);
+#endif
+	free(V_msgpool, M_MSG);
+	free(V_msgmaps, M_MSG);
+	free(V_msghdrs, M_MSG);
+	free(V_msqids, M_MSG);
+	mtx_destroy(&V_msq_mtx);
 	return (0);
 }
 
@@ -359,12 +542,22 @@ sysvmsg_modload(struct module *module, int cmd, void *arg)
 
 	switch (cmd) {
 	case MOD_LOAD:
+#ifdef VPS
+		error = msginit_global();
+		if (error != 0)
+			msgunload_global();
+#else
 		error = msginit();
 		if (error != 0)
 			msgunload();
+#endif
 		break;
 	case MOD_UNLOAD:
+#ifdef VPS
+		error = msgunload_global();
+#else
 		error = msgunload();
+#endif
 		break;
 	case MOD_SHUTDOWN:
 		break;
@@ -390,22 +583,25 @@ msg_freehdr(msghdr)
 {
 	while (msghdr->msg_ts > 0) {
 		short next;
-		if (msghdr->msg_spot < 0 || msghdr->msg_spot >= msginfo.msgseg)
+		if (msghdr->msg_spot < 0 || msghdr->msg_spot >= V_msginfo.msgseg)
 			panic("msghdr->msg_spot out of range");
-		next = msgmaps[msghdr->msg_spot].next;
-		msgmaps[msghdr->msg_spot].next = free_msgmaps;
-		free_msgmaps = msghdr->msg_spot;
-		nfree_msgmaps++;
+		next = V_msgmaps[msghdr->msg_spot].next;
+		msgmaps[msghdr->msg_spot].next = V_free_msgmaps;
+		V_free_msgmaps = msghdr->msg_spot;
+		V_nfree_msgmaps++;
+#ifdef VPS
+		atomic_subtract_int(&nmsgmaps_global, 1);
+#endif
 		msghdr->msg_spot = next;
-		if (msghdr->msg_ts >= msginfo.msgssz)
-			msghdr->msg_ts -= msginfo.msgssz;
+		if (msghdr->msg_ts >= V_msginfo.msgssz)
+			msghdr->msg_ts -= V_msginfo.msgssz;
 		else
 			msghdr->msg_ts = 0;
 	}
 	if (msghdr->msg_spot != -1)
 		panic("msghdr->msg_spot != -1");
-	msghdr->msg_next = free_msghdrs;
-	free_msghdrs = msghdr;
+	msghdr->msg_next = V_free_msghdrs;
+	V_free_msghdrs = msghdr;
 #ifdef MAC
 	mac_sysvmsg_cleanup(msghdr);
 #endif
@@ -456,7 +652,7 @@ msg_find_prison(struct ucred *cred)
 
 	pr = cred->cr_prison;
 	prison_lock(pr);
-	rpr = osd_jail_get(pr, msg_prison_slot);
+	rpr = osd_jail_get(pr, V_msg_prison_slot);
 	prison_unlock(pr);
 	return rpr;
 }
@@ -516,15 +712,15 @@ kern_msgctl(td, msqid, cmd, msqbuf)
 	AUDIT_ARG_SVIPC_ID(msqid);
 	msqix = IPCID_TO_IX(msqid);
 
-	if (msqix < 0 || msqix >= msginfo.msgmni) {
+	if (msqix < 0 || msqix >= V_msginfo.msgmni) {
 		DPRINTF(("msqid (%d) out of range (0<=msqid<%d)\n", msqix,
-		    msginfo.msgmni));
+		    V_msginfo.msgmni));
 		return (EINVAL);
 	}
 
-	msqkptr = &msqids[msqix];
+	msqkptr = &V_msqids[msqix];
 
-	mtx_lock(&msq_mtx);
+	mtx_lock(&V_msq_mtx);
 	if (msqkptr->u.msg_qbytes == 0) {
 		DPRINTF(("no such msqid\n"));
 		error = EINVAL;
@@ -593,10 +789,10 @@ kern_msgctl(td, msqid, cmd, msqbuf)
 			if (error)
 				goto done2;
 		}
-		if (msqbuf->msg_qbytes > msginfo.msgmnb) {
+		if (msqbuf->msg_qbytes > V_msginfo.msgmnb) {
 			DPRINTF(("can't increase msg_qbytes beyond %d"
-			    "(truncating)\n", msginfo.msgmnb));
-			msqbuf->msg_qbytes = msginfo.msgmnb;	/* silently restrict qbytes to system limit */
+			    "(truncating)\n", V_msginfo.msgmnb));
+			msqbuf->msg_qbytes = V_msginfo.msgmnb;	/* silently restrict qbytes to system limit */
 		}
 		if (msqbuf->msg_qbytes == 0) {
 			DPRINTF(("can't reduce msg_qbytes to 0\n"));
@@ -630,7 +826,7 @@ kern_msgctl(td, msqid, cmd, msqbuf)
 	if (error == 0)
 		td->td_retval[0] = rval;
 done2:
-	mtx_unlock(&msq_mtx);
+	mtx_unlock(&V_msq_mtx);
 	return (error);
 }
 
@@ -655,17 +851,17 @@ sys_msgget(struct thread *td, struct msgget_args *uap)
 	if (msg_find_prison(cred) == NULL)
 		return (ENOSYS);
 
-	mtx_lock(&msq_mtx);
+	mtx_lock(&V_msq_mtx);
 	if (key != IPC_PRIVATE) {
-		for (msqid = 0; msqid < msginfo.msgmni; msqid++) {
-			msqkptr = &msqids[msqid];
+		for (msqid = 0; msqid < V_msginfo.msgmni; msqid++) {
+			msqkptr = &V_msqids[msqid];
 			if (msqkptr->u.msg_qbytes != 0 &&
 			    msqkptr->cred != NULL &&
 			    msqkptr->cred->cr_prison == cred->cr_prison &&
 			    msqkptr->u.msg_perm.key == key)
 				break;
 		}
-		if (msqid < msginfo.msgmni) {
+		if (msqid < V_msginfo.msgmni) {
 			DPRINTF(("found public key\n"));
 			if ((msgflg & IPC_CREAT) && (msgflg & IPC_EXCL)) {
 				DPRINTF(("not exclusive\n"));
@@ -691,19 +887,19 @@ sys_msgget(struct thread *td, struct msgget_args *uap)
 
 	DPRINTF(("need to allocate the msqid_ds\n"));
 	if (key == IPC_PRIVATE || (msgflg & IPC_CREAT)) {
-		for (msqid = 0; msqid < msginfo.msgmni; msqid++) {
+		for (msqid = 0; msqid < V_msginfo.msgmni; msqid++) {
 			/*
 			 * Look for an unallocated and unlocked msqid_ds.
 			 * msqid_ds's can be locked by msgsnd or msgrcv while
 			 * they are copying the message in/out.  We can't
 			 * re-use the entry until they release it.
 			 */
-			msqkptr = &msqids[msqid];
+			msqkptr = &V_msqids[msqid];
 			if (msqkptr->u.msg_qbytes == 0 &&
 			    (msqkptr->u.msg_perm.mode & MSG_LOCKED) == 0)
 				break;
 		}
-		if (msqid == msginfo.msgmni) {
+		if (msqid == V_msginfo.msgmni) {
 			DPRINTF(("no more msqid_ds's available\n"));
 			error = ENOSPC;
 			goto done2;
@@ -753,7 +949,7 @@ found:
 	/* Construct the unique msqid */
 	td->td_retval[0] = IXSEQ_TO_IPCID(msqid, msqkptr->u.msg_perm);
 done2:
-	mtx_unlock(&msq_mtx);
+	mtx_unlock(&V_msq_mtx);
 	return (error);
 }
 
@@ -782,18 +978,18 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 	if (rpr == NULL)
 		return (ENOSYS);
 
-	mtx_lock(&msq_mtx);
+	mtx_lock(&V_msq_mtx);
 	AUDIT_ARG_SVIPC_ID(msqid);
 	msqix = IPCID_TO_IX(msqid);
 
-	if (msqix < 0 || msqix >= msginfo.msgmni) {
+	if (msqix < 0 || msqix >= V_msginfo.msgmni) {
 		DPRINTF(("msqid (%d) out of range (0<=msqid<%d)\n", msqix,
-		    msginfo.msgmni));
+		    V_msginfo.msgmni));
 		error = EINVAL;
 		goto done2;
 	}
 
-	msqkptr = &msqids[msqix];
+	msqkptr = &V_msqids[msqix];
 	AUDIT_ARG_SVIPC_PERM(&msqkptr->u.msg_perm);
 	if (msqkptr->u.msg_qbytes == 0) {
 		DPRINTF(("no such message queue id\n"));
@@ -841,9 +1037,9 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 	}
 #endif
 
-	segs_needed = howmany(msgsz, msginfo.msgssz);
+	segs_needed = howmany(msgsz, V_msginfo.msgssz);
 	DPRINTF(("msgsz=%zu, msgssz=%d, segs_needed=%d\n", msgsz,
-	    msginfo.msgssz, segs_needed));
+	    V_msginfo.msgssz, segs_needed));
 	for (;;) {
 		int need_more_resources = 0;
 
@@ -866,11 +1062,11 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 			DPRINTF(("msgsz + msg_cbytes > msg_qbytes\n"));
 			need_more_resources = 1;
 		}
-		if (segs_needed > nfree_msgmaps) {
+		if (segs_needed > V_nfree_msgmaps) {
 			DPRINTF(("segs_needed > nfree_msgmaps\n"));
 			need_more_resources = 1;
 		}
-		if (free_msghdrs == NULL) {
+		if (V_free_msghdrs == NULL) {
 			DPRINTF(("no more msghdrs\n"));
 			need_more_resources = 1;
 		}
@@ -896,7 +1092,7 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 				we_own_it = 1;
 			}
 			DPRINTF(("msgsnd:  goodnight\n"));
-			error = msleep(msqkptr, &msq_mtx, (PZERO - 4) | PCATCH,
+			error = msleep(msqkptr, &V_msq_mtx, (PZERO - 4) | PCATCH,
 			    "msgsnd", hz);
 			DPRINTF(("msgsnd:  good morning, error=%d\n", error));
 			if (we_own_it)
@@ -934,11 +1130,11 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 
 	if (msqkptr->u.msg_perm.mode & MSG_LOCKED)
 		panic("msg_perm.mode & MSG_LOCKED");
-	if (segs_needed > nfree_msgmaps)
+	if (segs_needed > V_nfree_msgmaps)
 		panic("segs_needed > nfree_msgmaps");
 	if (msgsz + msqkptr->u.msg_cbytes > msqkptr->u.msg_qbytes)
 		panic("msgsz + msg_cbytes > msg_qbytes");
-	if (free_msghdrs == NULL)
+	if (V_free_msghdrs == NULL)
 		panic("no more msghdrs");
 
 	/*
@@ -954,8 +1150,8 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 	 * Allocate a message header
 	 */
 
-	msghdr = free_msghdrs;
-	free_msghdrs = msghdr->msg_next;
+	msghdr = V_free_msghdrs;
+	V_free_msghdrs = msghdr->msg_next;
 	msghdr->msg_spot = -1;
 	msghdr->msg_ts = msgsz;
 	msghdr->msg_type = mtype;
@@ -973,19 +1169,22 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 	 */
 
 	while (segs_needed > 0) {
-		if (nfree_msgmaps <= 0)
+		if (V_nfree_msgmaps <= 0)
 			panic("not enough msgmaps");
-		if (free_msgmaps == -1)
+		if (V_free_msgmaps == -1)
 			panic("nil free_msgmaps");
-		next = free_msgmaps;
+		next = V_free_msgmaps;
 		if (next <= -1)
 			panic("next too low #1");
-		if (next >= msginfo.msgseg)
+		if (next >= V_msginfo.msgseg)
 			panic("next out of range #1");
 		DPRINTF(("allocating segment %d to message\n", next));
-		free_msgmaps = msgmaps[next].next;
-		nfree_msgmaps--;
-		msgmaps[next].next = msghdr->msg_spot;
+		V_free_msgmaps = V_msgmaps[next].next;
+		V_nfree_msgmaps--;
+#ifdef VPS
+		atomic_add_int(&nmsgmaps_global, 1);
+#endif 
+		V_msgmaps[next].next = msghdr->msg_spot;
 		msghdr->msg_spot = next;
 		segs_needed--;
 	}
@@ -1010,18 +1209,18 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 	next = msghdr->msg_spot;
 	while (msgsz > 0) {
 		size_t tlen;
-		if (msgsz > msginfo.msgssz)
-			tlen = msginfo.msgssz;
+		if (msgsz > V_msginfo.msgssz)
+			tlen = V_msginfo.msgssz;
 		else
 			tlen = msgsz;
 		if (next <= -1)
 			panic("next too low #2");
-		if (next >= msginfo.msgseg)
+		if (next >= V_msginfo.msgseg)
 			panic("next out of range #2");
-		mtx_unlock(&msq_mtx);
-		if ((error = copyin(msgp, &msgpool[next * msginfo.msgssz],
+		mtx_unlock(&V_msq_mtx);
+		if ((error = copyin(msgp, &V_msgpool[next * V_msginfo.msgssz],
 		    tlen)) != 0) {
-			mtx_lock(&msq_mtx);
+			mtx_lock(&V_msq_mtx);
 			DPRINTF(("error %d copying in message segment\n",
 			    error));
 			msg_freehdr(msghdr);
@@ -1029,10 +1228,10 @@ kern_msgsnd(struct thread *td, int msqid, const void *msgp,
 			wakeup(msqkptr);
 			goto done3;
 		}
-		mtx_lock(&msq_mtx);
+		mtx_lock(&V_msq_mtx);
 		msgsz -= tlen;
 		msgp = (const char *)msgp + tlen;
-		next = msgmaps[next].next;
+		next = V_msgmaps[next].next;
 	}
 	if (next != -1)
 		panic("didn't use all the msg segments");
@@ -1103,7 +1302,7 @@ done3:
 	}
 #endif
 done2:
-	mtx_unlock(&msq_mtx);
+	mtx_unlock(&V_msq_mtx);
 	return (error);
 }
 
@@ -1153,14 +1352,14 @@ kern_msgrcv(struct thread *td, int msqid, void *msgp, size_t msgsz, long msgtyp,
 	AUDIT_ARG_SVIPC_ID(msqid);
 	msqix = IPCID_TO_IX(msqid);
 
-	if (msqix < 0 || msqix >= msginfo.msgmni) {
+	if (msqix < 0 || msqix >= V_msginfo.msgmni) {
 		DPRINTF(("msqid (%d) out of range (0<=msqid<%d)\n", msqix,
-		    msginfo.msgmni));
+		    V_msginfo.msgmni));
 		return (EINVAL);
 	}
 
-	msqkptr = &msqids[msqix];
-	mtx_lock(&msq_mtx);
+	msqkptr = &V_msqids[msqix];
+	mtx_lock(&V_msq_mtx);
 	AUDIT_ARG_SVIPC_PERM(&msqkptr->u.msg_perm);
 	if (msqkptr->u.msg_qbytes == 0) {
 		DPRINTF(("no such message queue id\n"));
@@ -1304,7 +1503,7 @@ kern_msgrcv(struct thread *td, int msqid, void *msgp, size_t msgsz, long msgtyp,
 		 */
 
 		DPRINTF(("msgrcv:  goodnight\n"));
-		error = msleep(msqkptr, &msq_mtx, (PZERO - 4) | PCATCH,
+		error = msleep(msqkptr, &V_msq_mtx, (PZERO - 4) | PCATCH,
 		    "msgrcv", 0);
 		DPRINTF(("msgrcv:  good morning (error=%d)\n", error));
 
@@ -1357,20 +1556,20 @@ kern_msgrcv(struct thread *td, int msqid, void *msgp, size_t msgsz, long msgtyp,
 	 */
 
 	next = msghdr->msg_spot;
-	for (len = 0; len < msgsz; len += msginfo.msgssz) {
+	for (len = 0; len < msgsz; len += V_msginfo.msgssz) {
 		size_t tlen;
 
-		if (msgsz - len > msginfo.msgssz)
-			tlen = msginfo.msgssz;
+		if (msgsz - len > V_msginfo.msgssz)
+			tlen = V_msginfo.msgssz;
 		else
 			tlen = msgsz - len;
 		if (next <= -1)
 			panic("next too low #3");
-		if (next >= msginfo.msgseg)
+		if (next >= V_msginfo.msgseg)
 			panic("next out of range #3");
-		mtx_unlock(&msq_mtx);
-		error = copyout(&msgpool[next * msginfo.msgssz], msgp, tlen);
-		mtx_lock(&msq_mtx);
+		mtx_unlock(&V_msq_mtx);
+		error = copyout(&V_msgpool[next * V_msginfo.msgssz], msgp, tlen);
+		mtx_lock(&V_msq_mtx);
 		if (error != 0) {
 			DPRINTF(("error (%d) copying out message segment\n",
 			    error));
@@ -1379,7 +1578,7 @@ kern_msgrcv(struct thread *td, int msqid, void *msgp, size_t msgsz, long msgtyp,
 			goto done2;
 		}
 		msgp = (char *)msgp + tlen;
-		next = msgmaps[next].next;
+		next = V_msgmaps[next].next;
 	}
 
 	/*
@@ -1390,7 +1589,7 @@ kern_msgrcv(struct thread *td, int msqid, void *msgp, size_t msgsz, long msgtyp,
 	wakeup(msqkptr);
 	td->td_retval[0] = msgsz;
 done2:
-	mtx_unlock(&msq_mtx);
+	mtx_unlock(&V_msq_mtx);
 	return (error);
 }
 
@@ -1422,17 +1621,17 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 	pr = req->td->td_ucred->cr_prison;
 	rpr = msg_find_prison(req->td->td_ucred);
 	error = 0;
-	for (i = 0; i < msginfo.msgmni; i++) {
-		mtx_lock(&msq_mtx);
-		if (msqids[i].u.msg_qbytes == 0 || rpr == NULL ||
-		    msq_prison_cansee(rpr, &msqids[i]) != 0)
+	for (i = 0; i < V_msginfo.msgmni; i++) {
+		mtx_lock(&V_msq_mtx);
+		if (V_msqids[i].u.msg_qbytes == 0 || rpr == NULL ||
+		    msq_prison_cansee(rpr, &V_msqids[i]) != 0)
 			bzero(&tmsqk, sizeof(tmsqk));
 		else {
-			tmsqk = msqids[i];
+			tmsqk = V_msqids[i];
 			if (tmsqk.cred->cr_prison != pr)
 				tmsqk.u.msg_perm.key = IPC_PRIVATE;
 		}
-		mtx_unlock(&msq_mtx);
+		mtx_unlock(&V_msq_mtx);
 		error = SYSCTL_OUT(req, &tmsqk, sizeof(tmsqk));
 		if (error != 0)
 			break;
@@ -1440,19 +1639,19 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgmax, CTLFLAG_RD, &msginfo.msgmax, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgmax, CTLFLAG_RD, &VPS_NAME(msginfo.msgmax), 0,
     "Maximum message size");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgmni, CTLFLAG_RDTUN, &msginfo.msgmni, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgmni, CTLFLAG_RDTUN, &VPS_NAME(msginfo.msgmni), 0,
     "Number of message queue identifiers");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgmnb, CTLFLAG_RDTUN, &msginfo.msgmnb, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgmnb, CTLFLAG_RDTUN, &VPS_NAME(msginfo.msgmnb), 0,
     "Maximum number of bytes in a queue");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgtql, CTLFLAG_RDTUN, &msginfo.msgtql, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgtql, CTLFLAG_RDTUN, &VPS_NAME(msginfo.msgtql), 0,
     "Maximum number of messages in the system");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgssz, CTLFLAG_RDTUN, &msginfo.msgssz, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgssz, CTLFLAG_RDTUN, &VPS_NAME(msginfo.msgssz), 0,
     "Size of a message segment");
-SYSCTL_INT(_kern_ipc, OID_AUTO, msgseg, CTLFLAG_RDTUN, &msginfo.msgseg, 0,
+SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgseg, CTLFLAG_RDTUN, &VPS_NAME(msginfo.msgseg), 0,
     "Number of message segments");
-SYSCTL_PROC(_kern_ipc, OID_AUTO, msqids,
+SYSCTL_VPS_PROC(_kern_ipc, OID_AUTO, msqids,
     CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE,
     NULL, 0, sysctl_msqids, "", "Message queue IDs");
 
@@ -1478,7 +1677,7 @@ msg_prison_check(void *obj, void *data)
 		case JAIL_SYS_NEW:
 		case JAIL_SYS_INHERIT:
 			prison_lock(pr->pr_parent);
-			prpr = osd_jail_get(pr->pr_parent, msg_prison_slot);
+			prpr = osd_jail_get(pr->pr_parent, V_msg_prison_slot);
 			prison_unlock(pr->pr_parent);
 			if (prpr == NULL)
 				return (EPERM);
@@ -1512,9 +1711,9 @@ msg_prison_set(void *obj, void *data)
 		    : -1;
 	if (jsys == JAIL_SYS_DISABLE) {
 		prison_lock(pr);
-		orpr = osd_jail_get(pr, msg_prison_slot);
+		orpr = osd_jail_get(pr, V_msg_prison_slot);
 		if (orpr != NULL)
-			osd_jail_del(pr, msg_prison_slot);
+			osd_jail_del(pr, V_msg_prison_slot);
 		prison_unlock(pr);
 		if (orpr != NULL) {
 			if (orpr == pr)
@@ -1522,9 +1721,9 @@ msg_prison_set(void *obj, void *data)
 			/* Disable all child jails as well. */
 			FOREACH_PRISON_DESCENDANT(pr, tpr, descend) {
 				prison_lock(tpr);
-				trpr = osd_jail_get(tpr, msg_prison_slot);
+				trpr = osd_jail_get(tpr, V_msg_prison_slot);
 				if (trpr != NULL) {
-					osd_jail_del(tpr, msg_prison_slot);
+					osd_jail_del(tpr, V_msg_prison_slot);
 					prison_unlock(tpr);
 					if (trpr == tpr)
 						msg_prison_cleanup(tpr);
@@ -1539,14 +1738,14 @@ msg_prison_set(void *obj, void *data)
 			nrpr = pr;
 		else {
 			prison_lock(pr->pr_parent);
-			nrpr = osd_jail_get(pr->pr_parent, msg_prison_slot);
+			nrpr = osd_jail_get(pr->pr_parent, V_msg_prison_slot);
 			prison_unlock(pr->pr_parent);
 		}
-		rsv = osd_reserve(msg_prison_slot);
+		rsv = osd_reserve(V_msg_prison_slot);
 		prison_lock(pr);
-		orpr = osd_jail_get(pr, msg_prison_slot);
+		orpr = osd_jail_get(pr, V_msg_prison_slot);
 		if (orpr != nrpr)
-			(void)osd_jail_set_reserved(pr, msg_prison_slot, rsv,
+			(void)osd_jail_set_reserved(pr, V_msg_prison_slot, rsv,
 			    nrpr);
 		else
 			osd_free_reserved(rsv);
@@ -1559,10 +1758,10 @@ msg_prison_set(void *obj, void *data)
 				FOREACH_PRISON_DESCENDANT(pr, tpr, descend) {
 					prison_lock(tpr);
 					trpr = osd_jail_get(tpr,
-					    msg_prison_slot);
+					    V_msg_prison_slot);
 					if (trpr == orpr) {
 						(void)osd_jail_set(tpr,
-						    msg_prison_slot, nrpr);
+						    V_msg_prison_slot, nrpr);
 						prison_unlock(tpr);
 						if (trpr == tpr)
 							msg_prison_cleanup(tpr);
@@ -1588,7 +1787,7 @@ msg_prison_get(void *obj, void *data)
 
 	/* Set sysvmsg based on the jail's root prison. */
 	prison_lock(pr);
-	rpr = osd_jail_get(pr, msg_prison_slot);
+	rpr = osd_jail_get(pr, V_msg_prison_slot);
 	prison_unlock(pr);
 	jsys = rpr == NULL ? JAIL_SYS_DISABLE
 	    : rpr == pr ? JAIL_SYS_NEW : JAIL_SYS_INHERIT;
@@ -1605,7 +1804,7 @@ msg_prison_remove(void *obj, void *data __unused)
 	struct prison *rpr;
 
 	prison_lock(pr);
-	rpr = osd_jail_get(pr, msg_prison_slot);
+	rpr = osd_jail_get(pr, V_msg_prison_slot);
 	prison_unlock(pr);
 	if (rpr == pr)
 		msg_prison_cleanup(pr);
@@ -1619,14 +1818,14 @@ msg_prison_cleanup(struct prison *pr)
 	int i;
 
 	/* Remove any msqs that belong to this jail. */
-	mtx_lock(&msq_mtx);
-	for (i = 0; i < msginfo.msgmni; i++) {
-		msqkptr = &msqids[i];
+	mtx_lock(&V_msq_mtx);
+	for (i = 0; i < V_msginfo.msgmni; i++) {
+		msqkptr = &V_msqids[i];
 		if (msqkptr->u.msg_qbytes != 0 &&
 		    msqkptr->cred != NULL && msqkptr->cred->cr_prison == pr)
 			msq_remove(msqkptr);
 	}
-	mtx_unlock(&msq_mtx);
+	mtx_unlock(&V_msq_mtx);
 }
 
 SYSCTL_JAIL_PARAM_SYS_NODE(sysvmsg, CTLFLAG_RW, "SYSV message queues");
@@ -1878,3 +2077,240 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 
 #endif	/* COMPAT_FREEBSD4 || COMPAT_FREEBSD5 || COMPAT_FREEBSD6 ||
 	   COMPAT_FREEBSD7 */
+
+#ifdef VPS
+__attribute__ ((noinline, unused))
+int msg_snapshot_vps(struct vps_snapst_ctx *ctx, struct vps *vps)
+{
+	struct vps_dumpobj *o1;
+	struct vps_dump_sysvmsg_msginfo *vdmsginfo;
+	uint16 *vdmsgmaps;
+	struct vps_dump_sysvmsg_msg *vdmsghdrs;
+	struct vps_dump_sysvmsg_msqid *vdmsqids;
+	struct msginfo *msginfo;
+	struct msgmap *msgmaps;
+	struct msg *msghdrs;
+	struct msqid_kernel *msqids;
+	int i;
+
+	o1 = vdo_create(ctx, VPS_DUMPOBJT_SYSVMSG_VPS, M_WAITOK);
+	vdmsginfo = vdo_space(ctx, sizeof(*vdmsginfo), M_WAITOK);
+
+	msginfo = &VPS_VPS(vps, msginfo);
+	vdmsginfo->msgmax = msginfo->msgmax;
+	vdmsginfo->msgmni = msginfo->msgmni;
+	vdmsginfo->msgmnb = msginfo->msgmnb;
+	vdmsginfo->msgtql = msginfo->msgtql;
+	vdmsginfo->msgssz = msginfo->msgssz;
+	vdmsginfo->msgseg = msginfo->msgseg;
+	vdmsginfo->nfree_msgmaps = VPS_VPS(vps, nfree_msgmaps);
+	vdmsginfo->free_msgmaps = VPS_VPS(vps, free_msgmaps);
+	vdmsginfo->free_msghdrs_idx = VPS_VPS(vps, free_msghdrs) - VPS_VPS(vps, msghdrs);
+	vdmsginfo->msg_prison_slot = VPS_VPS(vps, msg_prison_slot);
+
+	/* msgpool */
+	vdo_append(ctx, VPS_VPS(vps, msgpool), msginfo->msgmax, M_WAITOK);
+
+	/* msgmaps */
+	msgmaps = VPS_VPS(vps, msgmaps);
+	vdmsgmaps = vdo_space(ctx, msginfo->msgseg * sizeof(uint16), M_WAITOK);
+	for (i = 0; i < msginfo->msgseg; i++) {
+		vdmsgmaps[i] = msgmaps[i].next;
+	}
+
+	/* msghdrs */
+	msghdrs = VPS_VPS(vps, msghdrs);
+	vdmsghdrs = vdo_space(ctx, sizeof(struct vps_dump_sysvmsg_msg) *
+		msginfo->msgtql, M_WAITOK);
+	for (i = 0; i < msginfo->msgtql; i++) {
+		vdmsghdrs[i].msg_next = -1;
+		if (msghdrs[i].msg_next != NULL)
+			vdmsghdrs[i].msg_next = msghdrs[i].msg_next - msghdrs;
+		vdmsghdrs[i].msg_type = msghdrs[i].msg_type;
+		vdmsghdrs[i].msg_ts = msghdrs[i].msg_ts;
+		vdmsghdrs[i].msg_spot = msghdrs[i].msg_spot;
+		/* XXX assert label == NULL */
+		vdmsghdrs[i].label = msghdrs[i].label;
+	}
+
+	/* msqids */
+	msqids = VPS_VPS(vps, msqids);
+	vdmsqids = vdo_space(ctx, sizeof(struct vps_dump_sysvmsg_msqid) *
+		msginfo->msgmni, M_WAITOK);
+	for (i = 0; i < msginfo->msgmni; i++) {
+		vdmsqids[i].msg_first = -1;
+		if (msqids[i].u.msg_first != NULL)
+			vdmsqids[i].msg_first = msqids[i].u.msg_first - msghdrs;
+		vdmsqids[i].msg_last = -1;
+		if (msqids[i].u.msg_last != NULL)
+			vdmsqids[i].msg_last = msqids[i].u.msg_last - msghdrs;
+		vdmsqids[i].msg_perm.cuid = msqids[i].u.msg_perm.cuid;
+		vdmsqids[i].msg_perm.cgid = msqids[i].u.msg_perm.cgid;
+		vdmsqids[i].msg_perm.uid = msqids[i].u.msg_perm.uid;
+		vdmsqids[i].msg_perm.gid = msqids[i].u.msg_perm.gid;
+		vdmsqids[i].msg_perm.mode = msqids[i].u.msg_perm.mode;
+		vdmsqids[i].msg_perm.seq = msqids[i].u.msg_perm.seq;
+		vdmsqids[i].msg_perm.key = msqids[i].u.msg_perm.key;
+		vdmsqids[i].msg_cbytes = msqids[i].u.msg_cbytes;
+		vdmsqids[i].msg_qnum = msqids[i].u.msg_qnum;
+		vdmsqids[i].msg_qbytes = msqids[i].u.msg_qbytes;
+		vdmsqids[i].msg_lspid = msqids[i].u.msg_lspid;
+		vdmsqids[i].msg_lrpid = msqids[i].u.msg_lrpid;
+		vdmsqids[i].msg_stime = msqids[i].u.msg_stime;
+		vdmsqids[i].msg_rtime = msqids[i].u.msg_rtime;
+		vdmsqids[i].msg_ctime = msqids[i].u.msg_ctime;
+		/* XXX assert label == NULL */
+		vdmsqids[i].label = msqids[i].label;
+		vdmsqids[i].cred = msqids[i].cred;
+	}
+
+	for (i = 0; i < msginfo->msgmni; i++) {
+		if (vdmsqids[i].cred != NULL)
+			vps_func->vps_snapshot_ucred(ctx, vps, vdmsqids[i].cred, M_WAITOK);
+	}
+
+	vdo_close(ctx);
+
+	return (0);
+}
+
+__attribute__ ((noinline, unused))
+int msg_snapshot_proc(struct vps_snapst_ctx *ctx, struct vps *vps, struct proc *p)
+{
+
+	return (0);
+}
+
+__attribute__ ((noinline, unused))
+int msg_restore_vps(struct vps_snapst_ctx *ctx, struct vps *vps)
+{
+	struct vps_dumpobj *o1;
+	struct vps_dump_sysvmsg_msginfo *vdmsginfo;
+	uint16 *vdmsgmaps;
+	struct vps_dump_sysvmsg_msg *vdmsghdrs;
+	struct vps_dump_sysvmsg_msqid *vdmsqids;
+	struct msginfo *msginfo;
+	struct msgmap *msgmaps;
+	struct msg *msghdrs;
+	struct msqid_kernel *msqids;
+	struct vps *vps_save;
+	struct ucred *ncr;
+	caddr_t cpos;
+	int i;
+
+	o1 = vdo_next(ctx);
+	if (o1->type != VPS_DUMPOBJT_SYSVMSG_VPS) {
+		printf("%s: o1=%p is not VPS_DUMPOBJT_SYSVMSG_VPS\n",
+			__func__, o1);
+		return (EINVAL);
+	}
+	vdmsginfo = (struct vps_dump_sysvmsg_msginfo *)o1->data;
+
+	/* realloc in case msginfo is different */
+	vps_save = curthread->td_vps;
+	curthread->td_vps = vps;
+	msgunload();
+	msginfo = &VPS_VPS(vps, msginfo);
+	msginfo->msgmax = vdmsginfo->msgmax;
+	msginfo->msgmni = vdmsginfo->msgmni;
+	msginfo->msgmnb = vdmsginfo->msgmnb;
+	msginfo->msgtql = vdmsginfo->msgtql;
+	msginfo->msgssz = vdmsginfo->msgssz;
+	msginfo->msgseg = vdmsginfo->msgseg;
+	msginit2();			/* XXX-BZ what about msg_prison_slot and OSD? */
+	curthread->td_vps = vps_save;
+
+	cpos = (caddr_t)(vdmsginfo + 1);
+
+	/* msgpool */
+	memcpy(VPS_VPS(vps, msgpool), cpos, msginfo->msgmax);
+	cpos += msginfo->msgmax;
+
+	/* msgmaps */
+	msgmaps = VPS_VPS(vps, msgmaps);
+	vdmsgmaps = (uint16 *)cpos;
+	cpos += sizeof(uint16) * msginfo->msgseg;
+	for (i = 0; i < msginfo->msgseg; i++) {
+		msgmaps[i].next = vdmsgmaps[i];
+	}
+
+	/* msghdrs */
+	msghdrs = VPS_VPS(vps, msghdrs);
+	vdmsghdrs = (struct vps_dump_sysvmsg_msg *)cpos;
+	cpos += sizeof(*vdmsghdrs) * msginfo->msgtql;
+	for (i = 0; i < msginfo->msgtql; i++) {
+		msghdrs[i].msg_next = NULL;
+		if (vdmsghdrs[i].msg_next != -1)
+			msghdrs[i].msg_next = msghdrs + vdmsghdrs[i].msg_next;
+		msghdrs[i].msg_type = vdmsghdrs[i].msg_type;
+		msghdrs[i].msg_ts = vdmsghdrs[i].msg_ts;
+		msghdrs[i].msg_spot = vdmsghdrs[i].msg_spot;
+		/* XXX assert label == NULL */
+		//msghdrs[i].label = vdmsghdrs[i].label;
+		msghdrs[i].label = NULL;
+
+	}
+
+	/* msqids */
+	msqids = VPS_VPS(vps, msqids);
+	vdmsqids = (struct vps_dump_sysvmsg_msqid *)cpos;
+	cpos += sizeof(*vdmsqids) * msginfo->msgmni;
+	for (i = 0; i < msginfo->msgmni; i++) {
+		msqids[i].u.msg_first = NULL;
+		if (vdmsqids[i].msg_first != -1)
+			msqids[i].u.msg_first = msghdrs + vdmsqids[i].msg_first;
+		msqids[i].u.msg_last = NULL;
+		if (vdmsqids[i].msg_last != -1)
+			msqids[i].u.msg_last = msghdrs + vdmsqids[i].msg_last;
+		msqids[i].u.msg_perm.cuid = vdmsqids[i].msg_perm.cuid;
+		msqids[i].u.msg_perm.cgid = vdmsqids[i].msg_perm.cgid;
+		msqids[i].u.msg_perm.uid = vdmsqids[i].msg_perm.uid;
+		msqids[i].u.msg_perm.gid = vdmsqids[i].msg_perm.gid;
+		msqids[i].u.msg_perm.mode = vdmsqids[i].msg_perm.mode;
+		msqids[i].u.msg_perm.seq = vdmsqids[i].msg_perm.seq;
+		msqids[i].u.msg_perm.key = vdmsqids[i].msg_perm.key;
+		msqids[i].u.msg_cbytes = vdmsqids[i].msg_cbytes;
+		msqids[i].u.msg_qnum = vdmsqids[i].msg_qnum;
+		msqids[i].u.msg_qbytes = vdmsqids[i].msg_qbytes;
+		msqids[i].u.msg_lspid = vdmsqids[i].msg_lspid;
+		msqids[i].u.msg_lrpid = vdmsqids[i].msg_lrpid;
+		msqids[i].u.msg_stime = vdmsqids[i].msg_stime;
+		msqids[i].u.msg_rtime = vdmsqids[i].msg_rtime;
+		msqids[i].u.msg_ctime = vdmsqids[i].msg_ctime;
+		/* XXX assert label == NULL */
+		msqids[i].label = vdmsqids[i].label;
+		msqids[i].cred = vdmsqids[i].cred;
+	}
+
+	VPS_VPS(vps, nfree_msgmaps) = vdmsginfo->nfree_msgmaps;
+	VPS_VPS(vps, free_msgmaps) = vdmsginfo->free_msgmaps;
+	VPS_VPS(vps, free_msghdrs) = VPS_VPS(vps, msghdrs) + vdmsginfo->free_msghdrs_idx;
+
+	while (vdo_typeofnext(ctx) == VPS_DUMPOBJT_UCRED)
+		vdo_next(ctx);//vps_func->vps_restore_ucred(ctx, vps);
+
+	for (i = 0; i < msginfo->msgmni; i++)
+		if (msqids[i].cred != NULL) {
+			ncr = vps_func->vps_restore_ucred_lookup(ctx, vps,
+					msqids[i].cred);
+			msqids[i].cred = ncr;
+		}
+
+	return (0);
+}
+
+__attribute__ ((noinline, unused))
+int msg_restore_proc(struct vps_snapst_ctx *ctx, struct vps *vps, struct proc *p)
+{
+
+	return (0);
+}
+
+__attribute__ ((noinline, unused))
+int msg_restore_fixup(struct vps_snapst_ctx *ctx, struct vps *vps)
+{
+
+	return (0);
+}
+
+#endif /* VPS */
