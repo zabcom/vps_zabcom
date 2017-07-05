@@ -1,0 +1,259 @@
+==> applied/xaa
+==> applied/xac
+==> applied/xad
+==> applied/xae
+==> applied/xaf
+==> applied/xah
+==> applied/xaj
+ERROR: applied/xaj sys/amd64/amd64/trap.c e2a14c603f20af5eaf11dfafcd181d6d82269dd7
+==> applied/xak
+==> applied/xal
+==> applied/xam
+==> applied/xan
+==> applied/xao
+==> applied/xap
+ERROR: applied/xap sys/amd64/linux32/linux32_machdep.c bf114a4c4ab96ebd1498400e34b1fd1b5e1bd69e
+==> applied/xaq
+==> applied/xar
+==> applied/xas
+==> applied/xax
+ERROR: applied/xax sys/compat/linux/linux_ioctl.c f1e6090f95e521b6b197c72c6f099abd4f1ac93d
+==> applied/xba
+ERROR: applied/xba sys/compat/linux/linux_misc.c 1a97fb3a1a7ac966f541b33dcb7e5ca7bd3694d0
+==> applied/xbe
+ERROR: applied/xbe sys/conf/files.i386 3b25e54451063301fc96b6cafa828247baf24633
+==> applied/xbf
+==> applied/xbg
+ERROR: applied/xbg sys/conf/options 3e7c6ed5082a0bc9bd208a60cc4f54c43c1b4ef7
+==> applied/xbh
+==> applied/xbj
+==> applied/xbl
+ERROR: applied/xbl sys/dev/hwpmc/hwpmc_mod.c 13c9408e90110bc0bb4363e0dd2d1fb078795ec6
+==> applied/xbm
+ERROR: applied/xbm sys/dev/syscons/daemon/daemon_saver.c 259480b6de42080f4d3f1e3072e52d3acee596b3
+==> applied/xbn
+ERROR: applied/xbn sys/dev/syscons/syscons.c 26ab0a7dd56b4dbb2614da62f946299b805962f4
+==> applied/xbo
+==> applied/xbp
+ERROR: applied/xbp sys/fs/devfs/devfs_devs.c e75ba1d5c4c79376a78351c8544388491db49664
+==> applied/xbq
+==> applied/xbr
+ERROR: applied/xbr sys/fs/devfs/devfs_vfsops.c db61d1271ad0bc51e60afe181a45a7318591dad6
+==> applied/xbt
+ERROR: applied/xbt sys/fs/fdescfs/fdesc_vnops.c e75ba1d5c4c79376a78351c8544388491db49664
+==> applied/xbv
+ERROR: applied/xbv sys/fs/nfsclient/nfs_clvfsops.c ac2d2673ca4c7c39a65391be44e9b3a689c0e980
+commit ac2d2673ca4c7c39a65391be44e9b3a689c0e980
+Author: Björn Zeeb <zabcom@users.noreply.github.com>
+Date:   Thu Jun 29 20:49:02 2017 +0000
+
+    Manually merge more of the patches that failed to apply automatically.
+==> applied/xbz
+==> applied/xca
+==> applied/xcb
+==> applied/xcc
+==> applied/xcd
+==> applied/xce
+==> applied/xcf
+==> applied/xck
+==> applied/xcl
+ERROR: applied/xcl sys/i386/ibcs2/ibcs2_sysvec.c be4082c832ab3e8ed4b2d4877eb549a54174bf85
+==> applied/xcm
+==> applied/xcn
+==> applied/xco
+ERROR: applied/xco sys/kern/imgact_elf.c 2a8ac69f46dce1b868a245d11b5c085201f8fc20
+==> applied/xcr
+ERROR: applied/xcr sys/kern/kern_clock.c 1901c3e1f2b5a90612d8fac795740ab884caccdb
+==> applied/xcs
+ERROR: applied/xcs sys/kern/kern_conf.c 4cbaaf9b71452396774f21abba47f5ca7384be38
+==> applied/xct
+ERROR: applied/xct sys/kern/kern_cpuset.c 56f722576fca8e61c913e04aba26c9f4a3195618
+==> applied/xcv
+==> applied/xdb
+==> applied/xde
+ERROR: applied/xde sys/kern/kern_linker.c e5ca15252d9115a0aac2332ccd43b97c0d0591cb
+==> applied/xdg
+ERROR: applied/xdg sys/kern/kern_module.c 887351d9dc692f2e3a284942df964823d58393ab
+==> applied/xdh
+ERROR: applied/xdh sys/kern/kern_priv.c 35b126e324b8032aebea9ab6b4daf7c0bf8daed0
+==> applied/xdl
+ERROR: applied/xdl sys/kern/kern_sharedpage.c e0c4faece4ce54570904909a5ede55c60f35fe5f
+==> applied/xdn
+ERROR: applied/xdn sys/kern/kern_sig.c 68cf2ac6e5c58e430c0e134e952f413955dc5f8c
+==> applied/xdo
+ERROR: applied/xdo sys/kern/kern_switch.c 9adde35e11491103d72f4be5a7472070eeb985aa
+==> applied/xdu
+ERROR: applied/xdu sys/kern/kern_time.c d6de25428dd98776c2d2d099df9c5465e2082e91
+==> applied/xdv
+ERROR: applied/xdv sys/kern/kern_umtx.c c2172076df12d95314f90d7340f1bf9483171448
+==> applied/xdw
+==> applied/xdx
+==> applied/xdy
+ERROR: applied/xdy sys/kern/sched_ule.c 83025f4a689b721ca160af3adfbede5aa81d85cf
+==> applied/xdz
+ERROR: applied/xdz sys/kern/subr_kdb.c 49c137f7be5791eee8102395257cdf48b40c81f7
+==> applied/xea
+ERROR: applied/xea sys/kern/subr_prf.c 3fa198df85a337eb8b27dc1b05de750eaaad3d79
+==> applied/xed
+ERROR: applied/xed sys/kern/subr_trap.c 21ead51d79e6c9c2eb017eff84a3c8ae660a79b5
+==> applied/xee
+ERROR: applied/xee sys/kern/subr_turnstile.c 319819fda10d4eb23a0482dcae7bfc2608147dfb
+==> applied/xef
+ERROR: applied/xef sys/kern/subr_witness.c f0b5266f18e7012c0effde8b3f07d5989d7dbfc0
+==> applied/xeg
+ERROR: applied/xeg sys/kern/sys_generic.c 8931d7c7fba34ea5b9a538cca66ff3bbb48cb7ed
+==> applied/xem
+ERROR: applied/xem sys/kern/tty.c e75ba1d5c4c79376a78351c8544388491db49664
+==> applied/xen
+ERROR: applied/xen sys/kern/tty_pts.c e75ba1d5c4c79376a78351c8544388491db49664
+==> applied/xeo
+ERROR: applied/xeo sys/kern/tty_tty.c 29181895d56800d19825c2c473d5d8f1521fd358
+==> applied/xep
+ERROR: applied/xep sys/kern/uipc_socket.c 4cfe97631740bb35b94a84a78453c4b35268d0ca
+==> applied/xeq
+ERROR: applied/xeq sys/kern/uipc_syscalls.c e35d543ec17b735ba76bb3311ed4a430d6cc945e
+==> applied/xet
+ERROR: applied/xet sys/kern/vfs_cluster.c 01e1e94c27d3abe3bb638752836a024bd920344d
+==> applied/xeu
+ERROR: applied/xeu sys/kern/vfs_default.c 8a7f8bb123cb2056ca239a472deaef02962bdd3e
+==> applied/xew
+ERROR: applied/xew sys/kern/vfs_mount.c 1901c3e1f2b5a90612d8fac795740ab884caccdb
+==> applied/xex
+ERROR: applied/xex sys/kern/vfs_mountroot.c 54b033bd1b8137d1085a05bebdceed5d8e8f1c26
+==> applied/xfa
+==> applied/xfb
+==> applied/xfc
+==> applied/xfd
+ERROR: applied/xfd sys/modules/Makefile 108469a3623ae86c900f51ee0a440fe85b1a68e3
+==> applied/xfe
+==> applied/xff
+==> applied/xfg
+==> applied/xfh
+==> applied/xfi
+==> applied/xfj
+==> applied/xfk
+==> applied/xfl
+==> applied/xfm
+==> applied/xfq
+ERROR: applied/xfq sys/net/if.c 0cfdb3c3056d9ea5b7a14292e663a5a0afd1f5a4
+==> applied/xfs
+ERROR: applied/xfs sys/net/if_tun.c 513d614cdfc5c65b52972952697269935f741934
+==> applied/xfv
+ERROR: applied/xfv sys/net/rtsock.c e8472f7b89178cd5116c32464b0a0f1b2de4945d
+==> applied/xfw
+ERROR: applied/xfw sys/net/vnet.c 7a1c0b1ad10703084b50a5b307bbd60603471e1c
+==> applied/xfy
+ERROR: applied/xfy sys/netinet/in_proto.c 7e6cabd06e6caa6a02eeb86308dc0cb3f27e10da
+==> applied/xgd
+ERROR: applied/xgd sys/netinet/tcp_input.c bb1f43f35d9d1ae3f54cfbf5f4bbe35794c35dc3
+==> applied/xge
+ERROR: applied/xge sys/netinet/tcp_output.c 42f4e00617a4d79758e1c4981934f3dbf9a9257d
+==> applied/xgk
+ERROR: applied/xgk sys/netinet6/in6.c d1b74add9a9ee8e208448aa1958ca9d1ca709aa0
+==> applied/xgm
+ERROR: applied/xgm sys/netinet6/in6_proto.c 7e6cabd06e6caa6a02eeb86308dc0cb3f27e10da
+==> applied/xgp
+ERROR: applied/xgp sys/netinet6/nd6.c d1b74add9a9ee8e208448aa1958ca9d1ca709aa0
+==> applied/xgs
+ERROR: applied/xgs sys/netinet6/nd6_rtr.c d1b74add9a9ee8e208448aa1958ca9d1ca709aa0
+==> applied/xgu
+==> applied/xgz
+ERROR: applied/xgz sys/nlm/nlm_advlock.c e75ba1d5c4c79376a78351c8544388491db49664
+==> applied/xhc
+ERROR: applied/xhc sys/rpc/svc_auth.c 2f61636cf871204be51aed93531356162b74c261
+==> applied/xhd
+ERROR: applied/xhd sys/sys/conf.h 0a043373abc93ecfb7dd9c509210dfff358ad7cc
+==> applied/xhe
+ERROR: applied/xhe sys/sys/eventhandler.h a25116b2e3c1014bd7f49e338a36ba69d64189f3
+==> applied/xhf
+ERROR: applied/xhf sys/sys/jail.h 86ca7d2af5777b562eb668205851c5fd7d3e054a
+==> applied/xhg
+ERROR: applied/xhg sys/sys/kernel.h 7e404e0c3663bc3457de5b963f1a54215e74c331
+==> applied/xhh
+ERROR: applied/xhh sys/sys/mount.h aa552394dbf32a59a1ab8763f00c8fe774b22032
+==> applied/xhi
+==> applied/xhj
+==> applied/xhl
+ERROR: applied/xhl sys/sys/resourcevar.h 7e6cabd06e6caa6a02eeb86308dc0cb3f27e10da
+==> applied/xhn
+==> applied/xho
+==> applied/xhp
+ERROR: applied/xhp sys/sys/shm.h 1fc7f43ffa9c1b3a547938ffeed88c6953e021aa
+==> applied/xhs
+ERROR: applied/xhs sys/sys/tty.h e75ba1d5c4c79376a78351c8544388491db49664
+==> applied/xht
+ERROR: applied/xht sys/sys/ucred.h 7e6cabd06e6caa6a02eeb86308dc0cb3f27e10da
+==> applied/xhu
+==> applied/xhv
+ERROR: applied/xhv sys/sys/vnode.h 6a43deb7a3a4bcfbcd7043b1fb69e35711e54462
+==> applied/xhw
+ERROR: applied/xhw sys/vm/default_pager.c 565e916002d503f44709e79fb13f82a47714bad9
+==> applied/xhx
+ERROR: applied/xhx sys/vm/phys_pager.c fd9c8a16f14a6afb543887209482d9d0b15d207a
+==> applied/xhy
+ERROR: applied/xhy sys/vm/swap_pager.c 63fd4c37fb976e1c00408fd95f168af12088f92b
+==> applied/xhz
+ERROR: applied/xhz sys/vm/uma.h b6e7d5b3137e04cda6b1f089c93b8bf8062b047a
+==> applied/xia
+ERROR: applied/xia sys/vm/uma_core.c 8e755a8e23216024a04651dddb5272cbbfff135f
+==> applied/xib
+ERROR: applied/xib sys/vm/vm.h 34de63e92dc7863ca0cc4f77c7084d7520f00411
+==> applied/xie
+ERROR: applied/xie sys/vm/vm_kern.c 8cf2af841cfb8bc9eed2ea6f3916d1e7d2c09151
+==> applied/xig
+ERROR: applied/xig sys/vm/vm_map.h 34de63e92dc7863ca0cc4f77c7084d7520f00411
+==> applied/xij
+ERROR: applied/xij sys/vm/vm_object.c e75ba1d5c4c79376a78351c8544388491db49664
+==> applied/xim
+ERROR: applied/xim sys/vm/vm_pager.c 7e6cabd06e6caa6a02eeb86308dc0cb3f27e10da
+==> applied/xin
+ERROR: applied/xin sys/vm/vm_pager.h 7e6cabd06e6caa6a02eeb86308dc0cb3f27e10da
+==> applied/xio
+==> applied/xip
+==> applied/xiq
+==> applied/xir
+==> applied/xis
+==> applied/xit
+==> applied/xiu
+==> applied/xiv
+==> applied/xiw
+==> applied/xix
+==> applied/xiy
+==> applied/xiz
+==> applied/xja
+==> applied/xjb
+==> applied/xjc
+==> applied/xjd
+==> applied/xje
+==> applied/xjf
+==> applied/xjg
+==> applied/xjh
+==> applied/xji
+==> applied/xjj
+==> applied/xjk
+==> applied/xjl
+==> applied/xjm
+==> applied/xjn
+==> applied/xjo
+==> applied/xjp
+==> applied/xjq
+==> applied/xjr
+==> applied/xjs
+==> applied/xjt
+==> applied/xju
+==> applied/xjv
+==> applied/xjw
+==> applied/xjx
+==> applied/xjy
+==> applied/xjz
+==> applied/xka
+ERROR: applied/xka usr.sbin/Makefile 53e4001dc65de51c95c3a9f556432352870c98bd
+==> applied/xkb
+==> applied/xkc
+==> applied/xkd
+==> applied/xke
+==> applied/xkf
+==> applied/xkg
+==> applied/xkh
+==> applied/xki
+==> applied/xkj
