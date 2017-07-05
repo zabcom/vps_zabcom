@@ -394,6 +394,15 @@ SUBDIR=	\
 	${_vmm} \
 	${_vmware} \
 	${_vpo} \
+	vps_dev \
+	vps_suspend \
+	vps_account \
+	vps_snapst \
+	vps_restore \
+	vps_libdump \
+	if_vps \
+	vps_ddb \
+	vpsfs \
 	vr \
 	vte \
 	vx \

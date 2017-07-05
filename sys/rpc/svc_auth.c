@@ -48,7 +48,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/systm.h>
 #include <sys/jail.h>
+#include <sys/proc.h>
 #include <sys/ucred.h>
+
+#include <vps/vps.h>
+#include <vps/vps2.h>
 
 #include <rpc/rpc.h>
 
@@ -179,8 +183,12 @@ svc_getcred(struct svc_req *rqst, struct ucred **crp, int *flavorp)
 		cr->cr_uid = cr->cr_ruid = cr->cr_svuid = xcr->cr_uid;
 		crsetgroups(cr, xcr->cr_ngroups, xcr->cr_groups);
 		cr->cr_rgid = cr->cr_svgid = cr->cr_groups[0];
-		cr->cr_prison = &prison0;
+		cr->cr_prison = V_prison0;
 		prison_hold(cr->cr_prison);
+#ifdef VPS
+		cr->cr_vps = curthread->td_vps;
+		vps_ref(cr->cr_vps, cr);
+#endif
 		*crp = cr;
 		return (TRUE);
 

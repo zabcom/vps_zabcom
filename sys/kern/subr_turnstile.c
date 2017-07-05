@@ -77,6 +77,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/turnstile.h>
 
+#include <vps/vps.h>
+
 #include <vm/uma.h>
 
 #ifdef DDB
@@ -252,6 +254,21 @@ propagate_priority(struct thread *td)
 			thread_unlock(td);
 			return;
 		}
+#ifdef VPS
+		/*
+		 * Td is suspended in order to maintain resource limits.
+		 * Since threads are only suspended if they don't own
+		 * locks, the only possible case is that td _was_
+		 * blocking on a turnstile, was woken up again
+		 * but wasn't scheduled to actually run yet.
+		 */
+		if (td->td_flags & TDF_VPSLIMIT) {
+			MPASS(td->td_blocked == NULL);
+			MPASS(td->td_turnstile != NULL);
+			thread_unlock(td);
+			return;
+		}
+#endif
 
 #ifndef SMP
 		/*
@@ -264,6 +281,11 @@ propagate_priority(struct thread *td)
 		/*
 		 * If we aren't blocked on a lock, we should be.
 		 */
+		if (TD_ON_LOCK(td) == 0) {
+			printf("%s: thread=%p proc=%p pid=%d procname=[%s] td->prio=%d prio=%d\n",
+				__func__, td, td->td_proc, td->td_proc->p_pid,
+				td->td_proc->p_comm, td->td_priority, pri);
+		}
 		KASSERT(TD_ON_LOCK(td), (
 		    "thread %d(%s):%d holds %s but isn't blocked on a lock\n",
 		    td->td_tid, td->td_name, td->td_state,

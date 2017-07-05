@@ -68,6 +68,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/cpuset.h>
 #include <sys/uio.h>
 
+#include <vps/vps.h>
+
 #include <security/mac/mac_framework.h>
 
 #include <vm/vm.h>
@@ -179,7 +181,7 @@ linux_sysinfo(struct thread *td, struct linux_sysinfo_args *args)
 	sysinfo.totalswap = i * PAGE_SIZE;
 	sysinfo.freeswap = (i - j) * PAGE_SIZE;
 
-	sysinfo.procs = nprocs;
+	sysinfo.procs = V_nprocs;
 
 	/* The following are only present in newer Linux kernels. */
 	sysinfo.totalbig = 0;

@@ -154,7 +154,10 @@ struct pagerops *pagertab[] = {
 	&physpagerops,		/* OBJT_PHYS */
 	&deadpagerops,		/* OBJT_DEAD */
 	&sgpagerops,		/* OBJT_SG */
-	&mgtdevicepagerops,	/* OBJT_MGTDEVICE */
+	&mgtdevicepagerops,     /* OBJT_MGTDEVICE */
+#ifdef VPS
+	&vps_pager_ops,		/* OBJT_VPS */
+#endif
 };
 
 /*

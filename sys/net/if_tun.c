@@ -55,6 +55,8 @@
 #include <net/bpf.h>
 #include <net/if_tun.h>
 
+#include <vps/vps.h>
+
 #include <sys/queue.h>
 #include <sys/condvar.h>
 

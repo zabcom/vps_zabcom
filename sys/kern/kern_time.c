@@ -60,6 +60,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktrace.h>
 #endif
 
+#include <vps/vps.h>
+
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 
@@ -346,11 +348,35 @@ kern_clock_gettime(struct thread *td, clockid_t clock_id, struct timespec *ats)
 	case CLOCK_MONOTONIC_PRECISE:
 	case CLOCK_UPTIME:
 	case CLOCK_UPTIME_PRECISE:
+#ifdef VPS
+		if (curthread->td_vps == vps0)
+			nanouptime(ats);
+		else {
+			struct timespec t1;
+
+			nanotime(ats);
+			bintime2timespec(&V_boottimebin, &t1);
+			timespecsub(ats, &t1);
+		}
+#else
 		nanouptime(ats);
+#endif
 		break;
 	case CLOCK_UPTIME_FAST:
 	case CLOCK_MONOTONIC_FAST:
+#ifdef VPS
+		if (curthread->td_vps == vps0)
+			getnanouptime(ats);
+		else {
+			struct timespec t1;
+
+			getnanotime(ats);
+			bintime2timespec(&V_boottimebin, &t1);
+			timespecsub(ats, &t1);
+		}
+#else
 		getnanouptime(ats);
+#endif
 		break;
 	case CLOCK_SECOND:
 		ats->tv_sec = time_second;

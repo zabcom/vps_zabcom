@@ -65,6 +65,8 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/vnet.h>
 
+extern struct prison prison0;
+
 /*-
  * This file implements core functions for virtual network stacks:
  *
@@ -463,6 +465,17 @@ vnet_data_copy(void *start, int size)
 		    (uintptr_t)start), start, size);
 	VNET_LIST_RUNLOCK();
 }
+
+#ifdef VPS
+int
+vnet_sysctl_handle_long(SYSCTL_HANDLER_ARGS)
+{
+
+	if (arg1 != NULL)
+		arg1 = (void *)(curvnet->vnet_data_base + (uintptr_t)arg1);
+	return (sysctl_handle_long(oidp, arg1, arg2, req));
+}
+#endif
 
 /*
  * Support for special SYSINIT handlers registered via VNET_SYSINIT()

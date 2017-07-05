@@ -34,6 +34,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sx.h>
 #include <sys/vnode.h>
 
+#include <vps/vps.h>
+
 #include <fs/devfs/devfs.h>
 #include <fs/devfs/devfs_int.h>
 
@@ -66,7 +68,7 @@ ctty_clone(void *arg, struct ucred *cred, char *name, int namelen,
 		return;
 	p = curproc;
 	sx_sunlock(&clone_drain_lock);
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 	sx_slock(&clone_drain_lock);
 	dev_lock();
 	if (!(p->p_flag & P_CONTROLT))
@@ -81,7 +83,7 @@ ctty_clone(void *arg, struct ucred *cred, char *name, int namelen,
 		*dev = p->p_session->s_ttyvp->v_rdev;
 	dev_refl(*dev);
 	dev_unlock();
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 }
 
 static void

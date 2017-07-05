@@ -94,6 +94,7 @@ SUBDIR=	adduser \
 	ugidfw \
 	vigr \
 	vipw \
+	vpsctl \
 	wake \
 	watch \
 	watchdogd \

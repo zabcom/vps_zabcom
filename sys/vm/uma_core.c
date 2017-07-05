@@ -1633,6 +1633,9 @@ keg_dtor(void *arg, int size, void *udata)
 	keg = (uma_keg_t)arg;
 	KEG_LOCK(keg);
 	if (keg->uk_free != 0) {
+#ifdef DDB
+		db_trace_self();
+#endif
 		printf("Freed UMA keg (%s) was not empty (%d items). "
 		    " Lost %d pages of memory.\n",
 		    keg->uk_name ? keg->uk_name : "",
@@ -2737,13 +2740,27 @@ slab_free_item(uma_keg_t keg, uma_slab_t slab, void *item)
 	mtx_assert(&keg->uk_lock, MA_OWNED);
 	MPASS(keg == slab->us_keg);
 
-	/* Do we need to remove from any lists? */
+	/*
+	 * http://lists.freebsd.org/pipermail/freebsd-hackers/2010-August/032800.html
+	 */
+	/* Move to the appropriate list or re-queue further from the head. */
 	if (slab->us_freecount+1 == keg->uk_ipers) {
+		/* Partial -> free. */
 		LIST_REMOVE(slab, us_link);
 		LIST_INSERT_HEAD(&keg->uk_free_slab, slab, us_link);
 	} else if (slab->us_freecount == 0) {
+		/* Full -> partial. */
 		LIST_REMOVE(slab, us_link);
 		LIST_INSERT_HEAD(&keg->uk_part_slab, slab, us_link);
+	} else {
+		/* Partial -> partial. */
+		uma_slab_t tmp;
+
+		tmp = LIST_NEXT(slab, us_link);
+		if (tmp != NULL && slab->us_freecount > tmp->us_freecount) {
+			LIST_REMOVE(slab, us_link);
+			LIST_INSERT_AFTER(tmp, slab, us_link);
+		}
 	}
 
 	/* Slab management. */
@@ -3157,6 +3174,16 @@ uma_zone_exhausted(uma_zone_t zone)
 	full = (zone->uz_flags & UMA_ZFLAG_FULL);
 	ZONE_UNLOCK(zone);
 	return (full);	
+}
+
+void
+uma_zone_reclaim(uma_zone_t zone)
+{
+
+	if (zone != NULL)
+		zone_drain_wait(zone, M_WAITOK);
+	else
+		zone_foreach(zone_drain);
 }
 
 int

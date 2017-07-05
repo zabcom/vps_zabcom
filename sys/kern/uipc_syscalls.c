@@ -107,6 +107,20 @@ getsock_cap(struct thread *td, int fd, cap_rights_t *rightsp,
 	return (0);
 }
 
+#ifdef VPS
+int getsock(struct filedesc *fdp, int fd, struct file **fpp, u_int *fflagp);
+#endif
+
+#ifdef VPS
+int
+getsock(struct filedesc *fdp, int fd, struct file **fpp, u_int *fflagp)
+{
+
+	/* XXX cap_rights_t rights --> 0 */
+	return (getsock_cap(fdp, fd, 0, fpp, fflagp));
+}
+#endif
+
 /*
  * System call interface to the socket abstraction.
  */

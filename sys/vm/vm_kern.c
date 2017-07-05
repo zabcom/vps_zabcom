@@ -76,6 +76,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/vmem.h>
 
+#include <vps/vps_account.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_kern.h>
@@ -458,6 +460,7 @@ kmap_alloc_wait(map, size)
 	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_ALL,
 	    VM_PROT_ALL, MAP_ACC_CHARGED);
 	vm_map_unlock(map);
+
 	return (addr);
 }
 

@@ -79,6 +79,7 @@ extern struct pagerops devicepagerops;
 extern struct pagerops physpagerops;
 extern struct pagerops sgpagerops;
 extern struct pagerops mgtdevicepagerops;
+extern struct pagerops vps_pager_ops;
 
 /*
  * get/put return values

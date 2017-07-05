@@ -131,7 +131,9 @@ struct shmid_kernel {
 	struct ucred *cred;	/* creator's credendials */
 };
 
+#ifndef VPS
 extern struct shminfo	shminfo;
+#endif
 
 struct shm_info {
 	int used_ids;

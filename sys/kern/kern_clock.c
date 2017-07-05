@@ -69,6 +69,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/limits.h>
 #include <sys/timetc.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+#define _VPS_USER_H__ONLY_FLAGS
+#include <vps/vps_user.h>
+
 #ifdef GPROF
 #include <sys/gmon.h>
 #endif
@@ -105,6 +110,13 @@ sysctl_kern_cp_time(SYSCTL_HANDLER_ARGS)
 #endif
 
 	read_cpu_time(cp_time);
+
+#ifdef VPS
+	/* XXX calc real per-vps times */
+	if (req->td->td_vps != vps0)
+		memset(&cp_time, 0, sizeof(cp_time));
+#endif
+
 #ifdef SCTL_MASK32
 	if (req->flags & SCTL_MASK32) {
 		if (!req->oldptr)
@@ -122,8 +134,8 @@ sysctl_kern_cp_time(SYSCTL_HANDLER_ARGS)
 	return error;
 }
 
-SYSCTL_PROC(_kern, OID_AUTO, cp_time, CTLTYPE_LONG|CTLFLAG_RD|CTLFLAG_MPSAFE,
-    0,0, sysctl_kern_cp_time, "LU", "CPU time statistics");
+_SYSCTL_PROC(_kern, OID_AUTO, cp_time, CTLTYPE_LONG|CTLFLAG_RD|CTLFLAG_MPSAFE,
+    0,0, sysctl_kern_cp_time, "LU", "CPU time statistics", VPS_PUBLIC);
 
 static long empty[CPUSTATES];
 
@@ -150,7 +162,12 @@ sysctl_kern_cp_times(SYSCTL_HANDLER_ARGS)
 	for (error = 0, c = 0; error == 0 && c <= mp_maxid; c++) {
 		if (!CPU_ABSENT(c)) {
 			pcpu = pcpu_find(c);
-			cp_time = pcpu->pc_cp_time;
+#ifdef VPS
+			if (req->td->td_vps != vps0)
+				cp_time = empty;
+			else
+#endif
+				cp_time = pcpu->pc_cp_time;
 		} else {
 			cp_time = empty;
 		}
@@ -166,8 +183,8 @@ sysctl_kern_cp_times(SYSCTL_HANDLER_ARGS)
 	return error;
 }
 
-SYSCTL_PROC(_kern, OID_AUTO, cp_times, CTLTYPE_LONG|CTLFLAG_RD|CTLFLAG_MPSAFE,
-    0,0, sysctl_kern_cp_times, "LU", "per-CPU time statistics");
+_SYSCTL_PROC(_kern, OID_AUTO, cp_times, CTLTYPE_LONG|CTLFLAG_RD|CTLFLAG_MPSAFE,
+    0,0, sysctl_kern_cp_times, "LU", "per-CPU time statistics", VPS_PUBLIC);
 
 #ifdef DEADLKRES
 static const char *blessed[] = {
@@ -187,9 +204,24 @@ deadlkres(void)
 	struct thread *td;
 	void *wchan;
 	int blkticks, i, slpticks, slptype, tryl, tticks;
+#ifdef VPS
+        struct vps *vps, *vps_tmp, *save_vps;
+#endif
 
 	tryl = 0;
 	for (;;) {
+
+#ifdef VPS
+		save_vps = curthread->td_vps;
+		sx_slock(&vps_all_lock);
+		LIST_FOREACH_SAFE(vps, &vps_head, vps_all, vps_tmp) {
+		if (vps->vps_status == VPS_ST_DEAD)
+			continue;
+		vps_ref(vps, (struct ucred *)&deadlkres);
+		sx_sunlock(&vps_all_lock);
+		curthread->td_vps = vps;
+#endif /* VPS */
+
 		blkticks = blktime_threshold * hz;
 		slpticks = slptime_threshold * hz;
 
@@ -198,12 +230,16 @@ deadlkres(void)
 		 * priority inversion problem leading to starvation.
 		 * If the lock can't be held after 100 tries, panic.
 		 */
-		if (!sx_try_slock(&allproc_lock)) {
+		if (!sx_try_slock(&V_allproc_lock)) {
 			if (tryl > 100)
 		panic("%s: possible deadlock detected on allproc_lock\n",
 				    __func__);
 			tryl++;
 			pause("allproc", sleepfreq * hz);
+#ifdef VPS
+			vps_deref(vps, (struct ucred *)&deadlkres);
+			sx_slock(&vps_all_lock);
+#endif /* VPS */
 			continue;
 		}
 		tryl = 0;
@@ -236,7 +272,7 @@ deadlkres(void)
 						 * turnstile.
 						 */
 						PROC_UNLOCK(p);
-						sx_sunlock(&allproc_lock);
+						sx_sunlock(&V_allproc_lock);
 	panic("%s: possible deadlock detected for %p, blocked for %d ticks\n",
 						    __func__, td, tticks);
 					}
@@ -282,7 +318,7 @@ deadlkres(void)
 							continue;
 						}
 						PROC_UNLOCK(p);
-						sx_sunlock(&allproc_lock);
+						sx_sunlock(&V_allproc_lock);
 	panic("%s: possible deadlock detected for %p, blocked for %d ticks\n",
 						    __func__, td, tticks);
 					}
@@ -291,7 +327,14 @@ deadlkres(void)
 			}
 			PROC_UNLOCK(p);
 		}
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
+#ifdef VPS
+		vps_deref(vps, (struct ucred *)&deadlkres);
+		sx_slock(&vps_all_lock);
+		}
+		sx_sunlock(&vps_all_lock);
+		curthread->td_vps = save_vps;
+#endif
 
 		/* Sleep for sleepfreq seconds. */
 		pause("-", sleepfreq * hz);

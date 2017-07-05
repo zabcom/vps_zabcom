@@ -62,6 +62,8 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/linker.h>		/* needs to be after <sys/malloc.h> */
 
+#include <vps/vps.h>
+
 #include <machine/atomic.h>
 #include <machine/md_var.h>
 
@@ -1064,7 +1066,7 @@ pmc_attach_process(struct proc *p, struct pmc *pm)
 	 * this PMC.
 	 */
 
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 
 	top = p;
 
@@ -1088,7 +1090,7 @@ pmc_attach_process(struct proc *p, struct pmc *pm)
 		(void) pmc_detach_process(top, pm);
 
  done:
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 	return error;
 }
 
@@ -1173,7 +1175,7 @@ pmc_detach_process(struct proc *p, struct pmc *pm)
 	 * partially attached proc tree.
 	 */
 
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 
 	top = p;
 
@@ -1194,7 +1196,7 @@ pmc_detach_process(struct proc *p, struct pmc *pm)
 	}
 
  done:
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 
 	if (LIST_EMPTY(&pm->pm_targets))
 		pm->pm_flags &= ~PMC_F_ATTACH_DONE;
@@ -1796,7 +1798,7 @@ pmc_log_all_process_mappings(struct pmc_owner *po)
 
 	PROC_UNLOCK(p);
 
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 
 	top = p;
 
@@ -1815,7 +1817,7 @@ pmc_log_all_process_mappings(struct pmc_owner *po)
 		}
 	}
  done:
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 }
 
 /*

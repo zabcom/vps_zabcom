@@ -64,6 +64,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/ctype.h>
 #include <sys/sbuf.h>
 
+#include <vps/vps.h>
+
 #ifdef DDB
 #include <ddb/ddb.h>
 #endif
@@ -162,12 +164,12 @@ uprintf(const char *fmt, ...)
 	if (TD_IS_IDLETHREAD(td))
 		return (0);
 
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 	p = td->td_proc;
 	PROC_LOCK(p);
 	if ((p->p_flag & P_CONTROLT) == 0) {
 		PROC_UNLOCK(p);
-		sx_sunlock(&proctree_lock);
+		sx_sunlock(&V_proctree_lock);
 		return (0);
 	}
 	SESS_LOCK(p->p_session);
@@ -175,14 +177,14 @@ uprintf(const char *fmt, ...)
 	SESS_UNLOCK(p->p_session);
 	PROC_UNLOCK(p);
 	if (pca.tty == NULL) {
-		sx_sunlock(&proctree_lock);
+		sx_sunlock(&V_proctree_lock);
 		return (0);
 	}
 	pca.flags = TOTTY;
 	pca.p_bufr = NULL;
 	va_start(ap, fmt);
 	tty_lock(pca.tty);
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 	retval = kvprintf(fmt, putchar, &pca, 10, ap);
 	tty_unlock(pca.tty);
 	va_end(ap);
@@ -211,7 +213,7 @@ vtprintf(struct proc *p, int pri, const char *fmt, va_list ap)
 	struct putchar_arg pca;
 	struct session *sess = NULL;
 
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 	if (pri != -1)
 		flags |= TOLOG;
 	if (p != NULL) {
@@ -234,7 +236,7 @@ vtprintf(struct proc *p, int pri, const char *fmt, va_list ap)
 	pca.p_bufr = NULL;
 	if (pca.tty != NULL)
 		tty_lock(pca.tty);
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 	kvprintf(fmt, putchar, &pca, 10, ap);
 	if (pca.tty != NULL)
 		tty_unlock(pca.tty);
@@ -1034,7 +1036,12 @@ sysctl_kern_msgbuf(SYSCTL_HANDLER_ARGS)
 	u_int seq;
 	int error, len;
 
+#ifdef VPS
+	/* Always check for PRIV_MSGBUF. */
+	if (1) {
+#else
 	if (!unprivileged_read_msgbuf) {
+#endif
 		error = priv_check(req->td, PRIV_MSGBUF);
 		if (error)
 			return (error);
@@ -1057,9 +1064,9 @@ sysctl_kern_msgbuf(SYSCTL_HANDLER_ARGS)
 	}
 }
 
-SYSCTL_PROC(_kern, OID_AUTO, msgbuf,
+_SYSCTL_PROC(_kern, OID_AUTO, msgbuf,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
-    NULL, 0, sysctl_kern_msgbuf, "A", "Contents of kernel message buffer");
+    NULL, 0, sysctl_kern_msgbuf, "A", "Contents of kernel message buffer", VPS_PUBLIC);
 
 static int msgbuf_clearflag;
 
