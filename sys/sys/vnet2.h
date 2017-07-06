@@ -18,6 +18,7 @@ struct vnet {
         u_int                    vnet_magic_n;
         u_int                    vnet_ifcnt;
         u_int                    vnet_sockcnt;
+	u_int			 vnet_state;	/* SI_SUB_* */
         u_int                    vnet_vps_flags; /* flags used by VPS */
         void                    *vnet_data_mem;
         uintptr_t                vnet_data_base;
@@ -29,35 +30,34 @@ struct vnet {
 /*
  * Location of the kernel's 'set_vnet' linker set.
  */
-
-extern uintptr_t        *__start_set_vnet;
+extern uintptr_t	*__start_set_vnet;
 __GLOBL(__start_set_vnet);
-extern uintptr_t        *__stop_set_vnet;
+extern uintptr_t	*__stop_set_vnet;
 __GLOBL(__stop_set_vnet);
 
-#define VNET_START      (uintptr_t)&__start_set_vnet
-#define VNET_STOP       (uintptr_t)&__stop_set_vnet
+#define	VNET_START	(uintptr_t)&__start_set_vnet
+#define	VNET_STOP	(uintptr_t)&__stop_set_vnet
 
 /*
  * Virtual network stack memory allocator, which allows global variables to
  * be automatically instantiated for each network stack instance.
  */
-#define VNET_NAME(n)            vnet_entry_##n
-#define VNET_DECLARE(t, n)      extern t VNET_NAME(n)
-#define VNET_DEFINE(t, n)       t VNET_NAME(n) __section(VNET_SETNAME) __used
-#define _VNET_PTR(b, n)         (__typeof(VNET_NAME(n))*)               \
-                                    ((b) + (uintptr_t)&VNET_NAME(n))
+#define	VNET_NAME(n)		vnet_entry_##n
+#define	VNET_DECLARE(t, n)	extern t VNET_NAME(n)
+#define	VNET_DEFINE(t, n)	t VNET_NAME(n) __section(VNET_SETNAME) __used
+#define	_VNET_PTR(b, n)		(__typeof(VNET_NAME(n))*)		\
+				    ((b) + (uintptr_t)&VNET_NAME(n))
 
-#define _VNET(b, n)             (*_VNET_PTR(b, n))
+#define	_VNET(b, n)		(*_VNET_PTR(b, n))
 
 /*
  * Virtualized global variable accessor macros.
  */
-#define VNET_VNET_PTR(vnet, n)          _VNET_PTR((vnet)->vnet_data_base, n)
-#define VNET_VNET(vnet, n)              (*VNET_VNET_PTR((vnet), n))
+#define	VNET_VNET_PTR(vnet, n)		_VNET_PTR((vnet)->vnet_data_base, n)
+#define	VNET_VNET(vnet, n)		(*VNET_VNET_PTR((vnet), n))
 
-#define VNET_PTR(n)             VNET_VNET_PTR(curvnet, n)
-#define VNET(n)                 VNET_VNET(curvnet, n)
+#define	VNET_PTR(n)		VNET_VNET_PTR(curvnet, n)
+#define	VNET(n)			VNET_VNET(curvnet, n)
 
 #else /* !VIMAGE */
 

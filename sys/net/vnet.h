@@ -64,17 +64,9 @@
  */
 #if defined(_KERNEL) || defined(_WANT_VNET)
 #include <sys/queue.h>
+#include <sys/sysctl.h>
+#include <sys/vnet2.h>
 
-struct vnet {
-	LIST_ENTRY(vnet)	 vnet_le;	/* all vnets list */
-	u_int			 vnet_magic_n;
-	u_int			 vnet_ifcnt;
-	u_int			 vnet_sockcnt;
-	u_int			 vnet_state;	/* SI_SUB_* */
-	void			*vnet_data_mem;
-	uintptr_t		 vnet_data_base;
-};
-#define	VNET_MAGIC_N	0x3e0d8f29
 
 /*
  * These two virtual network stack allocator definitions are also required
@@ -137,8 +129,8 @@ array##_sysctl(SYSCTL_HANDLER_ARGS)					\
 		    sizeof(type) / sizeof(uint64_t));			\
 	return (SYSCTL_OUT(req, &s, sizeof(type)));			\
 }									\
-SYSCTL_PROC(parent, nbr, name, CTLFLAG_VNET | CTLTYPE_OPAQUE | CTLFLAG_RW, \
-    NULL, 0, array ## _sysctl, "I", desc)
+_SYSCTL_PROC(parent, nbr, name, CTLFLAG_VNET | CTLTYPE_OPAQUE | CTLFLAG_RW, \
+    NULL, 0, array ## _sysctl, "I", desc, VPS_PUBLIC)
 #endif /* SYSCTL_OID */
 
 #ifdef VIMAGE
@@ -147,16 +139,6 @@ SYSCTL_PROC(parent, nbr, name, CTLFLAG_VNET | CTLTYPE_OPAQUE | CTLFLAG_RW, \
 #include <sys/rwlock.h>
 #include <sys/sx.h>
 
-/*
- * Location of the kernel's 'set_vnet' linker set.
- */
-extern uintptr_t	*__start_set_vnet;
-__GLOBL(__start_set_vnet);
-extern uintptr_t	*__stop_set_vnet;
-__GLOBL(__stop_set_vnet);
-
-#define	VNET_START	(uintptr_t)&__start_set_vnet
-#define	VNET_STOP	(uintptr_t)&__stop_set_vnet
 
 /*
  * Functions to allocate and destroy virtual network stacks.
@@ -259,27 +241,6 @@ extern struct sx vnet_sxlock;
  */
 #define	VNET_ITERATOR_DECL(arg)	struct vnet *arg
 #define	VNET_FOREACH(arg)	LIST_FOREACH((arg), &vnet_head, vnet_le)
-
-/*
- * Virtual network stack memory allocator, which allows global variables to
- * be automatically instantiated for each network stack instance.
- */
-#define	VNET_NAME(n)		vnet_entry_##n
-#define	VNET_DECLARE(t, n)	extern t VNET_NAME(n)
-#define	VNET_DEFINE(t, n)	t VNET_NAME(n) __section(VNET_SETNAME) __used
-#define	_VNET_PTR(b, n)		(__typeof(VNET_NAME(n))*)		\
-				    ((b) + (uintptr_t)&VNET_NAME(n))
-
-#define	_VNET(b, n)		(*_VNET_PTR(b, n))
-
-/*
- * Virtualized global variable accessor macros.
- */
-#define	VNET_VNET_PTR(vnet, n)		_VNET_PTR((vnet)->vnet_data_base, n)
-#define	VNET_VNET(vnet, n)		(*VNET_VNET_PTR((vnet), n))
-
-#define	VNET_PTR(n)		VNET_VNET_PTR(curvnet, n)
-#define	VNET(n)			VNET_VNET(curvnet, n)
 
 /*
  * Virtual network stack allocator interfaces from the kernel linker.
@@ -391,24 +352,6 @@ do {									\
 #define	CRED_TO_VNET(cr)	NULL
 #define	TD_TO_VNET(td)		NULL
 #define	P_TO_VNET(p)		NULL
-
-/*
- * Versions of the VNET macros that compile to normal global variables and
- * standard sysctl definitions.
- */
-#define	VNET_NAME(n)		n
-#define	VNET_DECLARE(t, n)	extern t n
-#define	VNET_DEFINE(t, n)	t n
-#define	_VNET_PTR(b, n)		&VNET_NAME(n)
-
-/*
- * Virtualized global variable accessor macros.
- */
-#define	VNET_VNET_PTR(vnet, n)		(&(n))
-#define	VNET_VNET(vnet, n)		(n)
-
-#define	VNET_PTR(n)		(&(n))
-#define	VNET(n)			(n)
 
 /*
  * When VIMAGE isn't compiled into the kernel, VNET_SYSINIT/VNET_SYSUNINIT
