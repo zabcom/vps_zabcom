@@ -1,5 +1,7 @@
 !
-! Looks like leftovers of an old time?
+! After r246143 LLE_PROXY is gone.  This flag will never be set.  As a consequence
+! RTF_PROTO1 will never be set.  As a consequence nd6_rtrequest_koh() will never be
+! called.  It's all dead code.  Back it out.
 !
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/net/if_llatbl.h trunk-clean/sys/net/if_llatbl.h
 --- 10.0.0-stripped/sys/net/if_llatbl.h	2014-01-15 14:20:21.000000000 +0100

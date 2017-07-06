@@ -491,9 +491,6 @@ struct nd_prefix *nd6_prefix_lookup(struct nd_prefixctl *);
 void rt6_flush(struct in6_addr *, struct ifnet *);
 int nd6_setdefaultiface(int);
 int in6_tmpifadd(const struct in6_ifaddr *, int, int);
-#ifdef VPS
-void nd6_rtrequest_koh(int, struct rtentry *, struct rt_addrinfo *);
-#endif
 
 #endif /* _KERNEL */
 
