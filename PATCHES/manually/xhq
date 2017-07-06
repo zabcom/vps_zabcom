@@ -1,3 +1,6 @@
+!
+! Lot's of whitespace changes in here; makes it hard to merge *sigh*.
+!
 diff -Naupr -x .svn -x 'rsync_vps.*' -I '$Id.*$' -I '$FreeBSD.*$' 10.0.0-stripped/sys/sys/sysctl.h trunk-clean/sys/sys/sysctl.h
 --- 10.0.0-stripped/sys/sys/sysctl.h	2014-01-15 14:19:16.000000000 +0100
 +++ trunk-clean/sys/sys/sysctl.h	2014-01-15 14:31:47.000000000 +0100

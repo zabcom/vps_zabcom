@@ -6,7 +6,6 @@ getboottime()
 	- failed/xdr
 	- xhr,  sys/sys/time.h
 
-_SYSCTL_ROOT_NODE
 hostid?
 
 failed/xej	sysv_msg ... skipped
