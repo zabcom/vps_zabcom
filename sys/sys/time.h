@@ -447,13 +447,15 @@ void	getmicrotime(struct timeval *tvp);
 void	getboottime(struct timeval *boottime);
 void	getboottimebin(struct bintime *boottimebin);
 
-/* XXX-BZ resolve. */
-VPS_DECLARE(struct bintime, boottimebin);
-VPS_DECLARE(struct timeval, boottime);
-#define V_boottimebin   VPSV(boottimebin)
-#define V_boottime      VPSV(boottime)
-#define G_boottimebin   VPS_VPS(vps0, boottimebin)
-#define G_boottime      VPS_VPS(vps0, boottime)
+void	V_nanouptime(struct timespec *tsp);
+void	V_getnanouptime(struct timespec *tsp);
+void	V_getboottime(struct timeval *boottime);
+void	V_getboottimebin(struct bintime *boottimebin);
+#define	G_getboottime(bt)	getboottime(bt)
+#define	G_getboottimebin(btb)	getboottimebin(btb)
+#ifdef VPS
+void	init_V_kern_tc(struct bintime *boottimebin);
+#endif
 
 /* Other functions */
 int	itimerdecr(struct itimerval *itp, int usec);

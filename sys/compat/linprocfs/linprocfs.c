@@ -460,7 +460,7 @@ linprocfs_dostat(PFS_FILL_ARGS)
 	int i;
 
 	read_cpu_time(cp_time);
-	getboottime(&boottime);
+	V_getboottime(&boottime);
 	sbuf_printf(sb, "cpu %ld %ld %ld %ld\n",
 	    T2J(cp_time[CP_USER]),
 	    T2J(cp_time[CP_NICE]),
@@ -640,7 +640,7 @@ linprocfs_doprocstat(PFS_FILL_ARGS)
 	static int ratelimit = 0;
 	vm_offset_t startcode, startdata;
 
-	getboottime(&boottime);
+	V_getboottime(&boottime);
 	sx_slock(&proctree_lock);
 	PROC_LOCK(p);
 	fill_kinfo_proc(p, &kp);

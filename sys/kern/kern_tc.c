@@ -40,6 +40,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/timex.h>
 #include <sys/vdso.h>
 
+#include <vps/vps.h>
+#include <vps/vps2.h>
+
 /*
  * A large step happens on boot.  This constant detects such steps.
  * It is relatively small so that ntp_update_second gets called enough
@@ -82,6 +85,37 @@ struct timehands {
 	struct timehands	*th_next;
 };
 
+#ifdef VPS
+static VPS_DEFINE(struct bintime, boottime_off);
+static VPS_DEFINE(struct bintime, offset_off);
+#define	V_boottimebin		VPSV(boottime_off)
+#define	V_offset		VPSV(offset_off)
+
+void
+init_V_kern_tc(struct bintime *boottimebin)
+{
+
+	/*
+	 * If boottimebin is NULL it means we are called during
+	 * (re)boot and should setup the delta accordingly.
+	 * Otherwise we are passed our "time" and we need to apply
+	 * that to the offset.
+	 */
+	V_boottimebin = timehands->th_boottime;
+	V_offset = timehands->th_offset;
+	if (boottimebin != NULL) {
+		/*
+		 * XXX-BZ if that gets us negative as the guest
+		 * has more uptime than the (new) host, I assume
+		 * all fun things will happen; deal with that as
+		 * we can test.
+		 */
+		bintime_sub(V_boottimebin, *boottimebin);
+		bintime_sub(V_offset, *boottimebin);
+	}
+}
+#endif
+
 static struct timehands th0;
 static struct timehands th1 = {
 	.th_next = &th0
@@ -104,7 +138,7 @@ volatile time_t time_second = 1;
 volatile time_t time_uptime = 1;
 
 static int sysctl_kern_boottime(SYSCTL_HANDLER_ARGS);
-SYSCTL_PROC(_kern, KERN_BOOTTIME, boottime, CTLTYPE_STRUCT|CTLFLAG_RD,
+SYSCTL_VPS_PROC(_kern, KERN_BOOTTIME, boottime, CTLTYPE_STRUCT|CTLFLAG_RD,
     NULL, 0, sysctl_kern_boottime, "S,timeval", "System boottime");
 
 SYSCTL_NODE(_kern, OID_AUTO, timecounter, CTLFLAG_RW, 0, "");
@@ -142,7 +176,7 @@ sysctl_kern_boottime(SYSCTL_HANDLER_ARGS)
 {
 	struct timeval boottime;
 
-	getboottime(&boottime);
+	V_getboottime(&boottime);
 
 #ifndef __mips__
 #ifdef SCTL_MASK32
@@ -500,6 +534,31 @@ getmicrotime(struct timeval *tvp)
 }
 #endif /* FFCLOCK */
 
+#ifdef VPS
+void
+V_nanouptime(struct timespec *tsp)
+{
+	struct timespec t;
+
+	nanouptime(tsp);
+	bintime2timespec(V_offset, &t);
+	timespecsub(tsp, &t);
+}
+
+void
+V_getnanouptime(struct timespec *tsp)
+{
+	struct timespec t;
+
+	getnanouptime(tsp);
+	bintime2timespec(V_offset, &t);
+	timespecsub(tsp, &t);
+}
+#else
+#define	V_nanouptime(tsp)	nanouptime(tsp)
+#define	V_getnanouptime(tsp)	getnanouptime(tsp)
+#endif
+
 void
 getboottime(struct timeval *boottime)
 {
@@ -508,6 +567,37 @@ getboottime(struct timeval *boottime)
 	getboottimebin(&boottimebin);
 	bintime2timeval(&boottimebin, boottime);
 }
+
+#ifdef VPS
+void
+V_getboottimebin(struct bintime *boottimebin)
+{
+	struct timehands *th;
+	u_int gen;
+
+	do {
+		th = timehands;
+		gen = atomic_load_acq_int(&th->th_generation);
+		*boottimebin = th->th_boottime;
+		atomic_thread_fence_acq();
+	} while (gen == 0 || gen != th->th_generation);
+
+	/* Apply offset. */
+	bintime_sub(*boottimebin, V_boottimebin);
+}
+
+void
+V_getboottime(struct timeval *boottime)
+{
+	struct bintime boottimebin;
+
+	V_getboottimebin(&boottimebin);
+	bintime2timeval(&boottimebin, boottime);
+}
+#else
+#define	V_getboottime(bt)	getboottime(bt)
+#define	V_getboottimebin(btb)	getboottimebin(btb)
+#endif
 
 void
 getboottimebin(struct bintime *boottimebin)
@@ -1154,7 +1244,7 @@ sysclock_snap2bintime(struct sysclock_snap *cs, struct bintime *bt,
 			bintime_addx(bt, cs->fb_info.th_scale * cs->delta);
 
 		if ((flags & FBCLOCK_UPTIME) == 0) {
-			getboottimebin(&boottimebin);
+			V_getboottimebin(&boottimebin);
 			bintime_add(bt, &boottimebin);
 		}
 		break;
@@ -2173,6 +2263,10 @@ tc_fill_vdso_timehands(struct vdso_timehands *vdso_th)
 		enabled = 0;
 	if (!vdso_th_enable)
 		enabled = 0;
+#ifdef VPS
+	/* XXX-BZ for now. */
+	enabled = 0;
+#endif
 	return (enabled);
 }
 
@@ -2198,6 +2292,10 @@ tc_fill_vdso_timehands32(struct vdso_timehands32 *vdso_th32)
 		enabled = 0;
 	if (!vdso_th_enable)
 		enabled = 0;
+#ifdef VPS
+	/* XXX-BZ for now. */
+	enabled = 0;
+#endif
 	return (enabled);
 }
 #endif

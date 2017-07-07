@@ -1030,7 +1030,7 @@ read_machclk(void)
 		struct timeval tv, boottime;
 
 		microtime(&tv);
-		getboottime(&boottime);
+		V_getboottime(&boottime);
 		val = (((u_int64_t)(tv.tv_sec - boottime.tv_sec) * 1000000
 		    + tv.tv_usec) << MACHCLK_SHIFT);
 	}

@@ -721,7 +721,7 @@ filt_timerattach(struct knote *kn)
 
 	to = timer2sbintime(kn->kn_sdata, kn->kn_sfflags);
 	if ((kn->kn_sfflags & NOTE_ABSTIME) != 0) {
-		getboottimebin(&bt);
+		G_getboottimebin(&bt);
 		sbt = bttosbt(bt);
 		to -= sbt;
 	}

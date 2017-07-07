@@ -351,13 +351,8 @@ kern_clock_gettime(struct thread *td, clockid_t clock_id, struct timespec *ats)
 #ifdef VPS
 		if (curthread->td_vps == vps0)
 			nanouptime(ats);
-		else {
-			struct timespec t1;
-
-			nanotime(ats);
-			bintime2timespec(&V_boottimebin, &t1);
-			timespecsub(ats, &t1);
-		}
+		else
+			V_nanouptime(ats);
 #else
 		nanouptime(ats);
 #endif
@@ -367,13 +362,8 @@ kern_clock_gettime(struct thread *td, clockid_t clock_id, struct timespec *ats)
 #ifdef VPS
 		if (curthread->td_vps == vps0)
 			getnanouptime(ats);
-		else {
-			struct timespec t1;
-
-			getnanotime(ats);
-			bintime2timespec(&V_boottimebin, &t1);
-			timespecsub(ats, &t1);
-		}
+		else
+			V_getnanouptime(ats);
 #else
 		getnanouptime(ats);
 #endif

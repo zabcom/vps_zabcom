@@ -914,8 +914,7 @@ vps_snapshot_vps(struct vps_snapst_ctx *ctx, struct vps *vps)
 	vdi = vdo_space(ctx, sizeof(*vdi), M_WAITOK);
 	strlcpy(vdi->hostname, VPS_VPS(vps, hostname),
 	    sizeof(vdi->hostname));
-	vdi->boottime.tv_sec = VPS_VPS(vps, boottime).tv_sec;
-	vdi->boottime.tv_usec = VPS_VPS(vps, boottime).tv_usec;
+	V_getboottime(&vdi->boottime);			/* XXX-BZ is that right? */
 	vdi->lastpid = VPS_VPS(vps, lastpid);
 
 	vdi->restore_count = vps->restore_count;

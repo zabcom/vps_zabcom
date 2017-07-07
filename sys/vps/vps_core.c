@@ -267,6 +267,7 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 	sx_xlock(&vps->vps_lock);
 
 	if (vps_parent) {
+		struct vps *save_vps;
 
 		/* Alloc vnet. Apparently always succeeds. */
 		vps->vnet = vnet_alloc();
@@ -277,9 +278,11 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 		vps_deref(vps->vps_ucred->cr_vps, vps->vps_ucred);
 		vps->vps_ucred->cr_vps = vps;
 
-		getbintime(&VPS_VPS(vps, boottimebin));
-		bintime2timeval(&VPS_VPS(vps, boottimebin),
-		    &VPS_VPS(vps, boottime));
+		/* XXX-BZ set the proper vps! */
+		vps_save = curthread->td_vps;
+		curthread->td_vps = vps;
+		init_V_kern_tc(NULL);
+		curthread->td_vps = vps_save;
 
 		memset(VPS_VPS(vps, hostname), 0, sizeof(VPS_VPS(vps,
 		    hostname)));
@@ -1663,13 +1666,7 @@ vps_reboot(struct thread *td, int howto)
 	sx_xunlock(&V_proctree_lock);
 
 	/* Reset vps uptime. */
-	curthread->td_vps = vps0;
-	memset(&VPS_VPS(vps, boottimebin), 0, sizeof(struct bintime));
-	memset(&VPS_VPS(vps, boottime), 0, sizeof(struct timeval));
-	getbintime(&VPS_VPS(vps, boottimebin));
-	bintime2timeval(&VPS_VPS(vps, boottimebin),
-	    &VPS_VPS(vps, boottime));
-	curthread->td_vps = vps;
+	init_V_kern_tc(NULL);
 
 	/* Reset hostname, domainname, hostuuid. */
 	memset(VPS_VPS(vps, hostname), 0, sizeof(VPS_VPS(vps, hostname)));

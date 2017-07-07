@@ -4632,7 +4632,7 @@ vps_restore_vps(struct vps_snapst_ctx *ctx, const char *vps_name,
 	struct vps_param vps_pr;
 	struct vps_dumpobj *o1;
 	struct vps_dump_vps *vdi;
-	struct vps *vps;
+	struct vps *vps, *save_vps;
 	int nexttype;
 	int error = 0;
 
@@ -4758,10 +4758,10 @@ vps_restore_vps(struct vps_snapst_ctx *ctx, const char *vps_name,
 	strlcpy(VPS_VPS(vps, hostname), vdi->hostname,
 	    sizeof(VPS_VPS(vps, hostname)));
 
-	VPS_VPS(vps, boottimebin).sec = vdi->boottime.tv_sec;
-	VPS_VPS(vps, boottimebin).frac = 0;
-	VPS_VPS(vps, boottime).tv_sec = vdi->boottime.tv_sec;
-	VPS_VPS(vps, boottime).tv_usec = vdi->boottime.tv_usec;
+	vps_save = curthread->td_vps;
+	curthread->td_vps = vps;
+	init_V_kern_tc(&vdi->boottime);
+	curthread->td_vps = vps_save;
 	VPS_VPS(vps, lastpid) = vdi->lastpid;
 
 	vps->restore_count = vdi->restore_count + 1;
