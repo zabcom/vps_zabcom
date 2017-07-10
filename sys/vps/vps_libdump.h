@@ -932,6 +932,7 @@ struct vps_dump_sysvmsg_msginfo {
 	sint32 nfree_msgmaps;
 	sint32 free_msgmaps;
 	uint64 free_msghdrs_idx;
+	unsigned msg_prison_slot;
 };
 
 struct vps_dump_sysvmsg_msg {
@@ -974,7 +975,7 @@ struct vps_dump_sysvsem_seminfo {
 	sint32 semusz;
 	sint32 semvmx;
 	sint32 semaem;
-	sint32 _pad0;
+	unsigned sem_prosin_slot;
 
         sint32 semtot;
         sint32 semundo_active;
@@ -1040,7 +1041,7 @@ struct vps_dump_sysvshm_shminfo {
 	sint32 shm_last_free;
 	sint32 shm_nused;
 	sint32 shmalloced;
-	sint32 _pad0;
+	unsigned shm_prison_slot;
 	uint64 shm_committed;
 
 	struct vps_dump_sysvshm_shmid shmsegs[0];
