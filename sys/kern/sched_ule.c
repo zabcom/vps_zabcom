@@ -2220,7 +2220,7 @@ sched_preempt(struct thread *td)
 		else
 			mi_switch(flags | SWT_REMOTEPREEMPT, NULL);
 	}
-	td->td_flags &= ~TDF_PREEMPTED;
+	td->td_flags2 &= ~TDF2_PREEMPTED;
 	thread_unlock(td);
 }
 

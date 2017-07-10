@@ -339,7 +339,8 @@ vps_suspend(struct vps *vps, int flags)
 			DBGCORE("td=%u/%p td->td_flags=%08x\n",
 			    td->td_tid, td, td->td_flags);
 			/*db_trace_thread(td, 16);*/
-			td->td_flags |= TDF_NEEDSUSPCHK | TDF_VPSSUSPEND;
+			td->td_flags |= TDF_NEEDSUSPCHK;
+			td->td_flags2 |= TDF2_VPSSUSPEND;
 			if (TD_ON_SLEEPQ(td)) {
 				if (td->td_flags & TDF_SINTR)
 					sleepq_abort(td, ERESTART);
@@ -770,7 +771,7 @@ vps_syscall_fixup_inthread(register_t code, struct trapframe *frame)
 		error = 0;
 		while (p2->p_flag & P_PPWAIT) {
 			cv_wait(&p2->p_pwait, &p2->p_mtx);
-			if (td->td_flags & TDF_VPSSUSPEND) {
+			if (td->td_flags2 & TDF2_VPSSUSPEND) {
 				DBGCORE("%s: aborted cv_wait(), td=%p/%u\n",
 					__func__, td, td->td_tid);
 				error = EINTR;
@@ -821,10 +822,10 @@ vps_syscall_fixup_inthread(register_t code, struct trapframe *frame)
 	}
 	}
 
-        if (td->td_flags & TDF_VPSSUSPEND) {
+        if (td->td_flags2 & TDF2_VPSSUSPEND) {
                 DBGCORE("%s: td=%p suspending\n", __func__, td);
                 td->td_errno = error;
-                if (td->td_flags & TDF_NEEDSUSPCHK) {
+                if (td->td_flags2 & TDF2_NEEDSUSPCHK) {
                         PROC_LOCK(td->td_proc);
                         thread_suspend_check(0);
                         /*
@@ -833,7 +834,7 @@ vps_syscall_fixup_inthread(register_t code, struct trapframe *frame)
                          */
                         PROC_UNLOCK(td->td_proc);
                 }
-                td->td_flags &= ~TDF_VPSSUSPEND;
+                td->td_flags2 &= ~TDF2_VPSSUSPEND;
                 error = td->td_errno;
         }
 

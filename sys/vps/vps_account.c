@@ -190,7 +190,7 @@ vps_account_uninit(void)
 	TAILQ_FOREACH_SAFE(td, &vps_paused_threads_head, td_runq, td2) {
 		mtx_unlock_spin(&vps_account_pausedqueue_mtx);
 		thread_lock(td);
-		if (td->td_flags & TDF_VPSLIMIT)
+		if (td->td_flags2 & TDF2_VPSLIMIT)
 			vps_account_thread_resume(td);
 		thread_unlock(td);
 		mtx_lock_spin(&vps_account_pausedqueue_mtx);
@@ -654,7 +654,7 @@ _vps_account_thread_pause(struct thread *td)
 
 	mtx_lock_spin(&vps_account_pausedqueue_mtx);
 	/* Thread is already off the run queues. */
-	td->td_flags |= TDF_VPSLIMIT;	/* XXX _Should_ be protected
+	td->td_flags2 |= TDF2_VPSLIMIT;	/* XXX _Should_ be protected
 					   by thread_lock */
 	TAILQ_INSERT_TAIL(&vps_paused_threads_head, td, td_runq);
 	mtx_unlock_spin(&vps_account_pausedqueue_mtx);
@@ -668,7 +668,7 @@ vps_account_thread_resume(struct thread *td)
 	THREAD_LOCK_ASSERT(td, MA_OWNED);
 
 	TAILQ_REMOVE(&vps_paused_threads_head, td, td_runq);
-	td->td_flags &= ~TDF_VPSLIMIT;
+	td->td_flags2 &= ~TDF2_VPSLIMIT;
 	mtx_unlock_spin(&vps_account_pausedqueue_mtx);
 
 	sched_add(td, SRQ_BORING);
@@ -686,10 +686,10 @@ vps_account_check_threads(void)
 		mtx_unlock_spin(&vps_account_pausedqueue_mtx);
 		thread_lock(td);
 		if (_vps_account_runnable(td)) {
-			/* If TDF_VPSLIMIT is missing thread is
+			/* If TDF2_VPSLIMIT is missing thread is
 			   already removed. */
 			mtx_lock_spin(&vps_account_pausedqueue_mtx);
-			if (td->td_flags & TDF_VPSLIMIT)
+			if (td->td_flags2 & TDF2_VPSLIMIT)
 				vps_account_thread_resume(td);
 			else
 				mtx_unlock_spin(
@@ -751,10 +751,10 @@ _vps_account_runnable(struct thread *td)
 	 * Otherwise we introduce performance loss and blow up the system.
 	 *
 	 * If td was preempted while being in kernel mode,
-	 * TDF_PREEMPTED is set.
+	 * TDF2_PREEMPTED is set.
 	 * In this case we can't and don't want to keep td from running.
 	 */
-	if (rc == 0 && ((td->td_flags & TDF_PREEMPTED) || TD_ON_LOCK(td))) {
+	if (rc == 0 && ((td->td_flags2 & TDF2_PREEMPTED) || TD_ON_LOCK(td))) {
 		/*
 		DBGACC("%s: td=%p [%d][%s] is not to be run but was "
 		    "preempted or is on lock!\n",

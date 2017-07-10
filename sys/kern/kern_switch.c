@@ -235,14 +235,14 @@ critical_exit(void)
 			td->td_critnest = 1;
 			thread_lock(td);
 			td->td_critnest--;
-			td->td_flags |= TDF_PREEMPTED;
+			td->td_flags2 |= TDF2_PREEMPTED;
 			flags = SW_INVOL | SW_PREEMPT;
 			if (TD_IS_IDLETHREAD(td))
 				flags |= SWT_IDLE;
 			else
 				flags |= SWT_OWEPREEMPT;
 			mi_switch(flags, NULL);
-			td->td_flags &= ~TDF_PREEMPTED;
+			td->td_flags2 &= ~TDF2_PREEMPTED;
 			thread_unlock(td);
 		}
 	} else

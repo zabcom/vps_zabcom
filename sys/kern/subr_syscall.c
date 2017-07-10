@@ -157,7 +157,7 @@ syscallenter(struct thread *td)
 	 *
 	 * XXX error/td_errno hack
 	 */
-	if (td->td_flags & TDF_VPSSUSPEND) {
+	if (td->td_flags2 & TDF2_VPSSUSPEND) {
 		DBGCORE("%s: td=%p suspending\n", __func__, td);
 		td->td_errno = error;
 		if (td->td_flags & TDF_NEEDSUSPCHK) {
@@ -169,7 +169,7 @@ syscallenter(struct thread *td)
 			 */
 			PROC_UNLOCK(td->td_proc);
 		}
-		td->td_flags &= ~TDF_VPSSUSPEND;
+		td->td_flags2 &= ~TDF2_VPSSUSPEND;
 		error = td->td_errno;
 	}
 #endif
@@ -283,7 +283,7 @@ again:
 			cv_timedwait(&p2->p_pwait, &p2->p_mtx, hz);
 #ifdef VPS
 			/* XXX-BZ is this right? */
-			if (td->td_flags & TDF_VPSSUSPEND)
+			if (td->td_flags2 & TDF2_VPSSUSPEND)
 				break;
 #endif
 		}
@@ -312,7 +312,7 @@ again:
 	 *
 	 * XXX error/td_errno hack
 	 */
-	if (td->td_flags & TDF_VPSSUSPEND) {
+	if (td->td_flags2 & TDF2_VPSSUSPEND) {
 		DBGCORE("%s: td=%p suspending\n", __func__, td);
 
 		vps_md_syscallret(td, sa);
@@ -328,7 +328,7 @@ again:
 			 */
 			PROC_UNLOCK(td->td_proc);
 		}
-		td->td_flags &= ~TDF_VPSSUSPEND;
+		td->td_flags2 &= ~TDF2_VPSSUSPEND;
 		error = td->td_errno;
 	}
 #endif

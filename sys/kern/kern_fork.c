@@ -1005,7 +1005,7 @@ fork1(struct thread *td, struct fork_req *fr)
 	if (ok) {
 		do_fork(td, fr, newproc, td2, vm2, fp_procdesc);
 #ifdef VPS
-		if (td->td_flags & TDF_VPSSUSPEND)
+		if (td->td_flags2 & TDF2_VPSSUSPEND)
 			return (EINTR);
 #endif
 		return (0);

@@ -256,7 +256,7 @@ struct thread {
 /* Cleared during fork1() */
 #define	td_startzero td_flags
 	int		td_flags;	/* (t) TDF_* flags. */
-	int		td_flags2;	/* (t) TDF_* flags. */
+	int		td_flags2;	/* (t) TDF2_* flags. */
 	int		td_inhibitors;	/* (t) Why can not run. */
 	int		td_pflags;	/* (k) Private thread (TDP_*) flags. */
 	int		td_dupfd;	/* (k) Ret value from fdopen. XXX */

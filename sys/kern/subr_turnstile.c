@@ -262,7 +262,7 @@ propagate_priority(struct thread *td)
 		 * blocking on a turnstile, was woken up again
 		 * but wasn't scheduled to actually run yet.
 		 */
-		if (td->td_flags & TDF_VPSLIMIT) {
+		if (td->td_flags2 & TDF2_VPSLIMIT) {
 			MPASS(td->td_blocked == NULL);
 			MPASS(td->td_turnstile != NULL);
 			thread_unlock(td);
