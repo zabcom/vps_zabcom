@@ -1,11 +1,17 @@
 # $Id: Makefile 208 2013-12-17 15:33:25Z klaus $
 
+.PATH:	${SRCTOP}/sys/vps
+
 PROG=	vpsctl
+SRCS+=	vpsctl.c
+SRCS+=	priv_ston.c priv_ntos.c
+SRCS+=	vps_libdump.c
 MAN=	vpsctl.8 vps.4 vps.9 vps.conf.5
 WARNS?=	6
-BINDIR=	/usr/sbin
 
-CFLAGS+= -I${.CURDIR}/../../sys/ -g
+CLEANFILES+=	priv_ston.c priv_ntos.c
+
+CFLAGS+= -I${SRCTOP}/sys
 
 clean:
 	rm -f vpsctl.o priv_ston.o priv_ntos.o vps_libdump.o \
@@ -30,7 +36,7 @@ priv_generate:
 
 priv_ston.c priv_ntos.c: mkprivlist priv_generate
 
-vpsctl: priv_ston.c priv_ntos.c
+FOO_vpsctl: priv_ston.c priv_ntos.c
 	cc -Wall -g -I../../sys -I/usr/include -o vpsctl \
 		${.CURDIR}/vpsctl.c \
 		./priv_ston.c \

@@ -105,14 +105,14 @@ static const char def_escape_pattern[] =
 static const char def_escape_message[] =
     "Escape sequence: <enter>#.\n";
 
-int vpsfd;
-char **vc_envv;
-int fscale;
+static int vpsfd;
+static char **vc_envv;
+static int fscale;
 
-int mig_did_suspend;
-int mig_did_revoke;
-char *mig_vps;
-struct vps_conf mig_vc;
+static int mig_did_suspend;
+static int mig_did_revoke;
+static char *mig_vps;
+static struct vps_conf mig_vc;
 
 int vc_read_config(char *file_n, struct vps_conf *vc);
 char *vc_trim_whitespace(char *s);
@@ -2963,11 +2963,9 @@ vc_savefile(int argc, char **argv)
 {
 	char buf[0x1000];
 	char *path;
-	long size;
-	long done;
+	ssize_t size, done, rc;
 	int mode;
 	int fd;
-	int rc;
 
 	if (argc < 3)
 		return (1);
@@ -3000,8 +2998,8 @@ vc_savefile(int argc, char **argv)
 	done = 0;
 	while (done < size) {
 		rc = size-done;
-		if (rc > sizeof(buf))
-			rc = sizeof(buf);
+		if (rc > (ssize_t)sizeof(buf))
+			rc = (ssize_t)sizeof(buf);
 		rc = read(0, buf, rc);
 		if (rc == -1) {
 			fprintf(stderr, "read(0, ...): error: %s\n",
