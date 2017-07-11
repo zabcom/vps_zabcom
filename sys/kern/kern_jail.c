@@ -81,16 +81,19 @@ static MALLOC_DEFINE(M_PRISON_RACCT, "prison_racct", "Prison racct structures");
 
 #ifdef VPS
 VPS_DEFINE(struct prison *, prison0);
-#define	V_prison0	VPSV(prison0)
+#define V_prison0       VPSV(prison0)
+#else
+#define V_prison0	(&prison0)
+#endif
 
-/* List head is initalized in vps_alloc(). */
-VPS_DEFINE(struct prisonlist, allprison);
 VPS_DEFINE(int, lastprid) = 0;
 #define	V_lastprid	VPSV(lastprid)
+
+#ifdef VPS
+/* List head is initalized in vps_alloc(). */
+VPS_DEFINE(struct prisonlist, allprison);
 #else
 struct	prisonlist allprison = TAILQ_HEAD_INITIALIZER(allprison);
-int	lastprid = 0;
-#define	V_lastprid	lastprid
 #endif /* !VPS */
 
 /* Keep struct prison prison0 and some code in kern_jail_set() readable. */
