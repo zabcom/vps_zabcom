@@ -27,15 +27,15 @@
  * SUCH DAMAGE.
  */
 
-static const char vpsid[] =
-    "$Id: vpsfs_quota.c 215 2014-01-15 15:58:11Z klaus $";
+#include <sys/cdefs.h>
+
+__IDSTRING(vpsid, "$Id: vpsfs_quota.c 215 2014-01-15 15:58:11Z klaus $");
 
 
 #include "opt_global.h"
 
 #ifdef VPS
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -559,7 +559,10 @@ vpsfs_readdir(struct thread *td, struct vnode *vp, int dirbuflen,
 		cnp->cn_lkflags = LK_SHARED;
 		cnp->cn_nameiop = LOOKUP;
 		cnp->cn_pnbuf = dp->d_name;
+#if 0
+		/* XXX-BZ this was probably field abuse which is now gone. */
 		cnp->cn_consume = strlen(dp->d_name);
+#endif
 		cnp->cn_nameptr = dp->d_name;
 		cnp->cn_namelen = strlen(dp->d_name);
 

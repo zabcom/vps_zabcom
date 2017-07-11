@@ -1254,7 +1254,7 @@ mkdumpheader(struct kerneldumpheader *kdh, char *magic, uint32_t archver,
 	kdh->dumptime = htod64(time_second);
 	kdh->dumpkeysize = htod32(dumpkeysize);
 	kdh->blocksize = htod32(blksz);
-	strlcpy(kdh->hostname, V_prison0.pr_hostname, sizeof(kdh->hostname));
+	strlcpy(kdh->hostname, V_prison0->pr_hostname, sizeof(kdh->hostname));
 	strlcpy(kdh->versionstring, version, sizeof(kdh->versionstring));
 	if (panicstr != NULL)
 		strlcpy(kdh->panicstring, panicstr, sizeof(kdh->panicstring));

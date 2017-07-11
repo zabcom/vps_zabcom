@@ -443,9 +443,9 @@ msginit2()
 	/* Set current prisons according to their allow.sysvipc. */
 	V_msg_prison_slot = osd_jail_register(NULL, methods);
 	rsv = osd_reserve(V_msg_prison_slot);
-	prison_lock(&V_prison0);
+	prison_lock(V_prison0);
 	(void)osd_jail_set_reserved(V_prison0, msg_prison_slot, rsv, V_prison0);
-	prison_unlock(&V_prison0);
+	prison_unlock(V_prison0);
 	rsv = NULL;
 	sx_slock(&allprison_lock);
 	TAILQ_FOREACH(pr, &allprison, pr_list) {
@@ -1639,20 +1639,20 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgmax, CTLFLAG_RD, &VPS_NAME(msginfo.msgmax), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgmax, CTLFLAG_RD|CTLFLAG_VPS, &VPS_NAME(msginfo.msgmax), 0,
     "Maximum message size");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgmni, CTLFLAG_RDTUN, &VPS_NAME(msginfo.msgmni), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgmni, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(msginfo.msgmni), 0,
     "Number of message queue identifiers");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgmnb, CTLFLAG_RDTUN, &VPS_NAME(msginfo.msgmnb), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgmnb, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(msginfo.msgmnb), 0,
     "Maximum number of bytes in a queue");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgtql, CTLFLAG_RDTUN, &VPS_NAME(msginfo.msgtql), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgtql, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(msginfo.msgtql), 0,
     "Maximum number of messages in the system");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgssz, CTLFLAG_RDTUN, &VPS_NAME(msginfo.msgssz), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgssz, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(msginfo.msgssz), 0,
     "Size of a message segment");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, msgseg, CTLFLAG_RDTUN, &VPS_NAME(msginfo.msgseg), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, msgseg, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(msginfo.msgseg), 0,
     "Number of message segments");
-SYSCTL_VPS_PROC(_kern_ipc, OID_AUTO, msqids,
-    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE,
+SYSCTL_PROC(_kern_ipc, OID_AUTO, msqids,
+    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE|CTLFLAG_VPS,
     NULL, 0, sysctl_msqids, "", "Message queue IDs");
 
 static int

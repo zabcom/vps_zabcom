@@ -58,28 +58,21 @@ struct vps2 {
 };
 
 #define VPS_NAME		VNET_NAME
-#define VPS_DECLARE		VNET_DECLARE
 #define VPS_DEFINE		VNET_DEFINE
 
 #define VPS_VPS(vps, n)		\
     VNET_VNET(((struct vps2 *)vps)->vnet, n)
 #define VPS_VPS_PTR(vps, n)	\
     VNET_VNET_PTR(((struct vps2 *)vps)->vnet, n)
+
+#ifdef VPS
+#define VPS_DECLARE		VNET_DECLARE
 #define VPSV(n)			\
     VNET_VNET(((struct vps2 *)curthread->td_vps)->vnet, n)
-
-#define SYSCTL_VPS_INT		SYSCTL_VNET_INT
-#define SYSCTL_VPS_PROC		SYSCTL_VNET_PROC
-#define SYSCTL_VPS_STRING	SYSCTL_VNET_STRING
-#define SYSCTL_VPS_STRUCT	SYSCTL_VNET_STRUCT
-#define SYSCTL_VPS_UINT		SYSCTL_VNET_UINT
-#define SYSCTL_VPS_LONG		SYSCTL_VNET_LONG
-#define SYSCTL_VPS_ULONG	SYSCTL_VNET_ULONG
-
-#define vps_sysctl_handle_int		vnet_sysctl_handle_int
-#define vps_sysctl_handle_opaque	vnet_sysctl_handle_opaque
-#define vps_sysctl_handle_string	vnet_sysctl_handle_string
-#define vps_sysctl_handle_uint		vnet_sysctl_handle_uint
+#else
+#define VPS_DECLARE(t, n)	extern t n
+#define	VPSV(n)			(n)
+#endif /* !VPS */
 
 struct vps;
 extern struct vps *vps0;

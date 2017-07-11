@@ -27,10 +27,9 @@
  * SUCH DAMAGE.
  */
 
-static const char vpsid[] =
-    "$Id: vps_restore.c 206 2013-12-16 18:15:42Z klaus $";
-
 #include <sys/cdefs.h>
+
+__IDSTRING(vpsid, "$Id: vps_restore.c 206 2013-12-16 18:15:42Z klaus $");
 
 #include "opt_ddb.h"
 #include "opt_ktrace.h"

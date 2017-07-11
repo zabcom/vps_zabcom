@@ -27,10 +27,9 @@
  * SUCH DAMAGE.
  */
 
-static const char vpsid[] =
-    "$Id: vps_snapst.c 206 2013-12-16 18:15:42Z klaus $";
-
 #include <sys/cdefs.h>
+
+__IDSTRING(vpsid, "$Id: vps_snapst.c 206 2013-12-16 18:15:42Z klaus $");
 
 #include "opt_ddb.h"
 #include "opt_global.h"
@@ -3374,8 +3373,8 @@ vps_snapshot_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vdtd->td_base_user_pri = td->td_base_user_pri;
 
 	vdtd->td_errno = td->td_errno;
-	vdtd->td_retval[0] = td->td_retval[0];
-	vdtd->td_retval[1] = td->td_retval[1];
+	vdtd->tdu_retval[0] = td->td_retval[0];
+	vdtd->tdu_retval[1] = td->td_retval[1];
 
 	vdtd->td_kstack_pages = td->td_kstack_pages;
 
@@ -3387,7 +3386,7 @@ vps_snapshot_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 		goto again;
 	}
 
-	if (vps_md_snapshot_thread(vdtd, td) != 0) {
+	if (vps_md_snapshot_thread(vudtd, td) != 0) {
 		thread_unlock(td);
 		vdo_discard(ctx, o1);
 		goto again;

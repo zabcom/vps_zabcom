@@ -2366,7 +2366,6 @@ vn_fullpath1_findparentdir_recurse(struct vnode *dvp, struct ucred *cred,
 			continue;
 
 		cnp.cn_pnbuf = NULL;
-		cnp.cn_consume = 0;
 		cnp.cn_nameptr = dp->d_name;
 		cnp.cn_namelen = strlen(dp->d_name);
 		cnp.cn_lkflags = LK_SHARED | LK_RETRY;
@@ -2489,10 +2488,9 @@ vn_fullpath1_fallback(struct thread *td, struct vnode *vp,
 		 * try the namecache for this one.
 		 */
 		vref(vp);
-		CACHE_RLOCK();
-		error = vn_vptocnp_locked(&vp, td->td_ucred, buf2, &buflen2);
+		error = vn_vptocnp(&vp, td->td_ucred, buf2, &buflen2);
 		if (error == 0)
-			CACHE_RUNLOCK();
+			goto out;
 		vrele(vp);
 		dvp = vp;
 		/*
@@ -2602,7 +2600,6 @@ vn_fullpath1_fallback(struct thread *td, struct vnode *vp,
 
 		/* Lookup "..". */
 		cnp.cn_pnbuf = NULL;
-		cnp.cn_consume = 0;
 		cnp.cn_nameptr = "..";
 		cnp.cn_namelen = 2;
 		cnp.cn_lkflags = LK_SHARED;

@@ -374,7 +374,7 @@ VM_STATS_VM(v_rforkpages, "VM pages affected by rfork()", VPS_0);
 VM_STATS_VM(v_kthreadpages, "VM pages affected by fork() by kernel", VPS_0);
 
 #define	VM_STATS_UINT(var, descr, vps)	\
-    SYSCTL_UINT(_vm_stats_vm, OID_AUTO, var, CTLFLAG_RD, &vm_cnt.var, 0, descr, vps)
+    _SYSCTL_UINT(_vm_stats_vm, OID_AUTO, var, CTLFLAG_RD, &vm_cnt.var, 0, descr, vps)
 VM_STATS_UINT(v_page_size, "Page size in bytes", VPS_0);
 VM_STATS_UINT(v_page_count, "Total number of pages in system", VPS_0);
 VM_STATS_UINT(v_free_reserved, "Pages reserved for deadlock", VPS_0);

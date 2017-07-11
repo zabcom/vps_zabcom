@@ -104,8 +104,6 @@ static struct pgrp pgrp0;
 struct	proc proc0;
 struct thread0_storage thread0_st __aligned(32);
 struct	vmspace vmspace0;
-#endif
-*/
 
 #ifndef BOOTHOWTO
 #define	BOOTHOWTO	0
@@ -231,6 +229,9 @@ restart:
 	 * their subsystem (primary key) and order (secondary key).
 	 */
 	for (sipp = sysinit; sipp < sysinit_end; sipp++) {
+		for (xipp = sipp + 1; xipp < sysinit_end; xipp++) {
+			if ((*sipp)->subsystem < (*xipp)->subsystem ||
+			     ((*sipp)->subsystem == (*xipp)->subsystem &&
 			      (*sipp)->order <= (*xipp)->order))
 				continue;	/* skip*/
 			save = *sipp;
@@ -508,7 +509,7 @@ proc0_init(void *dummy __unused)
 	newcred->cr_ngroups = 1;	/* group 0 */
 	newcred->cr_uidinfo = uifind(0);
 	newcred->cr_ruidinfo = uifind(0);
-	newcred->cr_prison = &V_prison0;
+	newcred->cr_prison = V_prison0;
 	newcred->cr_loginclass = loginclass_find("default");
 	proc_set_cred_init(p, newcred);
 #ifdef AUDIT
@@ -868,6 +869,3 @@ kick_init(const void *udata __unused)
 	thread_unlock(td);
 }
 SYSINIT(kickinit, SI_SUB_KTHREAD_INIT, SI_ORDER_MIDDLE, kick_init, NULL);
-/*-
- * Copyright (c) 1995 Terrence R. Lambert
- * All rights reserved.

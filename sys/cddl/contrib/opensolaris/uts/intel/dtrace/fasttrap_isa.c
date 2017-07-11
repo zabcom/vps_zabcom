@@ -1018,11 +1018,11 @@ fasttrap_pid_probe(struct reg *rp)
 	mutex_enter(pid_mtx);
 #else
 	pp = p;
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 	while (pp->p_vmspace == pp->p_pptr->p_vmspace)
 		pp = pp->p_pptr;
 	pid = pp->p_pid;
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 	pp = NULL;
 
 	rm_rlock(&fasttrap_tp_lock, &tracker);

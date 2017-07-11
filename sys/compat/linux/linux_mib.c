@@ -173,7 +173,7 @@ linux_find_prison(struct prison *spr, struct prison **prp)
 
 	for (pr = spr;; pr = pr->pr_parent) {
 		mtx_lock(&pr->pr_mtx);
-		lpr = (pr == &V_prison0)
+		lpr = (pr == V_prison0)
 		    ? &lprison0
 		    : osd_jail_get(pr, linux_osd_jail_slot);
 		if (lpr != NULL)

@@ -281,29 +281,6 @@ extern struct sx vps_all_lock;
 #endif /* VPS */
 
 /*
- * At least for now, just use vnet's facility for virtualized
- * global variables.
- * But map to our own names for easier change in the future.
- */
-
-#define VPS_NAME			VNET_NAME
-#define VPS_DECLARE			VNET_DECLARE
-#define VPS_DEFINE			VNET_DEFINE
-
-#define SYSCTL_VPS_INT			SYSCTL_VNET_INT
-#define SYSCTL_VPS_PROC			SYSCTL_VNET_PROC
-#define SYSCTL_VPS_STRING		SYSCTL_VNET_STRING
-#define SYSCTL_VPS_STRUCT		SYSCTL_VNET_STRUCT
-#define SYSCTL_VPS_UINT			SYSCTL_VNET_UINT
-#define SYSCTL_VPS_LONG			SYSCTL_VNET_LONG
-#define SYSCTL_VPS_ULONG		SYSCTL_VNET_ULONG
-
-#define vps_sysctl_handle_int		vnet_sysctl_handle_int
-#define vps_sysctl_handle_opaque	vnet_sysctl_handle_opaque
-#define vps_sysctl_handle_string	vnet_sysctl_handle_string
-#define vps_sysctl_handle_uint		vnet_sysctl_handle_uint
-
-/*
  * Declare virtualized globals.
  */
 

@@ -277,16 +277,11 @@ kern_do_statfs(struct thread *td, struct mount *mp, struct statfs *buf)
 	*buf = *sp;
 #ifdef VPS
 	if (td->td_ucred->cr_vps != vps0) {
-		bcopy(sp, &sb, sizeof(sb));
-		sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
-		vps_statfs(td->td_ucred, mp, &sb);
-		sp = &sb;
+		buf->f_fsid.val[0] = buf->f_fsid.val[1] = 0;
+		vps_statfs(td->td_ucred, mp, buf);
 	}
 #endif
 	if (priv_check(td, PRIV_VFS_GENERATION)) {
-		if (sp != &sb)
-			bcopy(sp, &sb, sizeof(sb));
-		sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
 		buf->f_fsid.val[0] = buf->f_fsid.val[1] = 0;
 		prison_enforce_statfs(td->td_ucred, mp, buf);
 	}

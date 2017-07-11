@@ -46,16 +46,15 @@
  * SUCH DAMAGE.
  */
 
-static const char vpsid[] =
-    "$Id: if_vps.c 207 2013-12-17 12:23:41Z klaus $";
+#include <sys/cdefs.h>
+
+__IDSTRING(vpsid, "$Id: if_vps.c 207 2013-12-17 12:23:41Z klaus $");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_global.h"
 
 #ifdef VPS
-
-#include <sys/cdefs.h>
 
 #include <sys/param.h>
 #include <sys/kernel.h>

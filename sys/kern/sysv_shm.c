@@ -228,23 +228,23 @@ static void shm_prison_cleanup(struct prison *);
 #define	SHMALL	(SHMMAXPGS)
 #endif
 
-SYSCTL_VPS_ULONG(_kern_ipc, OID_AUTO, shmmax, CTLFLAG_RWTUN, &VPS_NAME(shminfo.shmmax), 0,
+SYSCTL_ULONG(_kern_ipc, OID_AUTO, shmmax, CTLFLAG_RWTUN | CTLFLAG_VPS, &VPS_NAME(shminfo.shmmax), 0,
     "Maximum shared memory segment size");
-SYSCTL_VPS_ULONG(_kern_ipc, OID_AUTO, shmmin, CTLFLAG_RWTUN, &VPS_NAME(shminfo.shmmin), 0,
+SYSCTL_ULONG(_kern_ipc, OID_AUTO, shmmin, CTLFLAG_RWTUN | CTLFLAG_VPS, &VPS_NAME(shminfo.shmmin), 0,
     "Minimum shared memory segment size");
-SYSCTL_VPS_ULONG(_kern_ipc, OID_AUTO, shmmni, CTLFLAG_RDTUN, &VPS_NAME(shminfo.shmmni), 0,
+SYSCTL_ULONG(_kern_ipc, OID_AUTO, shmmni, CTLFLAG_RDTUN | CTLFLAG_VPS, &VPS_NAME(shminfo.shmmni), 0,
     "Number of shared memory identifiers");
-SYSCTL_VPS_ULONG(_kern_ipc, OID_AUTO, shmseg, CTLFLAG_RDTUN, &VPS_NAME(shminfo.shmseg), 0,
+SYSCTL_ULONG(_kern_ipc, OID_AUTO, shmseg, CTLFLAG_RDTUN | CTLFLAG_VPS, &VPS_NAME(shminfo.shmseg), 0,
     "Number of segments per process");
-SYSCTL_VPS_ULONG(_kern_ipc, OID_AUTO, shmall, CTLFLAG_RWTUN, &VPS_NAME(shminfo.shmall), 0,
+SYSCTL_ULONG(_kern_ipc, OID_AUTO, shmall, CTLFLAG_RWTUN | CTLFLAG_VPS, &VPS_NAME(shminfo.shmall), 0,
     "Maximum number of pages available for shared memory");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, shm_use_phys, CTLFLAG_RWTUN,
+SYSCTL_INT(_kern_ipc, OID_AUTO, shm_use_phys, CTLFLAG_RWTUN | CTLFLAG_VPS,
     &VPS_NAME(shm_use_phys), 0, "Enable/Disable locking of shared memory pages in core");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, shm_allow_removed, CTLFLAG_RWTUN,
+SYSCTL_INT(_kern_ipc, OID_AUTO, shm_allow_removed, CTLFLAG_RWTUN | CTLFLAG_VPS,
     &VPS_NAME(shm_allow_removed), 0,
     "Enable/Disable attachment to attached segments marked for removal");
-SYSCTL_VPS_PROC(_kern_ipc, OID_AUTO, shmsegs, CTLTYPE_OPAQUE | CTLFLAG_RD |
-    CTLFLAG_MPSAFE, NULL, 0, sysctl_shmsegs, "",
+SYSCTL_PROC(_kern_ipc, OID_AUTO, shmsegs, CTLTYPE_OPAQUE | CTLFLAG_RD |
+    CTLFLAG_MPSAFE | CTLFLAG_VPS, NULL, 0, sysctl_shmsegs, "",
     "Current number of shared memory segments allocated");
 
 static struct sx sysvshmsx;
@@ -1142,9 +1142,9 @@ shminit(void)
 	/* Set current prisons according to their allow.sysvipc. */
 	V_shm_prison_slot = osd_jail_register(NULL, methods);
 	rsv = osd_reserve(V_shm_prison_slot);
-	prison_lock(&V_prison0);
+	prison_lock(V_prison0);
 	(void)osd_jail_set_reserved(V_prison0, V_shm_prison_slot, rsv, V_prison0);
-	prison_unlock(&V_prison0);
+	prison_unlock(V_prison0);
 	rsv = NULL;
 	sx_slock(&allprison_lock);
 	TAILQ_FOREACH(pr, &allprison, pr_list) {

@@ -97,9 +97,14 @@ struct ctlname {
 #define	CTLFLAG_DYING	0x00010000	/* Oid is being removed */
 #define	CTLFLAG_CAPRD	0x00008000	/* Can be read in capability mode */
 #define	CTLFLAG_CAPWR	0x00004000	/* Can be written in capability mode */
+#define	CTLFLAG_CAPRW	(CTLFLAG_CAPRD|CTLFLAG_CAPWR)
 #define	CTLFLAG_STATS	0x00002000	/* Statistics, not a tuneable */
 #define	CTLFLAG_NOFETCH	0x00001000	/* Don't fetch tunable from getenv() */
-#define	CTLFLAG_CAPRW	(CTLFLAG_CAPRD|CTLFLAG_CAPWR)
+#ifdef notyet
+#define	CTLFLAG_VPS	0x00000800	/* Prisons with vnet can fiddle */
+#else
+#define	CTLFLAG_VPS	(CTLFLAG_VNET)
+#endif
 
 /*
  * Secure level.   Note that CTLFLAG_SECURE == CTLFLAG_SECURE1.
@@ -458,7 +463,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_S32) && \
 	    sizeof(int32_t) == sizeof(*(ptr)))
 
-#define	SYSCTL_ADD_S32(ctx, parent, nbr, name, access, ptr, val, descr, vps0)	\
+#define	_SYSCTL_ADD_S32(ctx, parent, nbr, name, access, ptr, val, descr, vps0)	\
 ({									\
 	int32_t *__ptr = (ptr);						\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
@@ -478,7 +483,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_U32) && \
 	    sizeof(uint32_t) == sizeof(*(ptr)))
 
-#define	SYSCTL_ADD_U32(ctx, parent, nbr, name, access, ptr, val, descr, vps0)	\
+#define	_SYSCTL_ADD_U32(ctx, parent, nbr, name, access, ptr, val, descr, vps0)	\
 ({									\
 	uint32_t *__ptr = (ptr);					\
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
@@ -802,182 +807,187 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
  * kernel features.
  */
 #define	_FEATURE(name, desc, vps0)						\
-	SYSCTL_INT_WITH_LABEL(_kern_features, OID_AUTO, name,		\
+	_SYSCTL_INT_WITH_LABEL(_kern_features, OID_AUTO, name,		\
 	    CTLFLAG_RD | CTLFLAG_CAPRD, SYSCTL_NULL_INT_PTR, 1, desc, "feature", vps0)
 
 
 #define	SYSCTL_OID(parent, nbr, name, kind, a1, a2, handler, fmt, descr) \
 	_SYSCTL_OID(parent, nbr, name, kind, a1, a2, handler, fmt, descr, VPS_0)
 
-#define	_SYSCTL_OID_WITH_LABEL(parent, nbr, name, kind, a1, a2, handler, fmt, descr, label) \
+#define	SYSCTL_OID_WITH_LABEL(parent, nbr, name, kind, a1, a2, handler, fmt, descr, label) \
 	_SYSCTL_OID_WITH_LABEL(parent, nbr, name, kind, a1, a2, handler, fmt, descr, label, VPS_0)
 
-#define	_SYSCTL_OID_GLOBAL(parent, nbr, name, kind, a1, a2, handler, fmt, descr, label) \
+#define	SYSCTL_OID_GLOBAL(parent, nbr, name, kind, a1, a2, handler, fmt, descr, label) \
 	_SYSCTL_OID_GLOBAL(parent, nbr, name, kind, a1, a2, handler, fmt, descr, label, VPS_0)
 
-#define	_SYSCTL_ADD_OID(ctx, parent, nbr, name, kind, a1, a2, handler, fmt, descr) \
+#define	SYSCTL_ADD_OID(ctx, parent, nbr, name, kind, a1, a2, handler, fmt, descr) \
 	_SYSCTL_ADD_OID(ctx, parent, nbr, name, kind, a1, a2, handler, fmt, descr, VPS_0)
 
-#define	_SYSCTL_ROOT_NODE(nbr, name, access, handler, descr)	\
+#define	SYSCTL_ROOT_NODE(nbr, name, access, handler, descr)	\
 	_SYSCTL_ROOT_NODE(nbr, name, access, handler, descr, VPS_0)
 
-#define	_SYSCTL_NODE(parent, nbr, name, access, handler, descr) \
+#define	SYSCTL_NODE(parent, nbr, name, access, handler, descr) \
 	_SYSCTL_NODE(parent, nbr, name, access, handler, descr, VPS_0)
 
-#define	_SYSCTL_NODE_WITH_LABEL(parent, nbr, name, access, handler, descr, label) \
+#define	SYSCTL_NODE_WITH_LABEL(parent, nbr, name, access, handler, descr, label) \
 	_SYSCTL_NODE_WITH_LABEL(parent, nbr, name, access, handler, descr, label, VPS_0)
 
-#define	_SYSCTL_ADD_NODE(ctx, parent, nbr, name, access, handler, descr)	\
+#define	SYSCTL_ADD_NODE(ctx, parent, nbr, name, access, handler, descr)	\
 	_SYSCTL_ADD_NODE(ctx, parent, nbr, name, access, handler, descr, VPS_0)
 
-#define	_SYSCTL_ADD_NODE_WITH_LABEL(ctx, parent, nbr, name, access, handler, descr, label) \
+#define	SYSCTL_ADD_NODE_WITH_LABEL(ctx, parent, nbr, name, access, handler, descr, label) \
 	_SYSCTL_ADD_NODE_WITH_LABEL(ctx, parent, nbr, name, access, handler, descr, label, VPS_0)
 
-#define	_SYSCTL_ADD_ROOT_NODE(ctx, nbr, name, access, handler, descr)	\
+#define	SYSCTL_ADD_ROOT_NODE(ctx, nbr, name, access, handler, descr)	\
 	_SYSCTL_ADD_ROOT_NODE(ctx, nbr, name, access, handler, descr, VPS_0)
 
-#define	_SYSCTL_STRING(parent, nbr, name, access, arg, len, descr)\
+#define	SYSCTL_STRING(parent, nbr, name, access, arg, len, descr)\
 	_SYSCTL_STRING(parent, nbr, name, access, arg, len, descr, VPS_0)
 
-#define	_SYSCTL_ADD_STRING(ctx, parent, nbr, name, access, arg, len, descr) \
+#define	SYSCTL_ADD_STRING(ctx, parent, nbr, name, access, arg, len, descr) \
 	_SYSCTL_ADD_STRING(ctx, parent, nbr, name, access, arg, len, descr, VPS_0)
 
-#define	_SYSCTL_BOOL(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_BOOL(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_BOOL(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_BOOL(ctx, parent, nbr, name, access, ptr, val, descr) \
+#define	SYSCTL_ADD_BOOL(ctx, parent, nbr, name, access, ptr, val, descr) \
 	_SYSCTL_ADD_BOOL(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_S8(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_S8(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_S8(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_S8(ctx, parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_ADD_S8(ctx, parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_ADD_S8(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_U8(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_U8(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_U8(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_U8(ctx, parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_ADD_U8(ctx, parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_ADD_U8(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_S16(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_S16(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_S16(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_S16(ctx, parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_ADD_S16(ctx, parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_ADD_S16(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_U16(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_U16(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_U16(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_U16(ctx, parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_ADD_U16(ctx, parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_ADD_U16(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_S32(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_S32(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_S32(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
 #define	SYSCTL_ADD_S32(ctx, parent, nbr, name, access, ptr, val, descr)	\
-	SYSCTL_ADD_S32(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
+	_SYSCTL_ADD_S32(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_U32(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_U32(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_U32(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
 #define	SYSCTL_ADD_U32(ctx, parent, nbr, name, access, ptr, val, descr)	\
-	SYSCTL_ADD_U32(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
+	_SYSCTL_ADD_U32(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_S64(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_S64(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_S64(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_S64(ctx, parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_ADD_S64(ctx, parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_ADD_S64(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_U64(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_U64(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_U64(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_U64(ctx, parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_ADD_U64(ctx, parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_ADD_U64(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_INT(parent, nbr, name, access, ptr, val, descr) \
+#define	SYSCTL_INT(parent, nbr, name, access, ptr, val, descr) \
 	_SYSCTL_INT(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_INT_WITH_LABEL(parent, nbr, name, access, ptr, val, descr, label) \
+#define	SYSCTL_INT_WITH_LABEL(parent, nbr, name, access, ptr, val, descr, label) \
 	_SYSCTL_INT_WITH_LABEL(parent, nbr, name, access, ptr, val, descr, label, VPS_0)
 
-#define	_SYSCTL_ADD_INT(ctx, parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_ADD_INT(ctx, parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_ADD_INT(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_INT(ctx, parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_ADD_INT(ctx, parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_ADD_INT(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_UINT(ctx, parent, nbr, name, access, ptr, val, descr) \
+#define	SYSCTL_UINT(parent, nbr, name, access, ptr, val, descr)		\
+	_SYSCTL_UINT(parent, nbr, name, access, ptr, val, descr, VPS_0)	\
+
+#define	SYSCTL_ADD_UINT(ctx, parent, nbr, name, access, ptr, val, descr) \
 	_SYSCTL_ADD_UINT(ctx, parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_LONG(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_LONG(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_LONG(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_LONG(ctx, parent, nbr, name, access, ptr, descr)	\
+#define	SYSCTL_ADD_LONG(ctx, parent, nbr, name, access, ptr, descr)	\
 	_SYSCTL_ADD_LONG(ctx, parent, nbr, name, access, ptr, descr, VPS_0)
 
-#define	_SYSCTL_ULONG(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_ULONG(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_ULONG(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_ULONG(ctx, parent, nbr, name, access, ptr, descr)	\
+#define	SYSCTL_ADD_ULONG(ctx, parent, nbr, name, access, ptr, descr)	\
 	_SYSCTL_ADD_ULONG(ctx, parent, nbr, name, access, ptr, descr, VPS_0)
 
-#define	_SYSCTL_QUAD(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_QUAD(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_QUAD(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_QUAD(ctx, parent, nbr, name, access, ptr, descr)	\
+#define	SYSCTL_ADD_QUAD(ctx, parent, nbr, name, access, ptr, descr)	\
 	_SYSCTL_ADD_QUAD(ctx, parent, nbr, name, access, ptr, descr, VPS_0)
 
-#define	_SYSCTL_UQUAD(parent, nbr, name, access, ptr, val, descr)	\
+#define	SYSCTL_UQUAD(parent, nbr, name, access, ptr, val, descr)	\
 	_SYSCTL_UQUAD(parent, nbr, name, access, ptr, val, descr, VPS_0)
 
-#define	_SYSCTL_ADD_UQUAD(ctx, parent, nbr, name, access, ptr, descr)	\
+#define	SYSCTL_ADD_UQUAD(ctx, parent, nbr, name, access, ptr, descr)	\
 	_SYSCTL_ADD_UQUAD(ctx, parent, nbr, name, access, ptr, descr, VPS_0)
 
-#define	_SYSCTL_ADD_UAUTO(ctx, parent, nbr, name, access, ptr, descr)	\
+#define	SYSCTL_ADD_UAUTO(ctx, parent, nbr, name, access, ptr, descr)	\
 	_SYSCTL_ADD_UAUTO(ctx, parent, nbr, name, access, ptr, descr, VPS_0)
 
-#define	_SYSCTL_COUNTER_U64(parent, nbr, name, access, ptr, descr)\
+#define	SYSCTL_COUNTER_U64(parent, nbr, name, access, ptr, descr)\
 	_SYSCTL_COUNTER_U64(parent, nbr, name, access, ptr, descr, VPS_0)
 
-#define	_SYSCTL_ADD_COUNTER_U64(ctx, parent, nbr, name, access, ptr, descr) \
+#define	SYSCTL_ADD_COUNTER_U64(ctx, parent, nbr, name, access, ptr, descr) \
 	_SYSCTL_ADD_COUNTER_U64(ctx, parent, nbr, name, access, ptr, descr, VPS_0)
 
-#define	_SYSCTL_COUNTER_U64_ARRAY(parent, nbr, name, access, ptr, len, descr) \
+#define	SYSCTL_COUNTER_U64_ARRAY(parent, nbr, name, access, ptr, len, descr) \
 	_SYSCTL_COUNTER_U64_ARRAY(parent, nbr, name, access, ptr, len, descr, VPS_0)
 
-#define	_SYSCTL_ADD_COUNTER_U64_ARRAY(ctx, parent, nbr, name, access,	\
+#define	SYSCTL_ADD_COUNTER_U64_ARRAY(ctx, parent, nbr, name, access,	\
+	    ptr, len, descr)						\
 	_SYSCTL_ADD_COUNTER_U64_ARRAY(ctx, parent, nbr, name, access,	\
+	    ptr, len, descr, VPS_0)					\
 
-#define	_SYSCTL_OPAQUE(parent, nbr, name, access, ptr, len, fmt, descr)	\
+#define	SYSCTL_OPAQUE(parent, nbr, name, access, ptr, len, fmt, descr)	\
 	_SYSCTL_OPAQUE(parent, nbr, name, access, ptr, len, fmt, descr, VPS_0)
 
-#define	_SYSCTL_ADD_OPAQUE(ctx, parent, nbr, name, access, ptr, len, fmt, descr)	\
+#define	SYSCTL_ADD_OPAQUE(ctx, parent, nbr, name, access, ptr, len, fmt, descr)	\
 	_SYSCTL_ADD_OPAQUE(ctx, parent, nbr, name, access, ptr, len, fmt, descr, VPS_0)
 
-#define	_SYSCTL_STRUCT(parent, nbr, name, access, ptr, type, descr)	\
+#define	SYSCTL_STRUCT(parent, nbr, name, access, ptr, type, descr)	\
 	_SYSCTL_STRUCT(parent, nbr, name, access, ptr, type, descr, VPS_0)
 
-#define	_SYSCTL_ADD_STRUCT(ctx, parent, nbr, name, access, ptr, type, descr) \
+#define	SYSCTL_ADD_STRUCT(ctx, parent, nbr, name, access, ptr, type, descr) \
 	_SYSCTL_ADD_STRUCT(ctx, parent, nbr, name, access, ptr, type, descr, VPS_0)
 
-#define	_SYSCTL_PROC(parent, nbr, name, access, ptr, arg, handler, fmt, descr) \
+#define	SYSCTL_PROC(parent, nbr, name, access, ptr, arg, handler, fmt, descr) \
 	_SYSCTL_PROC(parent, nbr, name, access, ptr, arg, handler, fmt, descr, VPS_0)
 
-#define	_SYSCTL_ADD_PROC(ctx, parent, nbr, name, access, ptr, arg, handler, fmt, descr) \
+#define	SYSCTL_ADD_PROC(ctx, parent, nbr, name, access, ptr, arg, handler, fmt, descr) \
 	_SYSCTL_ADD_PROC(ctx, parent, nbr, name, access, ptr, arg, handler, fmt, descr, VPS_0)
 
-#define	_SYSCTL_UMA_MAX(parent, nbr, name, access, ptr, descr)	\
+#define	SYSCTL_UMA_MAX(parent, nbr, name, access, ptr, descr)	\
 	_SYSCTL_UMA_MAX(parent, nbr, name, access, ptr, descr, VPS_0)
 
-#define	_SYSCTL_ADD_UMA_MAX(ctx, parent, nbr, name, access, ptr, descr)	\
+#define	SYSCTL_ADD_UMA_MAX(ctx, parent, nbr, name, access, ptr, descr)	\
 	_SYSCTL_ADD_UMA_MAX(ctx, parent, nbr, name, access, ptr, descr, VPS_0)
 
-#define	_SYSCTL_UMA_CUR(parent, nbr, name, access, ptr, descr)	\
+#define	SYSCTL_UMA_CUR(parent, nbr, name, access, ptr, descr)	\
 	_SYSCTL_UMA_CUR(parent, nbr, name, access, ptr, descr, VPS_0)
 
-#define	_SYSCTL_ADD_UMA_CUR(ctx, parent, nbr, name, access, ptr, descr)	\
+#define	SYSCTL_ADD_UMA_CUR(ctx, parent, nbr, name, access, ptr, descr)	\
 	_SYSCTL_ADD_UMA_CUR(ctx, parent, nbr, name, access, ptr, descr, VPS_0)
 
 #define	FEATURE(name, desc)						\

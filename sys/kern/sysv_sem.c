@@ -265,26 +265,26 @@ struct seminfo seminfo = {
 };
 #endif
 
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semmni, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semmni), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, semmni, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(seminfo.semmni), 0,
     "Number of semaphore identifiers");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semmns, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semmns), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, semmns, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(seminfo.semmns), 0,
     "Maximum number of semaphores in the system");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semmnu, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semmnu), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, semmnu, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(seminfo.semmnu), 0,
     "Maximum number of undo structures in the system");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semmsl, CTLFLAG_RWTUN, &VPS_NAME(seminfo.semmsl), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, semmsl, CTLFLAG_RWTUN|CTLFLAG_VPS, &VPS_NAME(seminfo.semmsl), 0,
     "Max semaphores per id");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semopm, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semopm), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, semopm, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(seminfo.semopm), 0,
     "Max operations per semop call");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semume, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semume), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, semume, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(seminfo.semume), 0,
     "Max undo entries per process");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semusz, CTLFLAG_RDTUN, &VPS_NAME(seminfo.semusz), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, semusz, CTLFLAG_RDTUN|CTLFLAG_VPS, &VPS_NAME(seminfo.semusz), 0,
     "Size in bytes of undo structure");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semvmx, CTLFLAG_RWTUN, &VPS_NAME(seminfo.semvmx), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, semvmx, CTLFLAG_RWTUN|CTLFLAG_VPS, &VPS_NAME(seminfo.semvmx), 0,
     "Semaphore maximum value");
-SYSCTL_VPS_INT(_kern_ipc, OID_AUTO, semaem, CTLFLAG_RWTUN, &VPS_NAME(seminfo.semaem), 0,
+SYSCTL_INT(_kern_ipc, OID_AUTO, semaem, CTLFLAG_RWTUN|CTLFLAG_VPS, &VPS_NAME(seminfo.semaem), 0,
     "Adjust on exit max value");
-SYSCTL_VPS_PROC(_kern_ipc, OID_AUTO, sema,
-    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE,
+SYSCTL_PROC(_kern_ipc, OID_AUTO, sema,
+    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE|CTLFLAG_VPS,
     NULL, 0, sysctl_sema, "", "Semaphore id pool");
 
 static struct syscall_helper_data sem_syscalls[] = {
@@ -372,9 +372,9 @@ seminit2(void)
 /* XXX-BZ safe/restore doesn't work that way, will it? Sigh. */
 	V_sem_prison_slot = osd_jail_register(NULL, methods);
 	rsv = osd_reserve(V_sem_prison_slot);
-	prison_lock(&V_prison0);
+	prison_lock(V_prison0);
 	(void)osd_jail_set_reserved(V_prison0, sem_prison_slot, rsv, V_prison0);
-	prison_unlock(&V_prison0);
+	prison_unlock(V_prison0);
 	rsv = NULL;
 	sx_slock(&allprison_lock);
 	TAILQ_FOREACH(pr, &allprison, pr_list) {
@@ -451,6 +451,7 @@ semunload(void)
 	for (i = 0; i < V_seminfo.semmni; i++) {
 		if (V_sema[i].cred != NULL)
 			crfree(V_sema[i].cred);
+	}
 	free(V_sem, M_SEM);
 	free(V_sema, M_SEM);
 	free(V_semu, M_SEM);
@@ -461,7 +462,6 @@ semunload(void)
 	mtx_destroy(&V_sem_undo_mtx);
 	return (0);
 }
-
 
 #ifdef VPS
 int sem_snapshot_vps(struct vps_snapst_ctx *ctx, struct vps *vps);

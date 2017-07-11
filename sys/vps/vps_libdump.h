@@ -580,7 +580,7 @@ struct vps_dump_thread {
 	uint8 td_base_user_pri;
 	uint8 _pad1[2];
 
-	uint64 td_retval[2];
+	uint64 tdu_retval[2];
 	sint32 td_errno;
 	uint32 _pad2;
 

@@ -31,8 +31,9 @@
  * Based on sys/vm/device_pager.c.
  */
 
-static const char vpsid[] =
-    "$Id: vps_pager.c 205 2013-12-13 19:01:04Z klaus $";
+#include <sys/cdefs.h>
+
+__IDSTRING(vpsid, "$Id: vps_pager.c 205 2013-12-13 19:01:04Z klaus $");
 
 /*
  * This pager makes it possible to provide a linear snapshot of
@@ -52,8 +53,6 @@ static const char vpsid[] =
  * snapshot there can't be any changes in vm maps or missing
  * objects (tm).
  */
-
-#include <sys/cdefs.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>

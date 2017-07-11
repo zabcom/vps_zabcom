@@ -3179,14 +3179,14 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 		rootvnode = newdp;
 		nrele++;
 	}
-	mtx_lock(&V_prison0.pr_mtx);
-	if (V_prison0.pr_root == olddp) {
+	mtx_lock(&V_prison0->pr_mtx);
+	if (V_prison0->pr_root == olddp) {
 		vrefact(newdp);
-		V_prison0.pr_root = newdp;
+		V_prison0->pr_root = newdp;
 		nrele++;
 	}
-	mtx_unlock(&V_prison0.pr_mtx);
-	sx_slock(&V_allprison_lock);
+	mtx_unlock(&V_prison0->pr_mtx);
+	sx_slock(&allprison_lock);
 	TAILQ_FOREACH(pr, &V_allprison, pr_list) {
 		mtx_lock(&pr->pr_mtx);
 		if (pr->pr_root == olddp) {
@@ -3196,7 +3196,7 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 		}
 		mtx_unlock(&pr->pr_mtx);
 	}
-	sx_sunlock(&V_allprison_lock);
+	sx_sunlock(&allprison_lock);
 	while (nrele--)
 		vrele(olddp);
 }

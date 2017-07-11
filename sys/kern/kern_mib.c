@@ -296,17 +296,6 @@ SYSCTL_STRING(_kern, OID_AUTO, supported_archs, CTLFLAG_RD | CTLFLAG_MPSAFE,
     MACHINE_ARCH, 0, "Supported architectures for binaries");
 #endif
 
-#ifdef VPS
-static int
-sysctl_hostname(SYSCTL_HANDLER_ARGS)
-{
-	int error;
-
-	error = vps_sysctl_handle_string(oidp, arg1, arg2, req);
- 
-	return (error);
-}
-#else /* VPS */
 static int
 sysctl_hostname(SYSCTL_HANDLER_ARGS)
 {
@@ -357,23 +346,22 @@ sysctl_hostname(SYSCTL_HANDLER_ARGS)
 	}
 	return (error);
 }
-#endif /* !VPS */
 
 #ifdef VPS
 VPS_DEFINE(char, hostname[MAXHOSTNAMELEN]) = "";
 VPS_DEFINE(char, domainname[MAXHOSTNAMELEN]) = "";
 VPS_DEFINE(char, hostuuid[HOSTUUIDLEN]) = "";
  
-SYSCTL_VPS_PROC(_kern, KERN_HOSTNAME, hostname,
-    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE,
+SYSCTL_PROC(_kern, KERN_HOSTNAME, hostname,
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE | CTLFLAG_VPS,
     &VPS_NAME(hostname), MAXHOSTNAMELEN,
     sysctl_hostname, "A", "Hostname");
-SYSCTL_VPS_PROC(_kern, KERN_NISDOMAINNAME, domainname,
-    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE,
+SYSCTL_PROC(_kern, KERN_NISDOMAINNAME, domainname,
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE | CTLFLAG_VPS,
     &VPS_NAME(domainname), MAXHOSTNAMELEN,
     sysctl_hostname, "A", "Name of the current YP/NIS domain");
-SYSCTL_VPS_PROC(_kern, KERN_HOSTUUID, hostuuid,
-    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE,
+SYSCTL_PROC(_kern, KERN_HOSTUUID, hostuuid,
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE | CTLFLAG_VPS,
     &VPS_NAME(hostuuid), HOSTUUIDLEN,
     sysctl_hostname, "A", "Host UUID");
 #else

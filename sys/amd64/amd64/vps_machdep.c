@@ -27,10 +27,9 @@
  * SUCH DAMAGE.
  */
 
-static const char vpsid[] =
-    "$Id$";
-
 #include <sys/cdefs.h>
+
+__IDSTRING(vpsid, "$Id$");
 
 #include <sys/param.h>
 #include <sys/conf.h>

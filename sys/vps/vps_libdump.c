@@ -27,8 +27,9 @@
  * SUCH DAMAGE.
  */
 
-static const char vpsid[] =
-    "$Id: vps_libdump.c 190 2013-07-15 15:36:26Z klaus $";
+#include <sys/cdefs.h>
+
+__IDSTRING(vpsid, "$Id: vps_libdump.c 190 2013-07-15 15:36:26Z klaus $");
 
 /*
  * cc -o dumptest -I. -DTEST=1 vps/vps_libdump.c
@@ -52,8 +53,6 @@ static const char vpsid[] =
 #ifdef VPS
 
 #ifdef _KERNEL
-
-#include <sys/cdefs.h>
 
 #include <sys/param.h>
 #include <sys/types.h>

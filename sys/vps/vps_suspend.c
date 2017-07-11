@@ -27,8 +27,9 @@
  * SUCH DAMAGE.
  */
 
-static const char vpsid[] =
-    "$Id: vps_suspend.c 194 2013-07-26 19:49:49Z klaus $";
+#include <sys/cdefs.h>
+
+__IDSTRING(vpsid, "$Id: vps_suspend.c 194 2013-07-26 19:49:49Z klaus $");
 
 #include "opt_global.h"
 #include "opt_ddb.h"
@@ -37,9 +38,6 @@ static const char vpsid[] =
 #include "opt_compat.h"
 
 #ifdef VPS
-
-#include <sys/cdefs.h>
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/limits.h>

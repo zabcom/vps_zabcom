@@ -138,7 +138,7 @@ volatile time_t time_second = 1;
 volatile time_t time_uptime = 1;
 
 static int sysctl_kern_boottime(SYSCTL_HANDLER_ARGS);
-SYSCTL_VPS_PROC(_kern, KERN_BOOTTIME, boottime, CTLTYPE_STRUCT|CTLFLAG_RD,
+SYSCTL_PROC(_kern, KERN_BOOTTIME, boottime, CTLTYPE_STRUCT|CTLFLAG_RD|CTLFLAG_VPS,
     NULL, 0, sysctl_kern_boottime, "S,timeval", "System boottime");
 
 SYSCTL_NODE(_kern, OID_AUTO, timecounter, CTLFLAG_RW, 0, "");
@@ -555,8 +555,19 @@ V_getnanouptime(struct timespec *tsp)
 	timespecsub(tsp, &t);
 }
 #else
-#define	V_nanouptime(tsp)	nanouptime(tsp)
-#define	V_getnanouptime(tsp)	getnanouptime(tsp)
+void
+V_nanouptime(struct timespec *tsp)
+{
+
+	nanouptime(tsp);
+}
+
+void
+V_getnanouptime(struct timespec *tsp)
+{
+
+	getnanouptime(tsp);
+}
 #endif
 
 void
@@ -595,8 +606,19 @@ V_getboottime(struct timeval *boottime)
 	bintime2timeval(&boottimebin, boottime);
 }
 #else
-#define	V_getboottime(bt)	getboottime(bt)
-#define	V_getboottimebin(btb)	getboottimebin(btb)
+void
+V_getboottimebin(struct bintime *boottimebin)
+{
+
+	getboottimebin(boottimebin);
+}
+
+void
+V_getboottime(struct timeval *boottime)
+{
+
+	getboottime(boottime);
+}
 #endif
 
 void
