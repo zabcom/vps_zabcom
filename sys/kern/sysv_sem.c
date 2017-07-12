@@ -246,7 +246,7 @@ struct sem_undo {
  * Macro to find a particular sem_undo vector
  */
 #define SEMU(ix) \
-	((struct sem_undo *)(((intptr_t)semu)+ix * V_seminfo.semusz))
+	((struct sem_undo *)(((intptr_t)V_semu)+ix * V_seminfo.semusz))
 
 #if 0
 /*
@@ -373,11 +373,11 @@ seminit2(void)
 	V_sem_prison_slot = osd_jail_register(NULL, methods);
 	rsv = osd_reserve(V_sem_prison_slot);
 	prison_lock(V_prison0);
-	(void)osd_jail_set_reserved(V_prison0, sem_prison_slot, rsv, V_prison0);
+	(void)osd_jail_set_reserved(V_prison0, V_sem_prison_slot, rsv, V_prison0);
 	prison_unlock(V_prison0);
 	rsv = NULL;
 	sx_slock(&allprison_lock);
-	TAILQ_FOREACH(pr, &allprison, pr_list) {
+	TAILQ_FOREACH(pr, &V_allprison, pr_list) {
 		if (rsv == NULL)
 			rsv = osd_reserve(V_sem_prison_slot);
 		prison_lock(pr);
@@ -529,11 +529,11 @@ seminit_global(void)
         vps_func->sem_restore_proc = sem_restore_proc;
         vps_func->sem_restore_fixup = sem_restore_fixup;
 
-	error = syscall_helper_register(sem_syscalls);
+	error = syscall_helper_register(sem_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
 		return (error);
 #ifdef COMPAT_FREEBSD32
-	error = syscall32_helper_register(sem32_syscalls);
+	error = syscall32_helper_register(sem32_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
 		return (error);
 #endif
@@ -797,8 +797,8 @@ sem_remove(int semidx, struct ucred *cred)
 		    V_sema[i].u.sem_base > semakptr->u.sem_base)
 			mtx_lock_flags(&V_sema_mtx[i], LOP_DUPOK);
 	}
-	for (i = semakptr->u.sem_base - sem; i < semtot; i++)
-		sem[i] = sem[i + semakptr->u.sem_nsems];
+	for (i = semakptr->u.sem_base - V_sem; i < V_semtot; i++)
+		V_sem[i] = V_sem[i + semakptr->u.sem_nsems];
 	for (i = 0; i < V_seminfo.semmni; i++) {
 		if ((V_sema[i].u.sem_perm.mode & SEM_ALLOC) &&
 		    V_sema[i].u.sem_base > semakptr->u.sem_base) {
@@ -925,7 +925,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	AUDIT_ARG_SVIPC_ID(semid);
 
 	rpr = sem_find_prison(td->td_ucred);
-	if (sem == NULL)
+	if (V_sem == NULL)
 		return (ENOSYS);
 
 	array = NULL;
@@ -1273,7 +1273,7 @@ sys_semget(struct thread *td, struct semget_args *uap)
 		V_sema[semid].u.sem_nsems = nsems;
 		V_sema[semid].u.sem_otime = 0;
 		V_sema[semid].u.sem_ctime = time_second;
-		V_sema[semid].u.sem_base = &sem[semtot];
+		V_sema[semid].u.sem_base = &V_sem[V_semtot];
 		V_semtot += nsems;
 #ifdef VPS
 		atomic_add_int(&semtot_global, nsems);
@@ -1333,7 +1333,7 @@ sys_semop(struct thread *td, struct semop_args *uap)
 	AUDIT_ARG_SVIPC_ID(semid);
 
 	rpr = sem_find_prison(td->td_ucred);
-	if (sem == NULL)
+	if (V_sem == NULL)
 		return (ENOSYS);
 
 	semid = IPCID_TO_IX(semid);	/* Convert back to zero origin */

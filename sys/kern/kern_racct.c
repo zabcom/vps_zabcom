@@ -1228,9 +1228,9 @@ racctd(void)
 	for (;;) {
 		racct_decay();
 
-		sx_slock(&allproc_lock);
+		sx_slock(&V_allproc_lock);
 
-		LIST_FOREACH(p, &zombproc, p_list) {
+		LIST_FOREACH(p, &V_zombproc, p_list) {
 			PROC_LOCK(p);
 			racct_set(p, RACCT_PCTCPU, 0);
 			PROC_UNLOCK(p);
@@ -1303,7 +1303,7 @@ racctd(void)
 			}
 			PROC_UNLOCK(p);
 		}
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		pause("-", hz);
 	}
 }
@@ -1335,7 +1335,7 @@ racct_init(void)
 	/*
 	 * XXX: Move this somewhere.
 	 */
-	prison0.pr_prison_racct = prison_racct_find("0");
+	V_prison0->pr_prison_racct = prison_racct_find("0");
 }
 SYSINIT(racct, SI_SUB_RACCT, SI_ORDER_FIRST, racct_init, NULL);
 

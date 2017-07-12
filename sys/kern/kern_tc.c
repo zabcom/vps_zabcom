@@ -90,30 +90,6 @@ static VPS_DEFINE(struct bintime, boottime_off);
 static VPS_DEFINE(struct bintime, offset_off);
 #define	V_boottimebin		VPSV(boottime_off)
 #define	V_offset		VPSV(offset_off)
-
-void
-init_V_kern_tc(struct bintime *boottimebin)
-{
-
-	/*
-	 * If boottimebin is NULL it means we are called during
-	 * (re)boot and should setup the delta accordingly.
-	 * Otherwise we are passed our "time" and we need to apply
-	 * that to the offset.
-	 */
-	V_boottimebin = timehands->th_boottime;
-	V_offset = timehands->th_offset;
-	if (boottimebin != NULL) {
-		/*
-		 * XXX-BZ if that gets us negative as the guest
-		 * has more uptime than the (new) host, I assume
-		 * all fun things will happen; deal with that as
-		 * we can test.
-		 */
-		bintime_sub(V_boottimebin, *boottimebin);
-		bintime_sub(V_offset, *boottimebin);
-	}
-}
 #endif
 
 static struct timehands th0;
@@ -170,6 +146,33 @@ static void tc_windup(struct bintime *new_boottimebin);
 static void cpu_tick_calibrate(int);
 
 void dtrace_getnanotime(struct timespec *tsp);
+
+#ifdef VPS
+void
+init_V_kern_tc(struct bintime *boottimebin)
+{
+
+	/*
+	 * If boottimebin is NULL it means we are called during
+	 * (re)boot and should setup the delta accordingly.
+	 * Otherwise we are passed our "time" and we need to apply
+	 * that to the offset.
+	 */
+	V_boottimebin = timehands->th_boottime;
+	V_offset = timehands->th_offset;
+	if (boottimebin != NULL) {
+		/*
+		 * XXX-BZ if that gets us negative as the guest
+		 * has more uptime than the (new) host, I assume
+		 * all fun things will happen; deal with that as
+		 * we can test.
+		 */
+		bintime_sub(&V_boottimebin, boottimebin);
+		bintime_sub(&V_offset, boottimebin);
+	}
+}
+#endif
+
 
 static int
 sysctl_kern_boottime(SYSCTL_HANDLER_ARGS)
@@ -541,7 +544,7 @@ V_nanouptime(struct timespec *tsp)
 	struct timespec t;
 
 	nanouptime(tsp);
-	bintime2timespec(V_offset, &t);
+	bintime2timespec(&V_offset, &t);
 	timespecsub(tsp, &t);
 }
 
@@ -551,7 +554,7 @@ V_getnanouptime(struct timespec *tsp)
 	struct timespec t;
 
 	getnanouptime(tsp);
-	bintime2timespec(V_offset, &t);
+	bintime2timespec(&V_offset, &t);
 	timespecsub(tsp, &t);
 }
 #else
@@ -594,7 +597,7 @@ V_getboottimebin(struct bintime *boottimebin)
 	} while (gen == 0 || gen != th->th_generation);
 
 	/* Apply offset. */
-	bintime_sub(*boottimebin, V_boottimebin);
+	bintime_sub(boottimebin, &V_boottimebin);
 }
 
 void

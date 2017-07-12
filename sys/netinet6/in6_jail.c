@@ -246,13 +246,13 @@ prison_equal_ip6(struct prison *pr1, struct prison *pr2)
 	if (pr1 == pr2)
 		return (1);
 
-	while (pr1 != &prison0 &&
+	while (pr1 != V_prison0 &&
 #ifdef VIMAGE
 	       !(pr1->pr_flags & PR_VNET) &&
 #endif
 	       !(pr1->pr_flags & PR_IP6_USER))
 		pr1 = pr1->pr_parent;
-	while (pr2 != &prison0 &&
+	while (pr2 != V_prison0 &&
 #ifdef VIMAGE
 	       !(pr2->pr_flags & PR_VNET) &&
 #endif

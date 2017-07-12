@@ -130,7 +130,9 @@ struct prison prison0 = {
 #endif
 	.pr_allow	= PR_ALLOW_ALL,
 };
-MTX_SYSINIT(prison0, &prison0.pr_mtx, "jail mutex", MTX_DEF);
+#if 0
+MTX_SYSINIT(prison0, &V_prison0->pr_mtx, "jail mutex", MTX_DEF);
+#endif
 
 /* allprison, allprison_racct and lastprid are protected by allprison_lock. */
 struct	sx allprison_lock;
@@ -263,9 +265,10 @@ void
 prison0_init(void)
 {
 
-	prison0.pr_cpuset = cpuset_ref(thread0.td_cpuset);
-	prison0.pr_osreldate = osreldate;
-	strlcpy(prison0.pr_osrelease, osrelease, sizeof(prison0.pr_osrelease));
+	mtx_init(&V_prison0->pr_mtx, "jail mutex", NULL, MTX_DEF);
+	V_prison0->pr_cpuset = cpuset_ref(thread0.td_cpuset);
+	V_prison0->pr_osreldate = osreldate;
+	strlcpy(V_prison0->pr_osrelease, osrelease, sizeof(V_prison0->pr_osrelease));
 }
 
 /*
@@ -1100,7 +1103,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 		}
 		if (namelc[0] != '\0') {
 			pnamelen =
-			    (ppr == &prison0) ? 0 : strlen(ppr->pr_name) + 1;
+			    (ppr == V_prison0) ? 0 : strlen(ppr->pr_name) + 1;
  name_again:
 			deadpr = NULL;
 			FOREACH_PRISON_CHILD(ppr, tpr) {
@@ -1436,7 +1439,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 		 */
 		tppr = ppr;
 #ifdef VIMAGE
-		for (; tppr != &prison0; tppr = tppr->pr_parent)
+		for (; tppr != V_prison0; tppr = tppr->pr_parent)
 			if (tppr->pr_flags & PR_VNET)
 				break;
 #endif
@@ -1503,7 +1506,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 		/* Check for conflicting IP addresses. */
 		tppr = ppr;
 #ifdef VIMAGE
-		for (; tppr != &prison0; tppr = tppr->pr_parent)
+		for (; tppr != V_prison0; tppr = tppr->pr_parent)
 			if (tppr->pr_flags & PR_VNET)
 				break;
 #endif
@@ -1553,7 +1556,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 		 * Make sure the name isn't too long for the prison or its
 		 * children.
 		 */
-		pnamelen = (ppr == &prison0) ? 0 : strlen(ppr->pr_name) + 1;
+		pnamelen = (ppr == V_prison0) ? 0 : strlen(ppr->pr_name) + 1;
 		onamelen = strlen(pr->pr_name + pnamelen);
 		namelen = strlen(namelc);
 		if (pnamelen + namelen + 1 > sizeof(pr->pr_name)) {
@@ -1671,7 +1674,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 			tpr->pr_devfs_rsnum = rsnum;
 	}
 	if (namelc != NULL) {
-		if (ppr == &prison0)
+		if (ppr == V_prison0)
 			strlcpy(pr->pr_name, namelc, sizeof(pr->pr_name));
 		else
 			snprintf(pr->pr_name, sizeof(pr->pr_name), "%s.%s",
@@ -2503,7 +2506,7 @@ prison_find_name(struct prison *mypr, const char *name)
 	int descend;
 
 	sx_assert(&allprison_lock, SX_LOCKED);
-	mylen = (mypr == &prison0) ? 0 : strlen(mypr->pr_name) + 1;
+	mylen = (mypr == V_prison0) ? 0 : strlen(mypr->pr_name) + 1;
  again:
 	deadpr = NULL;
 	FOREACH_PRISON_DESCENDANT(mypr, pr, descend) {
@@ -2609,7 +2612,7 @@ prison_deref(struct prison *pr, int flags)
 			lasturef = pr->pr_uref == 0;
 			if (lasturef)
 				pr->pr_ref++;
-			KASSERT(prison0.pr_uref != 0, ("prison0 pr_uref=0"));
+			KASSERT(V_prison0->pr_uref != 0, ("prison0 pr_uref=0"));
 		} else
 			lasturef = 0;
 		if (flags & PD_DEREF) {
@@ -2878,7 +2881,7 @@ int
 jailed(struct ucred *cred)
 {
 
-	return (cred->cr_prison != &prison0);
+	return (cred->cr_prison != V_prison0);
 }
 
 /*
@@ -2911,7 +2914,7 @@ getcredhostname(struct ucred *cred, char *buf, size_t size)
 	 * A NULL credential can be used to shortcut to the physical
 	 * system's hostname.
 	 */
-	pr = (cred != NULL) ? cred->cr_prison : &prison0;
+	pr = (cred != NULL) ? cred->cr_prison : V_prison0;
 	mtx_lock(&pr->pr_mtx);
 	strlcpy(buf, pr->pr_hostname, size);
 	mtx_unlock(&pr->pr_mtx);
@@ -3401,7 +3404,7 @@ prison_name(struct prison *pr1, struct prison *pr2)
 		 * so its length can't be counted on.  But the number of dots
 		 * can be counted on - and counted.
 		 */
-		for (; pr1 != &prison0; pr1 = pr1->pr_parent)
+		for (; pr1 != V_prison0; pr1 = pr1->pr_parent)
 			name = strchr(name, '.') + 1;
 	}
 	return (name);

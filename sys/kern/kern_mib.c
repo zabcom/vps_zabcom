@@ -97,6 +97,10 @@ SYSCTL_ROOT_NODE(OID_AUTO, clock, CTLFLAG_RW, 0,
 	"Clocks");
 #endif
 
+#ifdef VPS
+SYSCTL_ROOT_NODE(OID_AUTO, vps, CTLFLAG_RW, 0, "Virtual Private Systems");
+#endif
+
 _SYSCTL_STRING(_kern, OID_AUTO, ident, CTLFLAG_RD|CTLFLAG_MPSAFE,
     kern_ident, 0, "Kernel identifier", VPS_PUBLIC);
 

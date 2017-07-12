@@ -69,7 +69,7 @@ protect_setchildren(struct thread *td, struct proc *top, int flags)
 
 	p = top;
 	ret = 0;
-	sx_assert(&proctree_lock, SX_LOCKED);
+	sx_assert(&V_proctree_lock, SX_LOCKED);
 	for (;;) {
 		ret |= protect_setchild(td, p, flags);
 		PROC_UNLOCK(p);
@@ -128,7 +128,7 @@ static int
 reap_acquire(struct thread *td, struct proc *p)
 {
 
-	sx_assert(&proctree_lock, SX_XLOCKED);
+	sx_assert(&V_proctree_lock, SX_XLOCKED);
 	if (p != curproc)
 		return (EPERM);
 	if ((p->p_treeflag & P_TREE_REAPER) != 0)
@@ -145,10 +145,10 @@ static int
 reap_release(struct thread *td, struct proc *p)
 {
 
-	sx_assert(&proctree_lock, SX_XLOCKED);
+	sx_assert(&V_proctree_lock, SX_XLOCKED);
 	if (p != curproc)
 		return (EPERM);
-	if (p == initproc)
+	if (p == V_initproc)
 		return (EINVAL);
 	if ((p->p_treeflag & P_TREE_REAPER) == 0)
 		return (EINVAL);
@@ -162,7 +162,7 @@ reap_status(struct thread *td, struct proc *p,
 {
 	struct proc *reap, *p2, *first_p;
 
-	sx_assert(&proctree_lock, SX_LOCKED);
+	sx_assert(&V_proctree_lock, SX_LOCKED);
 	bzero(rs, sizeof(*rs));
 	if ((p->p_treeflag & P_TREE_REAPER) == 0) {
 		reap = p->p_reaper;
@@ -170,7 +170,7 @@ reap_status(struct thread *td, struct proc *p,
 		reap = p;
 		rs->rs_flags |= REAPER_STATUS_OWNED;
 	}
-	if (reap == initproc)
+	if (reap == V_initproc)
 		rs->rs_flags |= REAPER_STATUS_REALINIT;
 	rs->rs_reaper = reap->p_pid;
 	rs->rs_descendants = 0;
@@ -199,18 +199,18 @@ reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids *rp)
 	u_int i, n;
 	int error;
 
-	sx_assert(&proctree_lock, SX_LOCKED);
+	sx_assert(&V_proctree_lock, SX_LOCKED);
 	PROC_UNLOCK(p);
 	reap = (p->p_treeflag & P_TREE_REAPER) == 0 ? p->p_reaper : p;
 	n = i = 0;
 	error = 0;
 	LIST_FOREACH(p2, &reap->p_reaplist, p_reapsibling)
 		n++;
-	sx_unlock(&proctree_lock);
+	sx_unlock(&V_proctree_lock);
 	if (rp->rp_count < n)
 		n = rp->rp_count;
 	pi = malloc(n * sizeof(*pi), M_TEMP, M_WAITOK);
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 	LIST_FOREACH(p2, &reap->p_reaplist, p_reapsibling) {
 		if (i == n)
 			break;
@@ -223,10 +223,10 @@ reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids *rp)
 			pip->pi_flags |= REAPER_PIDINFO_CHILD;
 		i++;
 	}
-	sx_sunlock(&proctree_lock);
+	sx_sunlock(&V_proctree_lock);
 	error = copyout(pi, rp->rp_pids, i * sizeof(*pi));
 	free(pi, M_TEMP);
-	sx_slock(&proctree_lock);
+	sx_slock(&V_proctree_lock);
 	PROC_LOCK(p);
 	return (error);
 }
@@ -238,7 +238,7 @@ reap_kill(struct thread *td, struct proc *p, struct procctl_reaper_kill *rk)
 	ksiginfo_t ksi;
 	int error, error1;
 
-	sx_assert(&proctree_lock, SX_LOCKED);
+	sx_assert(&V_proctree_lock, SX_LOCKED);
 	if (IN_CAPABILITY_MODE(td))
 		return (ECAPMODE);
 	if (rk->rk_sig <= 0 || rk->rk_sig > _SIG_MAXSIG)
@@ -499,12 +499,12 @@ kern_procctl(struct thread *td, idtype_t idtype, id_t id, int com, void *data)
 	case PROC_REAP_KILL:
 	case PROC_TRACE_CTL:
 	case PROC_TRAPCAP_CTL:
-		sx_slock(&proctree_lock);
+		sx_slock(&V_proctree_lock);
 		tree_locked = true;
 		break;
 	case PROC_REAP_ACQUIRE:
 	case PROC_REAP_RELEASE:
-		sx_xlock(&proctree_lock);
+		sx_xlock(&V_proctree_lock);
 		tree_locked = true;
 		break;
 	case PROC_TRACE_STATUS:
@@ -571,6 +571,6 @@ kern_procctl(struct thread *td, idtype_t idtype, id_t id, int com, void *data)
 		break;
 	}
 	if (tree_locked)
-		sx_unlock(&proctree_lock);
+		sx_unlock(&V_proctree_lock);
 	return (error);
 }

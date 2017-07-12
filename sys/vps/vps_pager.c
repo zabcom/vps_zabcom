@@ -84,12 +84,14 @@ static void vps_pager_init(void);
 static vm_object_t vps_pager_alloc(void *, vm_ooffset_t, vm_prot_t,
 	vm_ooffset_t, struct ucred *);
 static void vps_pager_dealloc(vm_object_t);
-static int vps_pager_getpages(vm_object_t, vm_page_t *, int, int);
+static int vps_pager_getpages(vm_object_t, vm_page_t *, int, int *, int *);
+
 static void vps_pager_putpages(vm_object_t, vm_page_t *, int,
 	boolean_t, int *);
 static boolean_t vps_pager_haspage(vm_object_t, vm_pindex_t, int *,
 	int *);
 void vps_pager_lowmem(void *);
+
 
 struct pagerops vps_pager_ops = {
 	.pgo_init =     vps_pager_init,
@@ -376,8 +378,10 @@ vps_pager_put_object(vm_object_t object, long desired)
 }
 
 static int
-vps_pager_getpages(vm_object_t object, vm_page_t *m, int count, int reqpage)
+vps_pager_getpages(vm_object_t object, vm_page_t *m, int count, int *rbehind, int *rahead)
 {
+#if 0
+	/* XXX-BZ TODO */
 	struct vps_snapst_ctx *ctx;
 	struct vps_page_ref *pref;
 	vm_memattr_t memattr;
@@ -571,6 +575,7 @@ vps_pager_getpages(vm_object_t object, vm_page_t *m, int count, int reqpage)
 			ctx->pager_npages_res,
 			ctx->pager_npages_swap,
 			ctx->pager_npages_miss);
+#endif
 
 	return (VM_PAGER_OK);
 }

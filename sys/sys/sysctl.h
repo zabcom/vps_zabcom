@@ -1200,6 +1200,9 @@ SYSCTL_DECL(_security_bsd);
 #ifdef EXT_RESOURCES
 SYSCTL_DECL(_clock);
 #endif
+#ifdef VPS
+SYSCTL_DECL(_vps);
+#endif
 
 extern char	machine[];
 extern char	osrelease[];

@@ -60,6 +60,7 @@ __IDSTRING(vpsid, "$Id: vps_snapst.c 206 2013-12-16 18:15:42Z klaus $");
 #include <sys/mount.h>
 #include <sys/vnode.h>
 #include <sys/namei.h>
+#include <sys/rwlock.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/reboot.h>
@@ -83,7 +84,7 @@ __IDSTRING(vpsid, "$Id: vps_snapst.c 206 2013-12-16 18:15:42Z klaus $");
 #include <sys/event.h>
 #include <sys/eventvar.h>
 #include <sys/umtx.h>
-#include <sys/capability.h>
+#include <sys/capsicum.h>
 
 #include <machine/pcb.h>
 
@@ -115,6 +116,7 @@ __IDSTRING(vpsid, "$Id: vps_snapst.c 206 2013-12-16 18:15:42Z klaus $");
 #include <net/ethernet.h>
 #include <net/radix.h>
 #include <net/route.h>
+#include <net/route_var.h>
 #include <net/vnet.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -913,7 +915,7 @@ vps_snapshot_vps(struct vps_snapst_ctx *ctx, struct vps *vps)
 	vdi = vdo_space(ctx, sizeof(*vdi), M_WAITOK);
 	strlcpy(vdi->hostname, VPS_VPS(vps, hostname),
 	    sizeof(vdi->hostname));
-	V_getboottime(&vdi->boottime);			/* XXX-BZ is that right? */
+	V_getboottimebin(&vdi->boottime);			/* XXX-BZ is that right? */
 	vdi->lastpid = VPS_VPS(vps, lastpid);
 
 	vdi->restore_count = vps->restore_count;
@@ -1189,10 +1191,12 @@ vps_snapshot_vnet_route_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vdr->rt_have_ifa = 0;
 	vdr->rt_flags = rt->rt_flags;
 	vdr->rt_fibnum = rt->rt_fibnum;
+#if 0
 	vdr->rt_rmx.rmx_mtu = rt->rt_rmx.rmx_mtu;
 	vdr->rt_rmx.rmx_expire = rt->rt_rmx.rmx_expire;
 	vdr->rt_rmx.rmx_pksent = rt->rt_rmx.rmx_pksent;
 	vdr->rt_rmx.rmx_weight = rt->rt_rmx.rmx_weight;
+#endif
 
 	if (rt_key(rt) != NULL) {
 		if ((vds = vdo_space(ctx, sizeof(*vds), M_NOWAIT)) ==
@@ -1262,7 +1266,7 @@ static int
 vps_snapshot_vnet_route_table(struct vps_snapst_ctx *ctx, struct vps *vps,
 	struct vnet *vnet, int fibnum, int af)
 {
-	struct radix_node_head *rnh;
+	struct rib_head *rnh;
 	struct radix_node **stack;
 	struct radix_node **sp;
 	struct radix_node *rn;
@@ -1297,10 +1301,14 @@ vps_snapshot_vnet_route_table(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	DBGS("%s: fibnum=%d af=%d rnh=%p\n", __func__, fibnum, af, rnh);
 
-	RADIX_NODE_HEAD_RLOCK(rnh);
+	RIB_RLOCK(rnh);
 
 	sp = &stack[0xff];
+#if 0
 	*sp = rnh->rnh_treetop;
+#else
+	*sp = rnh->head.rnh_treetop;
+#endif
 
 	while (sp <= &stack[0xff] && *sp) {
 
@@ -1329,7 +1337,7 @@ vps_snapshot_vnet_route_table(struct vps_snapst_ctx *ctx, struct vps *vps,
 				    vps, vnet, rn);
 				if (error == ENOMEM) {
 					vdo_discard(ctx, o1);
-					RADIX_NODE_HEAD_RUNLOCK(rnh);
+					RIB_RUNLOCK(rnh);
 					goto again;
 				} else if (error != 0) {
 					goto out;
@@ -1362,7 +1370,7 @@ vps_snapshot_vnet_route_table(struct vps_snapst_ctx *ctx, struct vps *vps,
 	}
 
  out:
-	RADIX_NODE_HEAD_RUNLOCK(rnh);
+	RIB_RUNLOCK(rnh);
 
 	free(stack, M_TEMP);
 
@@ -2128,7 +2136,7 @@ vps_snapshot_sockbuf(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vdsb->sb_state = sb->sb_state;
 	vdsb->sb_flags = sb->sb_flags;
 	vdsb->sb_sndptroff = sb->sb_sndptroff;
-	vdsb->sb_cc = sb->sb_cc;
+	vdsb->sb_ccc = sb->sb_ccc;
 	vdsb->sb_hiwat = sb->sb_hiwat;
 	vdsb->sb_mbcnt = sb->sb_mbcnt;
 	vdsb->sb_mcnt = sb->sb_mcnt;
@@ -2148,8 +2156,8 @@ vps_snapshot_sockbuf(struct vps_snapst_ctx *ctx, struct vps *vps,
 	DBGS("%s: sb=%p sb_mb=%p sb_mbtail=%p sb_lastrecord=%p "
 	    "sb_sndptr=%p\n", __func__, sb, sb->sb_mb, sb->sb_mbtail,
 	    sb->sb_lastrecord, sb->sb_sndptr);
-	DBGS("%s: sb=%p sb->sb_cc=%u sb->sb_mb=%p sb->sb_sndptroff=%u\n",
-	    __func__, sb, sb->sb_cc, sb->sb_mb, sb->sb_sndptroff);
+	DBGS("%s: sb=%p sb->sb_ccc=%u sb->sb_mb=%p sb->sb_sndptroff=%u\n",
+	    __func__, sb, sb->sb_ccc, sb->sb_mb, sb->sb_sndptroff);
 
 	vdo_close(ctx);
 
@@ -2183,8 +2191,10 @@ vps_snapshot_socket_unix(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	vdunpcb->unp_socket = un_pcb->unp_socket;
 	vdunpcb->unp_flags = un_pcb->unp_flags;
+#if 0
 	vdunpcb->unp_cc = un_pcb->unp_cc;
 	vdunpcb->unp_mbcnt = un_pcb->unp_mbcnt;
+#endif
 
 	vdunpcb->unp_peercred.cr_uid = un_pcb->unp_peercred.cr_uid;
 	vdunpcb->unp_peercred.cr_ngroups =
@@ -2393,10 +2403,10 @@ vps_snapshot_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	vds->so_options = so->so_options;
 	vds->so_state = so->so_state;
-	vds->so_qlimit = so->so_qlimit;
+	vds->so_qlimit = so->sol_qlimit;
 	vds->so_qstate = so->so_qstate;
-	vds->so_qlen = so->so_qlen;
-	vds->so_incqlen = so->so_incqlen;
+	vds->sol_qlen = so->sol_qlen;
+	vds->sol_incqlen = so->sol_incqlen;
 	vds->so_cred = so->so_cred;
 	vds->so_orig_ptr = so;
 
@@ -2440,16 +2450,16 @@ vps_snapshot_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vdo_close(ctx);
 
 	/* Sockets that are on the accept queue of this socket. */
-	if (so->so_qlen > 0 || so->so_incqlen > 0) {
-		DBGS("%s: so=%p so_qlen=%d so_incqlen=%d\n",
-			__func__, so, so->so_qlen, so->so_incqlen);
-		TAILQ_FOREACH(so2, &so->so_comp, so_list) {
-			DBGS("%s: so_comp: so2=%p \n", __func__, so2);
+	if (so->sol_qlen > 0 || so->sol_incqlen > 0) {
+		DBGS("%s: so=%p sol_qlen=%d sol_incqlen=%d\n",
+			__func__, so, so->sol_qlen, so->sol_incqlen);
+		TAILQ_FOREACH(so2, &so->sol_comp, so_list) {
+			DBGS("%s: sol_comp: so2=%p \n", __func__, so2);
 			if ((error = vps_snapshot_socket(ctx, vps, so2)))
 				goto drop;
 		}
-		TAILQ_FOREACH(so2, &so->so_incomp, so_list) {
-			DBGS("%s: so_incomp: so2=%p \n", __func__, so2);
+		TAILQ_FOREACH(so2, &so->sol_incomp, so_list) {
+			DBGS("%s: sol_incomp: so2=%p \n", __func__, so2);
 			if ((error = vps_snapshot_socket(ctx, vps, so2)))
 				goto drop;
 		}
@@ -2518,12 +2528,6 @@ vps_snapshot_kqueue(struct vps_snapst_ctx *ctx, struct vps *vps,
 		SLIST_FOREACH(kn, &kq->kq_knlist[i], kn_link) {
 			DBGS("%s: knote=%p kn_status=%08x\n",
 			    __func__, kn, kn->kn_status);
-			if (kn != NULL && (kn->kn_status & KN_INFLUX) ==
-			    KN_INFLUX) {
-				DBGS("%s: kn->kn_status & KN_INFLUX\n",
-				    __func__);
-				/* XXX have to sleep here */
-			}
 			kev = &kn->kn_kevent;
 			DBGS("kevent: ident  = 0x%016zx\n",
 			    (size_t)kev->ident);
@@ -2598,12 +2602,12 @@ vps_snapshot_fdset(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vdfd = vdo_space(ctx, sizeof(*vdfd), M_WAITOK);
 
 	vdfd->fd_orig_ptr = fdp;
-	vdfd->fd_nfiles = fdp->fd_nfiles;
+	vdfd->fdt_nfiles = fdp->fd_nfiles;
 	vdfd->fd_have_cdir = (fdp->fd_cdir != NULL) ? 1 : 0;
 	vdfd->fd_have_rdir = (fdp->fd_rdir != NULL) ? 1 : 0;
 	vdfd->fd_have_jdir = (fdp->fd_jdir != NULL) ? 1 : 0;
 
-	vdo_space(ctx, sizeof(vdfd->fd_entries[0]) * vdfd->fd_nfiles,
+	vdo_space(ctx, sizeof(vdfd->fd_entries[0]) * vdfd->fdt_nfiles,
 	    M_WAITOK);
 
 	if ((error = vps_snapshot_vnode(ctx, vps, fdp->fd_cdir,
@@ -3239,7 +3243,6 @@ vps_snapshot_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 		vdvme->offset = e->offset;
 		vdvme->start = e->start;
 		vdvme->end = e->end;
-		vdvme->avail_ssize = e->avail_ssize;
 		vdvme->eflags = e->eflags;
 		vdvme->protection = e->protection;
 		vdvme->max_protection = e->max_protection;
@@ -3386,7 +3389,7 @@ vps_snapshot_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 		goto again;
 	}
 
-	if (vps_md_snapshot_thread(vudtd, td) != 0) {
+	if (vps_md_snapshot_thread(vdtd, td) != 0) {
 		thread_unlock(td);
 		vdo_discard(ctx, o1);
 		goto again;
@@ -3524,7 +3527,6 @@ vps_snapshot_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vdp->p_state = p->p_state;
 	vdp->p_stops = p->p_stops;
 	vdp->p_oppid = p->p_oppid;
-	vdp->p_xstat = p->p_xstat;
 	vdp->p_stype = p->p_stype;
 	vdp->p_step = p->p_step;
 	vdp->p_sigparent = p->p_sigparent;

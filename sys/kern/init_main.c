@@ -829,7 +829,7 @@ create_init(const void *udata __unused)
 	KASSERT(V_initproc->p_pid == 1, ("create_init: V_initproc->p_pid != 1"));
 	/* divorce init's credentials from the kernel's */
 	newcred = crget();
-	sx_xlock(&proctree_lock);
+	sx_xlock(&V_proctree_lock);
 	PROC_LOCK(V_initproc);
 	V_initproc->p_flag |= P_SYSTEM | P_INMEM;
 	V_initproc->p_treeflag |= P_TREE_REAPER;
@@ -847,7 +847,7 @@ create_init(const void *udata __unused)
 	crfree(td->td_ucred);
 	td->td_ucred = crhold(V_initproc->p_ucred);
 	PROC_UNLOCK(V_initproc);
-	sx_xunlock(&proctree_lock);
+	sx_xunlock(&V_proctree_lock);
 	crfree(oldcred);
 	cpu_fork_kthread_handler(FIRST_THREAD_IN_PROC(V_initproc),
 	    start_init, NULL);

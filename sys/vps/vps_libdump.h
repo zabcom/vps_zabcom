@@ -303,10 +303,7 @@ struct vps_dump_vps {
 	char vps_name[0x100];
 	char rootpath[0x400];
 
-	struct {
-		sint64 tv_sec;
-		sint64 tv_usec;
-	} boottime;
+	struct bintime boottime;
 
 	sint32 lastpid;
 	sint32 initpgrp_id;
@@ -440,7 +437,6 @@ struct vps_dump_proc {
 
 	sint8 p_nice;
 	sint8 p_step;
-	uint16 p_xstat;
 	sint32 p_oppid;
 
 	uint32 p_xthread_id;
@@ -537,7 +533,6 @@ struct vps_dump_vmmapentry {
 	uint64 offset;
 	uint64 start;
 	uint64 end;
-	uint64 avail_ssize;
 };
 
 struct vps_dump_vmobject {
@@ -599,7 +594,7 @@ struct vps_dump_filedesc {
 	uint8 fd_have_jdir;
 	uint8 _pad0[5];
 
-	uint32 fd_nfiles;
+	uint32 fdt_nfiles;
 	uint32 _pad1;
 
 	struct {
@@ -681,8 +676,8 @@ struct vps_dump_socket {
 	sint16 _pad1;
 
 	sint32 so_qstate;
-	uint16 so_qlen;
-	uint16 so_incqlen;
+	uint16 sol_qlen;
+	uint16 sol_incqlen;
 };
 
 struct vps_dump_unixpcb {
@@ -783,7 +778,7 @@ struct vps_dump_sockbuf {
 	sint16 sb_flags;
 	uint32 sb_sndptroff;
 
-	uint32 sb_cc;
+	uint32 sb_ccc;
 	uint32 sb_hiwat;
 
 	uint32 sb_mbcnt;
@@ -975,7 +970,7 @@ struct vps_dump_sysvsem_seminfo {
 	sint32 semusz;
 	sint32 semvmx;
 	sint32 semaem;
-	unsigned sem_prosin_slot;
+	unsigned sem_prison_slot;
 
         sint32 semtot;
         sint32 semundo_active;

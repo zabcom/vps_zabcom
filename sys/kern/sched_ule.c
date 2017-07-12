@@ -2499,8 +2499,10 @@ void
 sched_rem_norunq(struct thread *td)
 {
 	struct tdq *tdq;
+	struct td_sched *ts;
 
-	tdq = TDQ_CPU(td->td_sched->ts_cpu);
+	ts = td_get_sched(td);
+	tdq = TDQ_CPU(ts->ts_cpu);
 	TDQ_LOCK_ASSERT(tdq, MA_OWNED);
 	MPASS(td->td_lock == TDQ_LOCKPTR(tdq));
 

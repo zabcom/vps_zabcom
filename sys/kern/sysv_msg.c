@@ -319,11 +319,11 @@ msginit_global(void)
 	vps_func->msg_restore_proc = msg_restore_proc;
 	vps_func->msg_restore_fixup = msg_restore_fixup;
 
-	error = syscall_helper_register(msg_syscalls);
+	error = syscall_helper_register(msg_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
 		return (error);
 #ifdef COMPAT_FREEBSD32
-	error = syscall32_helper_register(msg32_syscalls);
+	error = syscall32_helper_register(msg32_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
 		return (error);
 #endif
@@ -444,17 +444,17 @@ msginit2()
 	V_msg_prison_slot = osd_jail_register(NULL, methods);
 	rsv = osd_reserve(V_msg_prison_slot);
 	prison_lock(V_prison0);
-	(void)osd_jail_set_reserved(V_prison0, msg_prison_slot, rsv, V_prison0);
+	(void)osd_jail_set_reserved(V_prison0, V_msg_prison_slot, rsv, V_prison0);
 	prison_unlock(V_prison0);
 	rsv = NULL;
 	sx_slock(&allprison_lock);
-	TAILQ_FOREACH(pr, &allprison, pr_list) {
+	TAILQ_FOREACH(pr, &V_allprison, pr_list) {
 		if (rsv == NULL)
-			rsv = osd_reserve(msg_prison_slot);
+			rsv = osd_reserve(V_msg_prison_slot);
 		prison_lock(pr);
 		if ((pr->pr_allow & PR_ALLOW_SYSVIPC) && pr->pr_ref > 0) {
 			(void)osd_jail_set_reserved(pr, V_msg_prison_slot, rsv,
-			    &prison0);
+			    V_prison0);
 			rsv = NULL;
 		}
 		prison_unlock(pr);
@@ -586,7 +586,7 @@ msg_freehdr(msghdr)
 		if (msghdr->msg_spot < 0 || msghdr->msg_spot >= V_msginfo.msgseg)
 			panic("msghdr->msg_spot out of range");
 		next = V_msgmaps[msghdr->msg_spot].next;
-		msgmaps[msghdr->msg_spot].next = V_free_msgmaps;
+		V_msgmaps[msghdr->msg_spot].next = V_free_msgmaps;
 		V_free_msgmaps = msghdr->msg_spot;
 		V_nfree_msgmaps++;
 #ifdef VPS
@@ -929,7 +929,7 @@ sys_msgget(struct thread *td, struct msgget_args *uap)
 		msqkptr->u.msg_last = NULL;
 		msqkptr->u.msg_cbytes = 0;
 		msqkptr->u.msg_qnum = 0;
-		msqkptr->u.msg_qbytes = msginfo.msgmnb;
+		msqkptr->u.msg_qbytes = V_msginfo.msgmnb;
 		msqkptr->u.msg_lspid = 0;
 		msqkptr->u.msg_lrpid = 0;
 		msqkptr->u.msg_stime = 0;

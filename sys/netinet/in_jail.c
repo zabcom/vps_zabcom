@@ -259,13 +259,13 @@ prison_equal_ip4(struct prison *pr1, struct prison *pr2)
 	 * No need to lock since the PR_IP4_USER flag can't be altered for
 	 * existing prisons.
 	 */
-	while (pr1 != &prison0 &&
+	while (pr1 != V_prison0 &&
 #ifdef VIMAGE
 	       !(pr1->pr_flags & PR_VNET) &&
 #endif
 	       !(pr1->pr_flags & PR_IP4_USER))
 		pr1 = pr1->pr_parent;
-	while (pr2 != &prison0 &&
+	while (pr2 != V_prison0 &&
 #ifdef VIMAGE
 	       !(pr2->pr_flags & PR_VNET) &&
 #endif

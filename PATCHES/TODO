@@ -19,4 +19,7 @@ xes -> vfs_cache.c needs review;  just applied blindly so far.
 Lots of &prison0 vs. V_prison0  (no &)  but only in some places;  check that!
 	- the osd calls take the prison0 argument twice; check those still
 
+
+vps_pager_getpages()
+
 # end

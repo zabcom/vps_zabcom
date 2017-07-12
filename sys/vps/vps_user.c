@@ -55,6 +55,7 @@ __IDSTRING(vpsid, "$Id: vps_user.c 189 2013-07-12 07:15:07Z klaus $");
 #include <sys/jail.h>
 
 #include <net/if.h>
+#include <net/if_var.h>
 #include <netinet/in.h>
 
 #include "vps_user.h"

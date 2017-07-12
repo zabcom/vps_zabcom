@@ -116,7 +116,7 @@ proc_realparent(struct proc *child)
 		    child->p_pptr->p_pid == child->p_oppid)
 			parent = child->p_pptr;
 		else
-			parent = initproc;
+			parent = V_initproc;
 		return (parent);
 	}
 	for (p = child; (p->p_treeflag & P_TREE_FIRST_ORPHAN) == 0;) {
@@ -137,7 +137,7 @@ reaper_abandon_children(struct proc *p, bool exiting)
 	struct proc *p1, *p2, *ptmp;
 
 	sx_assert(&V_proctree_lock, SX_LOCKED);
-	KASSERT(p != initproc, ("reaper_abandon_children for initproc"));
+	KASSERT(p != V_initproc, ("reaper_abandon_children for initproc"));
 	if ((p->p_treeflag & P_TREE_REAPER) == 0)
 		return;
 	p1 = p->p_reaper;

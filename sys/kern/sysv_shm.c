@@ -1034,11 +1034,11 @@ shminit_global(void)
 	vps_func->shm_restore_proc = shm_restore_proc;
 	vps_func->shm_restore_fixup = shm_restore_fixup;
 
-	error = syscall_helper_register(shm_syscalls);
+	error = syscall_helper_register(shm_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
 		return (error);
 #ifdef COMPAT_FREEBSD32
-	error = syscall32_helper_register(shm32_syscalls);
+	error = syscall32_helper_register(shm32_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
 		return (error);
 #endif
@@ -1147,7 +1147,7 @@ shminit(void)
 	prison_unlock(V_prison0);
 	rsv = NULL;
 	sx_slock(&allprison_lock);
-	TAILQ_FOREACH(pr, &allprison, pr_list) {
+	TAILQ_FOREACH(pr, &V_allprison, pr_list) {
 		if (rsv == NULL)
 			rsv = osd_reserve(V_shm_prison_slot);
 		prison_lock(pr);

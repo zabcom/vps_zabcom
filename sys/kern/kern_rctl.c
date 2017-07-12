@@ -1173,7 +1173,7 @@ rctl_string_to_rule(char *rulestr, struct rctl_rule **rulep)
 			error = str2id(subject_idstr, &id);
 			if (error != 0)
 				goto out;
-			sx_assert(&allproc_lock, SA_LOCKED);
+			sx_assert(&V_allproc_lock, SA_LOCKED);
 			rule->rr_subject.rs_proc = pfind(id);
 			if (rule->rr_subject.rs_proc == NULL) {
 				error = ESRCH;
@@ -1355,7 +1355,7 @@ rctl_rule_add(struct rctl_rule *rule)
 	 * Now go through all the processes and add the new rule to the ones
 	 * it applies to.
 	 */
-	sx_assert(&allproc_lock, SA_LOCKED);
+	sx_assert(&V_allproc_lock, SA_LOCKED);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		cred = p->p_ucred;
 		switch (rule->rr_subject_type) {
@@ -1450,7 +1450,7 @@ rctl_rule_remove(struct rctl_rule *filter)
 	    rctl_rule_pre_callback, rctl_rule_post_callback,
 	    filter, (void *)&found);
 
-	sx_assert(&allproc_lock, SA_LOCKED);
+	sx_assert(&V_allproc_lock, SA_LOCKED);
 	RACCT_LOCK();
 	FOREACH_PROC_IN_SYSTEM(p) {
 		found += rctl_racct_remove_rules(p->p_racct, filter);
@@ -1621,11 +1621,11 @@ sys_rctl_get_racct(struct thread *td, struct rctl_get_racct_args *uap)
 	if (error != 0)
 		return (error);
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	error = rctl_string_to_rule(inputstr, &filter);
 	free(inputstr, M_RCTL);
 	if (error != 0) {
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (error);
 	}
 
@@ -1667,7 +1667,7 @@ sys_rctl_get_racct(struct thread *td, struct rctl_get_racct_args *uap)
 	}
 out:
 	rctl_rule_release(filter);
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 	if (error != 0)
 		return (error);
 
@@ -1716,17 +1716,17 @@ sys_rctl_get_rules(struct thread *td, struct rctl_get_rules_args *uap)
 	if (error != 0)
 		return (error);
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	error = rctl_string_to_rule(inputstr, &filter);
 	free(inputstr, M_RCTL);
 	if (error != 0) {
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (error);
 	}
 
 	bufsize = uap->outbuflen;
 	if (bufsize > rctl_maxbufsize) {
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (E2BIG);
 	}
 
@@ -1775,7 +1775,7 @@ sys_rctl_get_rules(struct thread *td, struct rctl_get_rules_args *uap)
 	error = rctl_write_outbuf(sb, uap->outbufp, uap->outbuflen);
 out:
 	rctl_rule_release(filter);
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 	free(buf, M_RCTL);
 	return (error);
 }
@@ -1801,34 +1801,34 @@ sys_rctl_get_limits(struct thread *td, struct rctl_get_limits_args *uap)
 	if (error != 0)
 		return (error);
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	error = rctl_string_to_rule(inputstr, &filter);
 	free(inputstr, M_RCTL);
 	if (error != 0) {
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (error);
 	}
 
 	if (filter->rr_subject_type == RCTL_SUBJECT_TYPE_UNDEFINED) {
 		rctl_rule_release(filter);
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (EINVAL);
 	}
 	if (filter->rr_subject_type != RCTL_SUBJECT_TYPE_PROCESS) {
 		rctl_rule_release(filter);
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (EOPNOTSUPP);
 	}
 	if (filter->rr_subject.rs_proc == NULL) {
 		rctl_rule_release(filter);
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (EINVAL);
 	}
 
 	bufsize = uap->outbuflen;
 	if (bufsize > rctl_maxbufsize) {
 		rctl_rule_release(filter);
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (E2BIG);
 	}
 
@@ -1858,7 +1858,7 @@ sys_rctl_get_limits(struct thread *td, struct rctl_get_limits_args *uap)
 	error = rctl_write_outbuf(sb, uap->outbufp, uap->outbuflen);
 out:
 	rctl_rule_release(filter);
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 	free(buf, M_RCTL);
 	return (error);
 }
@@ -1881,11 +1881,11 @@ sys_rctl_add_rule(struct thread *td, struct rctl_add_rule_args *uap)
 	if (error != 0)
 		return (error);
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	error = rctl_string_to_rule(inputstr, &rule);
 	free(inputstr, M_RCTL);
 	if (error != 0) {
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (error);
 	}
 	/*
@@ -1904,7 +1904,7 @@ sys_rctl_add_rule(struct thread *td, struct rctl_add_rule_args *uap)
 
 out:
 	rctl_rule_release(rule);
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 	return (error);
 }
 
@@ -1926,17 +1926,17 @@ sys_rctl_remove_rule(struct thread *td, struct rctl_remove_rule_args *uap)
 	if (error != 0)
 		return (error);
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	error = rctl_string_to_rule(inputstr, &filter);
 	free(inputstr, M_RCTL);
 	if (error != 0) {
-		sx_sunlock(&allproc_lock);
+		sx_sunlock(&V_allproc_lock);
 		return (error);
 	}
 
 	error = rctl_rule_remove(filter);
 	rctl_rule_release(filter);
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 
 	return (error);
 }

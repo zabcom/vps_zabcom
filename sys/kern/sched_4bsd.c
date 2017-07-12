@@ -462,7 +462,7 @@ schedcpu(void)
 	struct td_sched *ts;
 	int awake;
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		PROC_LOCK(p);
 		if (p->p_state == PRS_NEW) {
@@ -548,7 +548,7 @@ schedcpu(void)
 		}
 		PROC_UNLOCK(p);
 	}
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 }
 
 /*

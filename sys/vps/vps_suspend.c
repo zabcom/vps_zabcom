@@ -88,6 +88,7 @@ __IDSTRING(vpsid, "$Id: vps_suspend.c 194 2013-07-26 19:49:49Z klaus $");
 #include <machine/pcb.h>
 
 #include <net/if.h>
+#include <net/if_var.h>
 #include <net/if_clone.h>
 #include <netinet/in.h>
 
@@ -164,7 +165,7 @@ vps_suspend_relinkvnodes_one(struct vps *vps, struct vnode *vp,
 	path2 = malloc(strlen(path) + 1, M_TEMP, M_WAITOK);
 	strlcpy(path2, path, strlen(path) + 1);
 
-	kern_stat(curthread, path2, UIO_SYSSPACE, statp);
+	kern_statat(curthread, 0, AT_FDCWD, path2, UIO_SYSSPACE, statp, NULL);
 
 	free(path2, M_TEMP);
 	free(statp, M_TEMP);
@@ -429,7 +430,9 @@ vps_resume(struct vps *vps, int flags)
 	struct vnet *vnet;
 	struct thread *td;
 	struct proc *p;
+#if 0
 	int wakeup_swapper;
+#endif
 	int descend;
 #ifdef DISABLED_INVARIANTS
 	struct vps_ref *ref;
@@ -501,7 +504,9 @@ vps_resume(struct vps *vps, int flags)
 
 		PROC_UNLOCK(p);
 		PROC_SLOCK(p);
-
+#if 1
+		thread_unsuspend(p);
+#else
 		if ((p->p_flag & P_STOPPED_SIG) == 0) {
 			TAILQ_FOREACH(td, &p->p_threads, td_plist) {
 				DBGCORE("td=%p\n", td);
@@ -525,6 +530,7 @@ vps_resume(struct vps *vps, int flags)
 			DBGCORE("%s: P_STOPPED_SIG, not resuming\n",
 			    __func__);
 		}
+#endif
 		PROC_SUNLOCK(p);
 	}
 	sx_xunlock(&VPS_VPS(vps, allproc_lock));
@@ -823,7 +829,7 @@ vps_syscall_fixup_inthread(register_t code, struct trapframe *frame)
         if (td->td_flags2 & TDF2_VPSSUSPEND) {
                 DBGCORE("%s: td=%p suspending\n", __func__, td);
                 td->td_errno = error;
-                if (td->td_flags2 & TDF2_NEEDSUSPCHK) {
+                if (td->td_flags & TDF_NEEDSUSPCHK) {
                         PROC_LOCK(td->td_proc);
                         thread_suspend_check(0);
                         /*

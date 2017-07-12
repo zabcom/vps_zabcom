@@ -92,6 +92,7 @@ struct selfd {
         struct mtx              *sf_mtx;        /* Pointer to selinfo mtx. */
         struct seltd            *sf_td;         /* (k) owning seltd. */
         void                    *sf_cookie;     /* (k) fd or pollfd. */
+	u_int			sf_refs;
 };
 
 extern uma_zone_t selfd_zone;

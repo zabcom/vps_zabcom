@@ -3298,7 +3298,7 @@ nfssvc_idname(struct nfsd_idargs *nidp)
 			cr->cr_uid = cr->cr_ruid = cr->cr_svuid = nidp->nid_uid;
 			crsetgroups(cr, nidp->nid_ngroup, grps);
 			cr->cr_rgid = cr->cr_svgid = cr->cr_groups[0];
-			cr->cr_prison = &prison0;
+			cr->cr_prison = V_prison0;
 			prison_hold(cr->cr_prison);
 #ifdef MAC
 			mac_cred_associate_nfsd(cr);

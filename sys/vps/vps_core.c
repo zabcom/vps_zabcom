@@ -80,6 +80,7 @@ __IDSTRING(vpsid, "$Id: vps_core.c 207 2013-12-17 12:23:41Z klaus $");
 #include <machine/pcb.h>
 
 #include <net/if.h>
+#include <net/if_var.h>
 #include <net/if_clone.h>
 #include <netinet/in.h>
 
@@ -90,8 +91,6 @@ __IDSTRING(vpsid, "$Id: vps_core.c 207 2013-12-17 12:23:41Z klaus $");
 #else
 #define db_trace_thread(x,y)
 #endif
-
-extern struct prison prison0;
 
 #include "vps_user.h"
 #include "vps.h"
@@ -235,15 +234,14 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 
 	if (vm_page_count_min()) {
 		printf("%s: low on memory: v_free_min=%u > "
-		    "(v_free_count=%u + v_cache_count=%u)\n",
-		    __func__, cnt.v_free_min, cnt.v_free_count,
-		    cnt.v_cache_count);
+		    "(v_free_count=%u)\n",
+		    __func__, vm_cnt.v_free_min, vm_cnt.v_free_count);
 		if (errorval)
 			*errorval = ENOMEM;
 		return (NULL);
 	}
-	DBGCORE("%s: v_free_min=%u v_free_count=%u + v_cache_count=%u\n",
-	    __func__, cnt.v_free_min, cnt.v_free_count, cnt.v_cache_count);
+	DBGCORE("%s: v_free_min=%u v_free_count=%u\n",
+	    __func__, vm_cnt.v_free_min, vm_cnt.v_free_count);
 
 	vps = malloc(sizeof(*vps), M_VPS_CORE, M_WAITOK | M_ZERO);
 
@@ -266,7 +264,7 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 	sx_xlock(&vps->vps_lock);
 
 	if (vps_parent) {
-		struct vps *save_vps;
+		struct vps *vps_save;
 
 		/* Alloc vnet. Apparently always succeeds. */
 		vps->vnet = vnet_alloc();
@@ -350,8 +348,8 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 
 	   	vps->vps_ucred = crget();
 		vps->vps_ucred->cr_ngroups = 1;
-		vps->vps_ucred->cr_prison = &prison0;
-		prison_hold(&prison0);
+		vps->vps_ucred->cr_prison = V_prison0;
+		prison_hold(V_prison0);
 		/*
 		vps->vps_ucred->cr_uidinfo = uifind(0);
 		vps->vps_ucred->cr_ruidinfo = uifind(0);
@@ -388,7 +386,7 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 		    sizeof(vps->vps_ip6->addr));
 		vps->vps_ip6->plen = 0;
 	
-		VPS_VPS(vps, prison0) = &prison0;
+		VPS_VPS(vps, prison0) = V_prison0;
 	
 		DBGCORE("%s: vps=%p vmaxproc=%d\n", __func__,
 		    vps, VPS_VPS(vps, vmaxproc));
@@ -451,7 +449,10 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 
 	if (vps->vnet) {
 		/* see vps_free() */
+#if 0
 		VPS_VPS(vps, loif) = NULL;
+#endif
+		V_loif = NULL;
 		vnet_destroy(vps->vnet);
 	}
 
@@ -1104,7 +1105,7 @@ vps_switch_rootvnode(struct thread *td, struct vps *vps)
 	}
 #endif
 	VOP_UNLOCK(vps->_rootvnode, 0);
-	change_root(vps->_rootvnode, td);
+	pwd_chroot(td, vps->_rootvnode);
 
 	kern_chdir(td, "/", UIO_SYSSPACE);
 
@@ -1337,7 +1338,7 @@ vps_switch_proc(struct thread *td, struct vps *vps2, int flag)
 		sx_xunlock(&vps1->vps_lock);
 		return (ENOMEM);
 	}
-	fdunshare(p, td);
+	fdunshare(td);
 
         /*
          * + copy ucred and set new vps

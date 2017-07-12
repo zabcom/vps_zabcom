@@ -238,7 +238,7 @@ vps_if_addroute(struct sockaddr *addr, struct sockaddr *mask,
 
 	rn = rnh->rnh_deladdr(&vrt->rt_uaddr.u_addr,
 		&vrt->rt_umask.u_mask,
-		rnh);
+		&rnh->rh);
 	if (rn != NULL) {
 		DBGIF("%s: warning: old matching route found --> deleted\n",
 			__func__);
@@ -247,7 +247,7 @@ vps_if_addroute(struct sockaddr *addr, struct sockaddr *mask,
 
 	rn = rnh->rnh_addaddr(&vrt->rt_uaddr.u_addr,
 		&vrt->rt_umask.u_mask,
-		rnh, vrt->rt_nodes);
+		&rnh->rh, vrt->rt_nodes);
 
 	RADIX_NODE_HEAD_UNLOCK(rnh);
 
@@ -275,7 +275,7 @@ vps_if_delroute(struct sockaddr *addr, struct sockaddr *mask,
 
 	RADIX_NODE_HEAD_LOCK(rnh);
 
-	rn = rnh->rnh_deladdr(addr, mask, rnh);
+	rn = rnh->rnh_deladdr(addr, mask, &rnh->rh);
 
 	RADIX_NODE_HEAD_UNLOCK(rnh);
 
@@ -304,7 +304,7 @@ vps_if_purgeroute_one(struct radix_node *rn, void *arg)
 		return (0);
 
 	vrt->rt_rnh->rnh_deladdr(&vrt->rt_uaddr.u_addr,
-		&vrt->rt_umask.u_mask, vrt->rt_rnh);
+		&vrt->rt_umask.u_mask, &vrt->rt_rnh->rh);
 
 	free(vrt, M_VPS_IF);
 
@@ -322,13 +322,13 @@ vps_if_purgeroutes(struct ifnet *ifp)
 
 	rnh = vps_if_routehead_ip4;
 	RADIX_NODE_HEAD_LOCK(rnh);
-	(void)(rnh)->rnh_walktree(rnh,
+	(void)(rnh)->rnh_walktree(&rnh->rh,
 		vps_if_purgeroute_one, ifp);
 	RADIX_NODE_HEAD_UNLOCK(rnh);
 
 	rnh = vps_if_routehead_ip6;
 	RADIX_NODE_HEAD_LOCK(rnh);
-	(void)(rnh)->rnh_walktree(rnh,
+	(void)(rnh)->rnh_walktree(&rnh->rh,
 		vps_if_purgeroute_one, ifp);
 	RADIX_NODE_HEAD_UNLOCK(rnh);
 
@@ -366,7 +366,7 @@ vps_if_lookup(const struct sockaddr *dst2)
 		return (NULL);
 	}
 
-	rn = rnh->rnh_matchaddr(dst, rnh);
+	rn = rnh->rnh_matchaddr(dst, &rnh->rh);
 	if (rn && ((rn->rn_flags & RNF_ROOT) == 0)) {
 		;//DBGIF("%s: rn=%p\n", __func__, rn);
 	} else {
@@ -440,7 +440,7 @@ vps_if_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
         }
 
         if (oifp == NULL) {
-                ifp->if_oerrors++;
+		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
                 m_freem(m);
                 return (EHOSTUNREACH);
         }
@@ -452,7 +452,7 @@ vps_if_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
          */
         if ((oifp->if_drv_flags & IFF_DRV_RUNNING) == 0 ||
                 (oifp->if_flags & IFF_UP) == 0) {
-                ifp->if_oerrors++;
+		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
                 m_freem(m);
                 return (EHOSTUNREACH);
         }
@@ -460,7 +460,7 @@ vps_if_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	/* Loop protection. */
 	if (oifp == ifp) {
 		DBGIF("%s: LOOP ! oifp == ifp == %p\n", __func__, ifp);
-                ifp->if_oerrors++;
+		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
                 m_freem(m);
 		return (EHOSTUNREACH);
 	}
@@ -493,8 +493,8 @@ vps_if_output(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	KASSERT(m->m_pkthdr.rcvif->if_dname[0] == 'v',
 	    ("%s: m->m_pkthdr.rcvif->if_dname = [%s]\n",
 	    __func__, m->m_pkthdr.rcvif->if_dname));
-        oifp->if_ipackets++;
-        oifp->if_ibytes += m->m_pkthdr.len;
+	if_inc_counter(oifp, IFCOUNTER_IPACKETS, 1);
+	if_inc_counter(oifp, IFCOUNTER_IBYTES, m->m_pkthdr.len);
 
         CURVNET_SET_QUIET(oifp->if_vnet);
         error = netisr_queue(isr, m);   /* mbuf is free'd on failure. */

@@ -3258,7 +3258,7 @@ static int compress_user_cores = 0;
 /*
  * Protect the access to corefilename[] by allproc_lock.
  */
-#define	corefilename_lock	allproc_lock
+#define	corefilename_lock	V_allproc_lock
 
 static char corefilename[MAXPATHLEN] = {"%N.core"};
 TUNABLE_STR("kern.corefile", corefilename, sizeof(corefilename));

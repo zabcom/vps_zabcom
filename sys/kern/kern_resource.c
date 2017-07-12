@@ -1378,7 +1378,7 @@ ui_racct_foreach(void (*callback)(struct racct *racct,
 	rw_rlock(&V_uihashtbl_lock);
 	if (pre != NULL)
 		(pre)();
-	for (uih = &V_uihashtbl[uihash]; uih >= V_uihashtbl; uih--) {
+	for (uih = &V_uihashtbl[V_uihash]; uih >= V_uihashtbl; uih--) {
 		LIST_FOREACH(uip, uih, ui_hash) {
 			(callback)(uip->ui_racct, arg2, arg3);
 		}

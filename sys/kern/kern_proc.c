@@ -195,7 +195,7 @@ procinit(void)
 	snprintf(str + 0x200, 0x100, "ppeers_%p", curthread->td_vps);
 	mtx_init(&V_ppeers_lock, str + 0x200, NULL, MTX_DEF);
 
-else
+#else
 	sx_init(&V_allproc_lock, "allproc");
 	sx_init(&V_proctree_lock, "proctree");
 	mtx_init(&V_ppeers_lock, "p_peers", NULL, MTX_DEF);

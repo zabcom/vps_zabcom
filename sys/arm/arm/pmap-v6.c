@@ -6540,7 +6540,7 @@ pmap_pid_dump(int pid)
 	int npte2 = 0;
 	int i, j, index;
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		if (p->p_pid != pid || p->p_vmspace == NULL)
 			continue;
@@ -6568,7 +6568,7 @@ pmap_pid_dump(int pid)
 							index = 0;
 							printf("\n");
 						}
-						sx_sunlock(&allproc_lock);
+						sx_sunlock(&V_allproc_lock);
 						return (npte2);
 					}
 					pte2p = pmap_pte2(pmap, va);
@@ -6595,7 +6595,7 @@ pmap_pid_dump(int pid)
 			}
 		}
 	}
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 	return (npte2);
 }
 

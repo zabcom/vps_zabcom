@@ -86,7 +86,7 @@ __IDSTRING(vpsid, "$Id: vps_restore.c 206 2013-12-16 18:15:42Z klaus $");
 #include <sys/eventvar.h>
 #include <sys/stat.h>
 #include <sys/kdb.h>
-#include <sys/capability.h>
+#include <sys/capsicum.h>
 
 #include <net/if.h>
 #include <net/radix.h>
@@ -1083,7 +1083,7 @@ vps_restore_pipe(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	if (vdp->pi_have_dumped_pipe != 0) {
 
-		if ((error = kern_pipe(curthread, filedes))) {
+		if ((error = kern_pipe(curthread, filedes, 0, NULL, NULL))) {
 			ERRMSG(ctx, "%s: kern_pipe() error: %d\n",
 				__func__, error);
 			goto out;
@@ -1127,8 +1127,7 @@ vps_restore_pipe(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 			/* Close the write endpoint. */
 			fget(curthread, filedes[1], 0, &fp);
-			fdclose(curthread->td_proc->p_fd, fp,
-			    filedes[1], curthread);
+			fdclose(curthread, fp, filedes[1]);
 			fdrop(fp, curthread);
 
 			curthread->td_retval[0] = filedes[0];
@@ -1142,8 +1141,7 @@ vps_restore_pipe(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 			/* Close the read endpoint. */
 			fget(curthread, filedes[0], 0, &fp);
-			fdclose(curthread->td_proc->p_fd, fp,
-			    filedes[0], curthread);
+			fdclose(curthread, fp, filedes[0]);
 			fdrop(fp, curthread);
 
 			curthread->td_retval[0] = filedes[1];
@@ -1276,15 +1274,15 @@ vps_sbcheck(struct sockbuf *sb)
 				mbcnt += m->m_ext.ext_size;
 		}
         }
-        if (len != sb->sb_cc || mbcnt != sb->sb_mbcnt) {
+        if (len != sb->sb_ccc || mbcnt != sb->sb_mbcnt) {
 		/*
-                DBGR("cc %ld != %u || mbcnt %ld != %u\n", len, sb->sb_cc,
+                DBGR("ccc %ld != %u || mbcnt %ld != %u\n", len, sb->sb_ccc,
                     mbcnt, sb->sb_mbcnt);
                 panic("sbcheck");
 		*/
 		/* debugging */
-		printf("cc %ld != %u || mbcnt %ld != %u\n",
-			len, sb->sb_cc, mbcnt, sb->sb_mbcnt);
+		printf("ccc %ld != %u || mbcnt %ld != %u\n",
+			len, sb->sb_ccc, mbcnt, sb->sb_mbcnt);
 		kdb_enter(KDB_WHY_BREAK, "VPS break to debugger");
         }
 }
@@ -1495,7 +1493,7 @@ vps_restore_sockbuf(struct vps_snapst_ctx *ctx, struct vps *vps,
 	nsb->sb_sndptr = 		mptrs[3];
 	nsb->sb_state = 		vdsb->sb_state;
 	nsb->sb_sndptroff = 		vdsb->sb_sndptroff;
-	nsb->sb_cc = 			vdsb->sb_cc;
+	nsb->sb_ccc = 			vdsb->sb_ccc;
 	nsb->sb_hiwat = 		vdsb->sb_hiwat;
 	nsb->sb_mbcnt = 		vdsb->sb_mbcnt;
 	nsb->sb_mcnt = 			vdsb->sb_mcnt;
@@ -1513,8 +1511,8 @@ vps_restore_sockbuf(struct vps_snapst_ctx *ctx, struct vps *vps,
 	nsb->sb_upcall =		NULL;
 	nsb->sb_upcallarg =		NULL;
 
-	DBGR("%s: restored sockbuf=%p sb_cc=%u sb_mcnt=%u "
-	    "sb_sndptroff=%u\n", __func__, nsb, nsb->sb_cc,
+	DBGR("%s: restored sockbuf=%p sb_ccc=%u sb_mcnt=%u "
+	    "sb_sndptroff=%u\n", __func__, nsb, nsb->sb_ccc,
 	    nsb->sb_mcnt, nsb->sb_sndptroff);
 
 	vps_sbcheck(nsb);
@@ -1650,7 +1648,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		goto out;
 	}
 	fdidx = curthread->td_retval[0];
-	if ((error = getsock(curthread->td_proc->p_fd, fdidx, &fp, NULL))) {
+	if ((error = getsock(curthread, curthread->td_proc->p_fd, fdidx, &fp, NULL))) {
 		ERRMSG(ctx, "%s: getsock() error: %d\n",
 			__func__, error);
 		goto out;
@@ -1664,7 +1662,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 	nso->so_state = vds->so_state;
 	if (vds->so_options & SO_ACCEPTCONN)
 		nso->so_options |= SO_ACCEPTCONN;
-	nso->so_qlimit = vds->so_qlimit;
+	nso->sol_qlimit = vds->so_qlimit;
 	nso->so_qstate = vds->so_qstate;
 
 	/* XXX restore all socket options at all levels ! */
@@ -1713,8 +1711,8 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 			/* Remove name from filesystem first. */
 			statp = malloc(sizeof(*statp), M_TEMP, M_WAITOK);
-			error = kern_stat(curthread, saddr_un->sun_path,
-			    UIO_SYSSPACE, statp);
+			error = kern_statat(curthread, 0, AT_FDCWD,
+			    saddr_un->sun_path, UIO_SYSSPACE, statp, NULL);
 			if (error) {
 				ERRMSG(ctx, "%s: kern_stat() error: "
 				    "%d [%s]\n", __func__, error,
@@ -1725,8 +1723,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 				SOCKBUF_LOCK(&nso->so_snd);
 				goto out_unlock;
 			}
-			kern_unlink(curthread, saddr_un->sun_path,
-			    UIO_SYSSPACE);
+			kern_unlinkat(curthread, AT_FDCWD, saddr_un->sun_path, UIO_USERSPACE, 0);
 
 			error = sobind(nso, (struct sockaddr *)saddr_un,
 			    curthread);
@@ -1741,10 +1738,11 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 			}
 
 			/* Restore permissions. */
-			error = kern_chown(curthread, saddr_un->sun_path,
-			    UIO_SYSSPACE, statp->st_uid, statp->st_gid);
+			error = kern_fchownat(curthread, AT_FDCWD,
+			    saddr_un->sun_path, UIO_USERSPACE, statp->st_uid,
+			    statp->st_gid, 0);
 			if (error) {
-				ERRMSG(ctx, "%s: kern_chown() error: "
+				ERRMSG(ctx, "%s: kern_fchownat() error: "
 				    "%d [%s]\n", __func__, error,
 				    saddr_un->sun_path);
 				free(statp, M_TEMP);
@@ -1753,10 +1751,10 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 				SOCKBUF_LOCK(&nso->so_snd);
 				goto out_unlock;
 			}
-			error = kern_chmod(curthread, saddr_un->sun_path,
-			    UIO_SYSSPACE, statp->st_mode);
+			error = kern_fchmodat(curthread, AT_FDCWD, saddr_un->sun_path,
+			    UIO_SYSSPACE, statp->st_mode, 0);
 			if (error) {
-				ERRMSG(ctx, "%s: kern_chmod() error: "
+				ERRMSG(ctx, "%s: kern_fchmodat() error: "
 				    "%d [%s]\n", __func__, error,
 				    saddr_un->sun_path);
 				free(statp, M_TEMP);
@@ -1767,7 +1765,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 			}
 			free(statp, M_TEMP);
 
-			if (vdunpcb->unp_flags & UNP_HAVEPCCACHED) {
+			if (vdunpcb->unp_flags & UNP_HAVEPC) {
 				/* Socket was listening. */
 				DBGR("%s: socket was listening\n",
 				    __func__);
@@ -1840,8 +1838,8 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 			DBGR("%s: unknown socket state\n", __func__);
 		}
 
-		if (vdunpcb->unp_flags & UNP_HAVEPCCACHED) {
-			nunpcb->unp_flags |= UNP_HAVEPCCACHED;
+		if (vdunpcb->unp_flags & UNP_HAVEPC) {
+			nunpcb->unp_flags |= UNP_HAVEPC;
 			nunpcb->unp_peercred.cr_uid =
 			    vdunpcb->unp_peercred.cr_uid;
 			nunpcb->unp_peercred.cr_ngroups =
@@ -2065,14 +2063,14 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 	CURVNET_RESTORE();
 
 	/* Sockets that were on the accept queue of this socket. */
-	if (vds->so_qlen > 0 || vds->so_incqlen > 0) {
-		DBGR("%s: so_qlen=%d so_incqlen=%d\n",
-			__func__, vds->so_qlen, vds->so_incqlen);
+	if (vds->sol_qlen > 0 || vds->sol_incqlen > 0) {
+		DBGR("%s: sol_qlen=%d sol_incqlen=%d\n",
+			__func__, vds->sol_qlen, vds->sol_incqlen);
 
 		fdidx_save = fdidx;
 		cfd = curthread->td_proc->p_fd;
 
-		for (i = 0; i < (vds->so_qlen + vds->so_incqlen); i++) {
+		for (i = 0; i < (vds->sol_qlen + vds->sol_incqlen); i++) {
 
 			if ((error = vps_restore_socket(ctx, vps, p)))
 				return (error);
@@ -2102,14 +2100,14 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 			nso2->so_count = 0;
 
-			if (i < vds->so_qlen) {
-				TAILQ_INSERT_TAIL(&nso->so_comp, nso2,
+			if (i < vds->sol_qlen) {
+				TAILQ_INSERT_TAIL(&nso->sol_comp, nso2,
 				    so_list);
-				nso->so_qlen++;
+				nso->sol_qlen++;
 			} else {
-				TAILQ_INSERT_TAIL(&nso->so_incomp, nso2,
+				TAILQ_INSERT_TAIL(&nso->sol_incomp, nso2,
 				    so_list);
-				nso->so_incqlen++;
+				nso->sol_incqlen++;
 			}
 
 		}
@@ -2644,7 +2642,7 @@ vps_restore_fdset_linkup(struct vps_snapst_ctx *ctx, struct vps *vps,
 	nfd = p->p_fd;
 
 	/* Now all files should exist, so link them into fdset. */
-	for (i = 0; i < vdfd->fd_nfiles; i++) {
+	for (i = 0; i < vdfd->fdt_nfiles; i++) {
 
 		DBGR("%s: vdfd->fd_entries[%d].fp = %p\n",
 			__func__, i, vdfd->fd_entries[i].fp);
@@ -2755,9 +2753,9 @@ vps_restore_fdset(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	vdfd = (struct vps_dump_filedesc *)o1->data;
 
-	DBGR("%s: fdset has %d entries\n", __func__, vdfd->fd_nfiles);
+	DBGR("%s: fdset has %d entries\n", __func__, vdfd->fdt_nfiles);
 
-	p->p_fd = nfd = fdinit(NULL);
+	p->p_fd = nfd = fdinit(NULL, false);
 	cfd = curthread->td_proc->p_fd;
 
 	if (vdfd->fd_have_cdir != 0) {
@@ -2927,7 +2925,7 @@ vps_restore_getuserpage(struct vps_snapst_ctx *ctx, int idx, int test)
 		if (m == NULL)
 			panic("%s: vm_page_alloc() == NULL", __func__);
 
-		if ((vm_pager_get_pages(obj, &m, 1, 0)) != VM_PAGER_OK) {
+		if ((vm_pager_get_pages(obj, &m, 1, 0, NULL)) != VM_PAGER_OK) {
 			vm_page_lock(m);
 			vm_page_free(m);
 			vm_page_unlock(m);
@@ -3349,9 +3347,6 @@ vps_restore_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 			nme->eflags |= MAP_ENTRY_NEEDS_COPY;
 		if (vdvme->eflags & MAP_ENTRY_NOCOREDUMP)
 			nme->eflags |= MAP_ENTRY_NOCOREDUMP;
-		/* XXX audit this value */
-		if (vdvme->avail_ssize > 0)
-			nme->avail_ssize = vdvme->avail_ssize;
 
 		if (nme->cred != NULL) {
 			swap_release_by_cred(nme->end - nme->start,
@@ -3656,14 +3651,13 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	/* --- */
 	np->p_cpulimit = vdp->p_cpulimit;
 
-	knlist_init(&np->p_klist, &np->p_mtx, NULL, NULL, NULL, NULL);
+	knlist_init(np->p_klist, &np->p_mtx, NULL, NULL, NULL, NULL);
 	STAILQ_INIT(&np->p_ktr);
 	strlcpy(np->p_comm, vdp->p_comm, sizeof(np->p_comm));
 
 	np->p_flag = vdp->p_flag;
 	np->p_stops = vdp->p_stops;
 	np->p_oppid = vdp->p_oppid;
-	np->p_xstat = vdp->p_xstat;
 	np->p_sigparent = vdp->p_sigparent;
 	/* XXX */
 	np->p_stype = vdp->p_stype;
@@ -4631,7 +4625,7 @@ vps_restore_vps(struct vps_snapst_ctx *ctx, const char *vps_name,
 	struct vps_param vps_pr;
 	struct vps_dumpobj *o1;
 	struct vps_dump_vps *vdi;
-	struct vps *vps, *save_vps;
+	struct vps *vps, *vps_save;
 	int nexttype;
 	int error = 0;
 
@@ -4885,16 +4879,15 @@ vps_restore_copyin(struct vps_snapst_ctx *ctx, struct vps_arg_snapst *va)
 
 	if (vm_page_count_min()) {
 		ERRMSG(ctx, "%s: low on memory: v_free_min=%u > "
-		    "(v_free_count=%u + v_cache_count=%u)\n",
-		    __func__, cnt.v_free_min, cnt.v_free_count,
-		    cnt.v_cache_count);
-		ERRMSG(ctx, "%s: cnt.v_inactive_count=%u\n",
-		    __func__, cnt.v_inactive_count);
+		    "(v_free_count=%u)\n",
+		    __func__, vm_cnt.v_free_min, vm_cnt.v_free_count);
+		ERRMSG(ctx, "%s: vm_cnt.v_inactive_count=%u\n",
+		    __func__, vm_cnt.v_inactive_count);
 		error = ENOMEM;
 		goto fail;
 	}
-	DBGR("%s: v_free_min=%u v_free_count=%u + v_cache_count=%u\n",
-	    __func__, cnt.v_free_min, cnt.v_free_count, cnt.v_cache_count);
+	DBGR("%s: v_free_min=%u v_free_count=%u\n",
+	    __func__, vm_cnt.v_free_min, vm_cnt.v_free_count);
 
 	ctx->data = malloc(4 << PAGE_SHIFT, M_VPS_RESTORE,
 	    M_WAITOK | M_ZERO);
@@ -4941,14 +4934,14 @@ vps_restore_copyin(struct vps_snapst_ctx *ctx, struct vps_arg_snapst *va)
 	 */
 #ifndef INVARIANTS
 	if (1 && (dumphdr->nuserpages + dumphdr->nsyspages) / 2 >
-	    (cnt.v_free_count + cnt.v_cache_count + cnt.v_inactive_count)) {
+	    (vm_cnt.v_free_count + vm_cnt.v_inactive_count)) {
 		DBGR("%s: (dumphdr->nuserpages=%u + dumphdr->nsyspages=%u) "
 		     "/ 2 > \n"
-		     "          (v_free_count=%u + v_cache_count=%u + "
+		     "          (v_free_count=%u + "
 		     "v_inactive_count=%u)\n",
 		    __func__, dumphdr->nuserpages, dumphdr->nsyspages,
-		    cnt.v_free_count, cnt.v_cache_count,
-		    cnt.v_inactive_count);
+		    vm_cnt.v_free_count,
+		    vm_cnt.v_inactive_count);
 		ERRMSG(ctx, "%s: low on memory, not restoring "
 			"VPS instance (pid=%u)\n",
 			__func__, curthread->td_proc->p_pid);

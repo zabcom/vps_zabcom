@@ -718,7 +718,7 @@ pfs_iterate(struct thread *td, struct proc *proc, struct pfs_node *pd,
 	if (*pn != NULL && (*pn)->pn_type == pfstype_procdir) {
 		/* next process */
 		if (*p == NULL)
-			*p = LIST_FIRST(&allproc);
+			*p = LIST_FIRST(&V_allproc);
 		else
 			*p = LIST_NEXT(*p, p_list);
 		/* out of processes: next node */

@@ -739,7 +739,7 @@ sysctl_add_oid(struct sysctl_ctx_list *clist, struct sysctl_oid_list *parent,
 	if (label != NULL)
 		oidp->oid_label = strdup(label, M_SYSCTLOID);
 #ifdef VPS
-	oidp->vps0 = vps0;
+	oidp->oid_vps0 = vps0;
 #endif
 	/* Update the context, if used */
 	if (clist != NULL)
@@ -1831,7 +1831,7 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 		goto out;
 
 #ifdef VPS
-	if (req->td->td_vps != vps0 && oid->vps0 != 0) {
+	if (req->td->td_vps != vps0 && oid->oid_vps0 != 0) {
 
 		DBGCORE("%s: hiding [%s (%s)]\n",
 			__func__, oid->oid_name, oid->oid_descr);

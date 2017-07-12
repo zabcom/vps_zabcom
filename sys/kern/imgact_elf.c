@@ -2101,10 +2101,10 @@ __elfN(note_procstat_proc)(void *arg, struct sbuf *sb, size_t *sizep)
 		KASSERT(*sizep == size, ("invalid size"));
 		structsize = sizeof(elf_kinfo_proc_t);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
-		sx_slock(&proctree_lock);
+		sx_slock(&V_proctree_lock);
 		PROC_LOCK(p);
 		kern_proc_out(p, sb, ELF_KERN_PROC_MASK);
-		sx_sunlock(&proctree_lock);
+		sx_sunlock(&V_proctree_lock);
 	}
 	*sizep = size;
 }

@@ -68,6 +68,7 @@ __IDSTRING(vpsid, "$Id: vps_account.c 189 2013-07-12 07:15:07Z klaus $");
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/kthread.h>
+#include <sys/_task.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -101,7 +102,6 @@ SYSCTL_INT(_debug, OID_AUTO, vps_account_debug, CTLFLAG_RW,
 
 #endif /* DIAGNOSTIC */
 
-SYSCTL_NODE(, OID_AUTO, vps, CTLFLAG_RD, NULL, "Virtual Private Systems");
 SYSCTL_NODE(_vps, OID_AUTO, acc, CTLFLAG_RD, NULL, "Limits and Accounting");
 
 /* Interval between calls to vps_account_threads() in microseconds. */

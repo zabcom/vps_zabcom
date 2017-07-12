@@ -89,6 +89,7 @@ __IDSTRING(vpsid, "$Id: vps_libdump.c 190 2013-07-15 15:36:26Z klaus $");
 #include <sys/domain.h>
 #include <sys/protosw.h>
 #include <sys/pipe.h>
+#include <sys/rwlock.h>
 #include <sys/tty.h>
 #include <sys/syscall.h>
 #include <sys/un.h>

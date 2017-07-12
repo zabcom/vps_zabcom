@@ -223,7 +223,7 @@ filemon_untrack_processes(struct filemon *filemon)
 	 * filemon_event_process_exit() will lock on filemon->lock
 	 * which we hold.
 	 */
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		/*
 		 * No PROC_LOCK is needed to compare here since it is
@@ -234,7 +234,7 @@ filemon_untrack_processes(struct filemon *filemon)
 		if (p->p_filemon == filemon)
 			filemon_proc_drop(p);
 	}
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 
 	/*
 	 * It's possible some references were acquired but will be

@@ -47,7 +47,7 @@ struct vps_snapst_ctx;
 struct vps_arg_snapst;
 struct vps_dev_ctx;
 
-int getsock(struct filedesc *fdp, int fd, struct file **fpp, u_int *fflagp);
+int getsock(struct thread *td, struct filedesc *fdp, int fd, struct file **fpp, u_int *fflagp);
 void fdgrowtable(struct filedesc *fdp, int nfd);
 void fdused(struct filedesc *fdp, int fd);
 void fdunused(struct filedesc *fdp, int fd);

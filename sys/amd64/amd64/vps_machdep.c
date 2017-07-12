@@ -112,8 +112,8 @@ vps_md_restore_thread(struct vps_dump_thread *vdtd, struct thread *ntd,
 	ntd->td_md.md_spinlock_count = 1;
 	ntd->td_md.md_saved_flags = PSL_KERNEL | PSL_I;
 	ntd->td_errno = vdtd->td_errno;
-	ntd->td_retval[0] = vdtd->td_retval[0];
-	ntd->td_retval[1] = vdtd->td_retval[1];
+	ntd->td_retval[0] = vdtd->tdu_retval[0];
+	ntd->td_retval[1] = vdtd->tdu_retval[1];
 
 	/* db_trace_thread(ntd, 10); */
 	DBGCORE("%s: td_pcb = %p; td_frame = %p; pcb_rsp = %016lx\n",
@@ -121,6 +121,8 @@ vps_md_restore_thread(struct vps_dump_thread *vdtd, struct thread *ntd,
 
 	return (0);
 }
+
+extern struct sysentvec null_sysvec;
 
 int
 vps_md_snapshot_sysentvec(struct sysentvec *sv, long *svtype)
@@ -135,6 +137,7 @@ vps_md_snapshot_sysentvec(struct sysentvec *sv, long *svtype)
 		DBGCORE("%s: ia32_freebsd_sysvec\n", __func__);
 		*svtype = VPS_SYSENTVEC_ELF32;
 #endif
+/* XXX-BZ cloudabi, ...? */
 	} else if (sv == &null_sysvec) {
 		DBGCORE("%s: null_sysvec\n", __func__);
 		*svtype = VPS_SYSENTVEC_NULL;

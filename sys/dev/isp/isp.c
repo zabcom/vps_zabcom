@@ -4092,10 +4092,10 @@ isp_register_port_name_24xx(ispsoftc_t *isp, int chan)
 	rp.rspnid_portid[2] = fcp->isp_portid;
 	rp.rspnid_length = 0;
 	len = offsetof(rspn_id_t, rspnid_name);
-	mtx_lock(&prison0.pr_mtx);
+	mtx_lock(&V_prison0->pr_mtx);
 	rp.rspnid_length += sprintf(&scp[len + rp.rspnid_length],
-	    "%s", prison0.pr_hostname[0] ? prison0.pr_hostname : "FreeBSD");
-	mtx_unlock(&prison0.pr_mtx);
+	    "%s", V_prison0->pr_hostname[0] ? V_prison0->pr_hostname : "FreeBSD");
+	mtx_unlock(&V_prison0->pr_mtx);
 	rp.rspnid_length += sprintf(&scp[len + rp.rspnid_length],
 	    ":%s", device_get_nameunit(isp->isp_dev));
 	if (chan != 0) {
@@ -4156,10 +4156,10 @@ isp_register_node_name_24xx(ispsoftc_t *isp, int chan)
 	MAKE_NODE_NAME_FROM_WWN(rp.rsnnnn_nodename, fcp->isp_wwnn);
 	rp.rsnnnn_length = 0;
 	len = offsetof(rsnn_nn_t, rsnnnn_name);
-	mtx_lock(&prison0.pr_mtx);
+	mtx_lock(&V_prison0->pr_mtx);
 	rp.rsnnnn_length += sprintf(&scp[len + rp.rsnnnn_length],
-	    "%s", prison0.pr_hostname[0] ? prison0.pr_hostname : "FreeBSD");
-	mtx_unlock(&prison0.pr_mtx);
+	    "%s", V_prison0->pr_hostname[0] ? V_prison0->pr_hostname : "FreeBSD");
+	mtx_unlock(&V_prison0->pr_mtx);
 	len += rp.rsnnnn_length;
 	ct->ct_bcnt_resid = (len - sizeof(ct_hdr_t)) >> 2;
 	isp_put_rsnn_nn(isp, &rp, (rsnn_nn_t *)scp);
