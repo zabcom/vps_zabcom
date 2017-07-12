@@ -146,6 +146,8 @@ vps_md_restore_thread(struct vps_dump_thread *vdtd, struct thread *ntd,
 	return (0);
 }
 
+extern struct sysentvec null_sysvec;
+
 int
 vps_md_snapshot_sysentvec(struct sysentvec *sv, long *svtype)
 {

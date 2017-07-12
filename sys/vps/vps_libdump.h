@@ -190,8 +190,10 @@ typedef uint32		offset;
 #define PAGE_SHIFT	12
 #endif
 
+#if 0
 #ifndef _KERNEL
 typedef unsigned int size_t;
+#endif
 #endif
 
 /* end i386 declarations */

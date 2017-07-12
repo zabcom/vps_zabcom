@@ -109,13 +109,13 @@ vps_md_restore_thread(struct vps_dump_thread *vdtd, struct thread *ntd,
 	ntd->td_pcb->pcb_esp = (uint32_t)ntd->td_frame - sizeof(void *);
 	ntd->td_pcb->pcb_ebx = (uint32_t)ntd;
 	ntd->td_pcb->pcb_eip = (uint32_t)fork_trampoline;
-	ntd->td_pcb->pcb_psl = PSL_KERNEL;
+	ntd->td_pcb->pcb_waspsl = 0;
 	ntd->td_pcb->pcb_ext = NULL;
 	ntd->td_md.md_spinlock_count = 1;
 	ntd->td_md.md_saved_flags = PSL_KERNEL | PSL_I;
 	ntd->td_errno = vdtd->td_errno;
-	ntd->td_retval[0] = vdtd->td_retval[0];
-	ntd->td_retval[1] = vdtd->td_retval[1];
+	ntd->td_retval[0] = vdtd->tdu_retval[0];
+	ntd->td_retval[1] = vdtd->tdu_retval[1];
 
 	/* db_trace_thread(ntd, 10); */
 	DBGCORE("%s: td_pcb = %p; td_frame = %p; pcb_esp = %08x\n",
@@ -123,6 +123,8 @@ vps_md_restore_thread(struct vps_dump_thread *vdtd, struct thread *ntd,
 
 	return (0);
 }
+
+extern struct sysentvec null_sysvec;
 
 int
 vps_md_snapshot_sysentvec(struct sysentvec *sv, long *svtype)

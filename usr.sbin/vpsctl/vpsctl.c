@@ -1386,8 +1386,8 @@ vc_migrate(int argc, char **argv)
 	snprintf(cmd, sizeof(cmd), "mkdir -p %s\n", _PATH_CONFDIR);
 	write(wfd, cmd, strlen(cmd));
 
-	snprintf(cmd, sizeof(cmd), "vpsctl savefile %s %ld %d\n",
-	    file_n, st.st_size, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+	snprintf(cmd, sizeof(cmd), "vpsctl savefile %s %jd %d\n",
+	    file_n, (intmax_t)st.st_size, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
 	write(wfd, cmd, strlen(cmd));
 	/* vc_savefile() sends '\n' when ready */
 	len = read(rfd, cmd, 1); 
