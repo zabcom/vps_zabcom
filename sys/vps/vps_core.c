@@ -161,6 +161,7 @@ vps_init(void *unused)
 
 	vps_console_init();
 
+	printf("WARNING: VPS is a highly experimental feature.\n");
 	DBGCORE("WARNING: VPS VIRTUAL PRIVATE SYSTEMS ENABLED. "
 	    "HIGHLY EXPERIMENTAL!\n");
 }
