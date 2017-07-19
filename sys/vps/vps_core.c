@@ -129,6 +129,8 @@ struct vps *vps0;
 
 struct sx vps_all_lock;
 
+extern struct prison prison0;
+
 void vps_proc_release_timeout(void *);
 void vps_proc_release_taskq(void *, int);
 
@@ -348,8 +350,9 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 
 	   	vps->vps_ucred = crget();
 		vps->vps_ucred->cr_ngroups = 1;
-		vps->vps_ucred->cr_prison = V_prison0;
-		prison_hold(V_prison0);
+		/* Yes, here we DO mean &prison0 and not V_! */
+		vps->vps_ucred->cr_prison = &prison0;
+		prison_hold(&prison0);
 		/*
 		vps->vps_ucred->cr_uidinfo = uifind(0);
 		vps->vps_ucred->cr_ruidinfo = uifind(0);
@@ -386,7 +389,11 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 		    sizeof(vps->vps_ip6->addr));
 		vps->vps_ip6->plen = 0;
 	
+		/* XXX-BZ set the proper vps! */
+		vps_save = curthread->td_vps;
+		curthread->td_vps = vps;
 		VPS_VPS(vps, prison0) = V_prison0;
+		curthread->td_vps = vps_save;
 	
 		DBGCORE("%s: vps=%p vmaxproc=%d\n", __func__,
 		    vps, VPS_VPS(vps, vmaxproc));

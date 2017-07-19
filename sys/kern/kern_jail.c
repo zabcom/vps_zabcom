@@ -81,7 +81,7 @@ static MALLOC_DEFINE(M_PRISON_RACCT, "prison_racct", "Prison racct structures");
 
 #ifdef VPS
 VPS_DEFINE(struct prison *, prison0);
-#define V_prison0       VPSV(prison0)
+#define V_prison0	VPSV(prison0)
 #else
 #define V_prison0	(&prison0)
 #endif
@@ -130,9 +130,8 @@ struct prison prison0 = {
 #endif
 	.pr_allow	= PR_ALLOW_ALL,
 };
-#if 0
-MTX_SYSINIT(prison0, &V_prison0->pr_mtx, "jail mutex", MTX_DEF);
-#endif
+/* We do mean prison0 here and not V_. */
+MTX_SYSINIT(prison0, &prison0.pr_mtx, "jail mutex", MTX_DEF);
 
 /* allprison, allprison_racct and lastprid are protected by allprison_lock. */
 struct	sx allprison_lock;
@@ -265,10 +264,9 @@ void
 prison0_init(void)
 {
 
-	mtx_init(&V_prison0->pr_mtx, "jail mutex", NULL, MTX_DEF);
-	V_prison0->pr_cpuset = cpuset_ref(thread0.td_cpuset);
-	V_prison0->pr_osreldate = osreldate;
-	strlcpy(V_prison0->pr_osrelease, osrelease, sizeof(V_prison0->pr_osrelease));
+	prison0.pr_cpuset = cpuset_ref(thread0.td_cpuset);
+	prison0.pr_osreldate = osreldate;
+	strlcpy(prison0.pr_osrelease, osrelease, sizeof(prison0.pr_osrelease));
 }
 
 /*
