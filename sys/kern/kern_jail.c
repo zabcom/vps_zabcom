@@ -267,6 +267,13 @@ prison0_init(void)
 	prison0.pr_cpuset = cpuset_ref(thread0.td_cpuset);
 	prison0.pr_osreldate = osreldate;
 	strlcpy(prison0.pr_osrelease, osrelease, sizeof(prison0.pr_osrelease));
+#ifdef VPS
+	/*
+	 * Initailize the virtualised copy as we will access it for &prison0
+	 * shortly after initializing this in proc0_init().
+	 */
+	V_prison0 = &prison0;
+#endif
 }
 
 /*
