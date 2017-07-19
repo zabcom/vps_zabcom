@@ -304,28 +304,29 @@ static int
 sysctl_hostname(SYSCTL_HANDLER_ARGS)
 {
 	struct prison *pr, *cpr;
-	size_t pr_offset;
 	char tmpname[MAXHOSTNAMELEN];
+	char *p;
 	int descend, error, len;
+
+	pr = req->td->td_ucred->cr_prison;
+	if (!(pr->pr_allow & PR_ALLOW_SET_HOSTNAME) && req->newptr)
+		return (EPERM);
 
 	/*
 	 * This function can set: hostname domainname hostuuid.
 	 * Keep that in mind when comments say "hostname".
 	 */
-	pr_offset = (size_t)arg1;
+	p = (char *)pr + (size_t)arg1;
 	len = arg2;
 	KASSERT(len <= sizeof(tmpname),
 	    ("length %d too long for %s", len, __func__));
 
-	pr = req->td->td_ucred->cr_prison;
-	if (!(pr->pr_allow & PR_ALLOW_SET_HOSTNAME) && req->newptr)
-		return (EPERM);
 	/*
 	 * Make a local copy of hostname to get/set so we don't have to hold
 	 * the jail mutex during the sysctl copyin/copyout activities.
 	 */
 	mtx_lock(&pr->pr_mtx);
-	bcopy((char *)pr + pr_offset, tmpname, len);
+	bcopy(p, tmpname, len);
 	mtx_unlock(&pr->pr_mtx);
 
 	error = sysctl_handle_string(oidp, tmpname, len, req);
@@ -339,12 +340,14 @@ sysctl_hostname(SYSCTL_HANDLER_ARGS)
 		while (!(pr->pr_flags & PR_HOST))
 			pr = pr->pr_parent;
 		mtx_lock(&pr->pr_mtx);
-		bcopy(tmpname, (char *)pr + pr_offset, len);
+		bcopy(tmpname, p, len);
 		FOREACH_PRISON_DESCENDANT_LOCKED(pr, cpr, descend)
 			if (cpr->pr_flags & PR_HOST)
 				descend = 0;
-			else
-				bcopy(tmpname, (char *)cpr + pr_offset, len);
+			else {
+				p = (char *)cpr + (size_t)arg1;
+				bcopy(tmpname, p, len);
+			}
 		mtx_unlock(&pr->pr_mtx);
 		sx_sunlock(&allprison_lock);
 	}
@@ -355,20 +358,8 @@ sysctl_hostname(SYSCTL_HANDLER_ARGS)
 VPS_DEFINE(char, hostname[MAXHOSTNAMELEN]) = "";
 VPS_DEFINE(char, domainname[MAXHOSTNAMELEN]) = "";
 VPS_DEFINE(char, hostuuid[HOSTUUIDLEN]) = "";
+#endif
  
-SYSCTL_PROC(_kern, KERN_HOSTNAME, hostname,
-    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE | CTLFLAG_VPS,
-    &VPS_NAME(hostname), MAXHOSTNAMELEN,
-    sysctl_hostname, "A", "Hostname");
-SYSCTL_PROC(_kern, KERN_NISDOMAINNAME, domainname,
-    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE | CTLFLAG_VPS,
-    &VPS_NAME(domainname), MAXHOSTNAMELEN,
-    sysctl_hostname, "A", "Name of the current YP/NIS domain");
-SYSCTL_PROC(_kern, KERN_HOSTUUID, hostuuid,
-    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE | CTLFLAG_VPS,
-    &VPS_NAME(hostuuid), HOSTUUIDLEN,
-    sysctl_hostname, "A", "Host UUID");
-#else
 SYSCTL_PROC(_kern, KERN_HOSTNAME, hostname,
     CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_CAPRD | CTLFLAG_MPSAFE,
     (void *)(offsetof(struct prison, pr_hostname)), MAXHOSTNAMELEN,
@@ -381,7 +372,6 @@ SYSCTL_PROC(_kern, KERN_HOSTUUID, hostuuid,
     CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_CAPRD | CTLFLAG_MPSAFE,
     (void *)(offsetof(struct prison, pr_hostuuid)), HOSTUUIDLEN,
     sysctl_hostname, "A", "Host UUID");
-#endif /* !VPS */
 
 static int	regression_securelevel_nonmonotonic = 0;
 
