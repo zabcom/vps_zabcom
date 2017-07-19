@@ -165,7 +165,12 @@ devfs_dev_exists(const char *name)
 		if ((cdp->cdp_flags & CDP_ACTIVE) == 0)
 			continue;
 #ifdef VPS
-		if ((cdp->cdp_c.si_cred && cdp->cdp_c.si_cred->cr_vps != vps))
+		/*
+		 * XXX-BZ The latter seems to happen for devices created before
+		 * VPS was initialised; should we update them?
+		 */
+		if ((cdp->cdp_c.si_cred && cdp->cdp_c.si_cred->cr_vps != vps) ||
+		    (cdp->cdp_c.si_cred == NULL && vps != NULL))
 			/* 
 			 * This device does not belong to the
 			 * vps instance that is asking.
