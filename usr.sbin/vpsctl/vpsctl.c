@@ -782,8 +782,10 @@ vc_start(int argc, char **argv)
 
 	/* If given, execute the command to mount the root filesystem. */
 	if (vc.cmd_mountroot[0]) {
-		if (vc_exec_cmd(vc.cmd_mountroot, 0))
+		if (vc_exec_cmd(vc.cmd_mountroot, 0)) {
+			fprintf(stderr, "%s:%d cmd_mountroot\n", __func__, __LINE__);
 			goto startfail;
+		}
 	}
 
 	/* 
@@ -828,8 +830,10 @@ vc_start(int argc, char **argv)
 			argv2[2] = vc.priv_allow;
 			error = vc_arg_priv(3, argv2);
 			free(argv2[1]);
-			if (error != 0)
+			if (error != 0) {
+				fprintf(stderr, "%s:%d vc.priv_allow\n", __func__, __LINE__);
 				goto startfail;
+			}
 		}
 
 		if (vc.priv_nosys != NULL) {
@@ -837,8 +841,10 @@ vc_start(int argc, char **argv)
 			argv2[2] = vc.priv_nosys;
 			error = vc_arg_priv(3, argv2);
 			free(argv2[1]);
-			if (error != 0)
+			if (error != 0) {
+				fprintf(stderr, "%s:%d vc.priv_nosys\n", __func__, __LINE__);
 				goto startfail;
+			}
 		}
 
 		if (vc.limits != NULL) {
@@ -846,12 +852,16 @@ vc_start(int argc, char **argv)
 			argv2[2] = NULL;
 			error = vc_arg_limit(2, argv2);
 			/*
-			if (error != 0)
+			if (error != 0) {
+				fprintf(stderr, "%s:%d vc.limits\n", __func__, __LINE__);
 				goto startfail;
+			}
 			Ignore error and only warn if module is not loaded.
 			*/
-			if (error != 0 && error != EOPNOTSUPP)
+			if (error != 0 && error != EOPNOTSUPP) {
+				fprintf(stderr, "%s:%d vc.limits\n", __func__, __LINE__);
 				goto startfail;
+			}
 		}
 
 	}
@@ -871,13 +881,17 @@ vc_start(int argc, char **argv)
 			/* XXX check if interface does not exist before creating ! */
 
 			snprintf(cmd, 0x100, "ifconfig epair%d create\n", epp->ifidx);
-			if (vc_exec_cmd(cmd, 0))
+			if (vc_exec_cmd(cmd, 0)) {
+				fprintf(stderr, "%s:%d epair\n", __func__, __LINE__);
 				goto startfail;
+			}
 
 			snprintf(cmd, 0x100, "ifconfig epair%da %s\n",
 					epp->ifidx, epp->ifconfig);
-			if (vc_exec_cmd(cmd, 0))
+			if (vc_exec_cmd(cmd, 0)) {
+				fprintf(stderr, "%s:%d ifconfig epair\n", __func__, __LINE__);
 				goto startfail;
+			}
 
 			/* Move b-side into vps instance. */
 			strncpy(va.vps_name, vp.name, sizeof(va.vps_name));
@@ -944,7 +958,7 @@ vc_start(int argc, char **argv)
 				else
 					continue;
 
-				if (vc_exec_cmd(cmd, 0))
+				if (vc_exec_cmd(cmd, 0)) {
 					goto startfail;
 				*/
 
@@ -995,6 +1009,7 @@ vc_start(int argc, char **argv)
 		argv2[2] = vc.initproc;
 
 		if (vc_exec(argc2, argv2, NULL)) {
+			fprintf(stderr, "%s:%d initproc\n", __func__, __LINE__);
 			goto startfail;
 		}
 	}
