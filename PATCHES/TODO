@@ -23,9 +23,6 @@ Lots of &prison0 vs. V_prison0  (no &)  but only in some places;  check that!
 vps_pager_getpages()
 
 ------------------------------------------
-vpsctl list has a mmap EINVAL
-
-------------------------------------------
 vpsctl shell testvps triggers:
 
 root@rabbit3:~ # panic: Bad tailq NEXT(0xffffffff819f6260->tqh_last) != NULL

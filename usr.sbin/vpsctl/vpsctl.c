@@ -435,8 +435,10 @@ vc_list(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 	if (cnt <= 0)
 		return (rc);
 
+	fprintf(stdout, "Active VPS instances: %d\n", cnt);
+
 	if ((info0 = mmap(NULL, cnt * sizeof(struct vps_info), 
-		PROT_READ, 0, vpsfd, 0)) == MAP_FAILED) {
+		PROT_READ, MAP_SHARED, vpsfd, 0)) == MAP_FAILED) {
 		fprintf(stderr, "mmap: %s\n", strerror(errno));
 		return (rc);
 	}
