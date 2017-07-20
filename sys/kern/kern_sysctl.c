@@ -1836,7 +1836,8 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 		DBGCORE("%s: hiding [%s (%s)]\n",
 			__func__, oid->oid_name, oid->oid_descr);
 
-		return (ENOENT);
+		error = ENOENT;
+		goto out;
 	}
 #endif
 
