@@ -166,11 +166,12 @@ devfs_dev_exists(const char *name)
 			continue;
 #ifdef VPS
 		/*
-		 * XXX-BZ The latter seems to happen for devices created before
-		 * VPS was initialised; should we update them?
+		 * XXX-BZ The latter seems to happen for "system devices",
+		 * which by default have no cred attached to them.  See
+		 * tty_makedevf().
 		 */
 		if ((cdp->cdp_c.si_cred && cdp->cdp_c.si_cred->cr_vps != vps) ||
-		    (cdp->cdp_c.si_cred == NULL && vps != NULL))
+		    (cdp->cdp_c.si_cred == NULL && vps != vps0))
 			/* 
 			 * This device does not belong to the
 			 * vps instance that is asking.
