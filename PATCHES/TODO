@@ -66,4 +66,42 @@ PTR                      LINE   INQ  CAN  LIN  LOW  OUTQ  USE  LOW   COL  SESS  
 0xfffff8000a0c4400    console     0    0    0    0     0    0    0     0     0     0 s
 0xfffff8000a0c4400    console     0    0    0    0     0    0    0     0     0     0 s
 
+------------------------------------------
+root@rabbit3:~ # dtrace -s mmap.d -c vpsctl list
+
+
+Fatal trap 12: page fault while in kernel mode
+cpuid = 1; apic id = 04
+fault virtual address   = 0x58
+fault code              = supervisor read data, page not present
+instruction pointer     = 0x20:0xffffffff80a6f4a3
+stack pointer           = 0x28:0xfffffe085f8978a0
+frame pointer           = 0x28:0xfffffe085f8978e0
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 883 (dtrace)
+
+(gdb) l *0xffffffff80a6f4a3
+0xffffffff80a6f4a3 is in thread_create (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_thr.c:244).
+239             bcopy(&td->td_startcopy, &newtd->td_startcopy,
+240                 __rangeof(struct thread, td_startcopy, td_endcopy));
+241             newtd->td_proc = td->td_proc;
+242     #ifdef VPS
+243             /* XXX-BZ is this right?  Should we not inherit from td? */
+244             newtd->td_vps = newtd->td_ucred->cr_vps;
+245             newtd->td_vps_acc = newtd->td_ucred->cr_vps->vps_acc;
+246     #endif
+247             newtd->td_rb_list = newtd->td_rbp_list = newtd->td_rb_inact = 0;
+248             thread_cow_get(newtd, td);
+
+
+Guess not is the answer...
+
+------------------------------------------
+
+
+
+
+
 # end
