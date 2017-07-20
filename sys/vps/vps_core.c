@@ -1419,8 +1419,14 @@ vps_switch_proc(struct thread *td, struct vps *vps2, int flag)
 	PROC_UNLOCK(p->p_pptr);
 	p->p_pptr = NULL;
 
+	LIST_REMOVE(p, p_hash);
+	LIST_REMOVE(p, p_list);
+
 	ucr1 = p->p_ucred;
 	setsugid(p); /* ? */
+
+	PROC_UNLOCK(p);
+
 	crcopy(ucr2, ucr1);
 	vps_deref(ucr2->cr_vps, ucr2);
 	/* crcopy() did prison_hold() */
@@ -1431,13 +1437,22 @@ vps_switch_proc(struct thread *td, struct vps *vps2, int flag)
 	ucr2->cr_vps = vps2;
 	ucr2->cr_prison = VPS_VPS(vps2, prison0);
 	vps_ref(ucr2->cr_vps, ucr2);
+
 	td->td_vps = vps2;
+
 	prison_hold(ucr2->cr_prison);
 	prison_proc_hold(ucr2->cr_prison);
 	ucr2->cr_uidinfo = uifind(ucr2->cr_uid);
 	ucr2->cr_ruidinfo = uifind(ucr2->cr_ruid);
+
+	chgproccnt(ucr1->cr_uidinfo, -1, 0);
+	chgproccnt(ucr2->cr_uidinfo, 1, 0);
+	vps_account(vps1, VPS_ACC_PROCS, VPS_ACC_FREE, 1);
+
 	td->td_vps = vps1;
+	PROC_LOCK(p);
 	p->p_ucred = ucr2;
+
 	FOREACH_THREAD_IN_PROC(p, td2) {
 		if (td2->td_ucred != ucr1)
 			DBGCORE("%s: WARNING: td2->td_ucred != ucr1\n",
@@ -1453,12 +1468,6 @@ vps_switch_proc(struct thread *td, struct vps *vps2, int flag)
 	crfree(ucr1);
 
 	VPS_VPS(vps1, nprocs)--;
-	chgproccnt(ucr1->cr_uidinfo, -1, 0);
-	chgproccnt(ucr2->cr_uidinfo, 1, 0);
-	vps_account(vps1, VPS_ACC_PROCS, VPS_ACC_FREE, 1);
-
-	LIST_REMOVE(p, p_hash);
-	LIST_REMOVE(p, p_list);
 
 	if (VPS_VPS(vps2, initproc) == NULL) {
 		KASSERT(VPS_VPS(vps2, nprocs) == 0,
@@ -1469,6 +1478,7 @@ vps_switch_proc(struct thread *td, struct vps *vps2, int flag)
 	}
 
 	PROC_UNLOCK(p);
+
 	vps_switch_vmspace(td, vps1, vps2, ucr2, p->p_vmspace);
 	PROC_LOCK(p);
 
