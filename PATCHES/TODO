@@ -22,4 +22,48 @@ Lots of &prison0 vs. V_prison0  (no &)  but only in some places;  check that!
 
 vps_pager_getpages()
 
+------------------------------------------
+vpsctl list has a mmap EINVAL
+
+------------------------------------------
+vpsctl shell testvps triggers:
+
+root@rabbit3:~ # panic: Bad tailq NEXT(0xffffffff819f6260->tqh_last) != NULL
+cpuid = 0
+time = 1500552184
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085f8976b0
+vpanic() at vpanic+0x19c/frame 0xfffffe085f897730
+panic() at panic+0x43/frame 0xfffffe085f897790
+tty_makedevf() at tty_makedevf+0x4cf/frame 0xfffffe085f8978e0
+pts_alloc2() at pts_alloc2+0x215/frame 0xfffffe085f897940
+sys_posix_openpt_unit() at sys_posix_openpt_unit+0x61/frame 0xfffffe085f897980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085f897ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f897ab0
+--- syscall (504, FreeBSD ELF64, sys_posix_openpt), rip = 0x800881e1a, rsp = 0x7fffffffe188, rbp = 0x7fffffffe1c0 ---
+KDB: enter: panic
+[ thread pid 882 tid 100124 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+db> show all ttys
+PTR                      LINE   INQ  CAN  LIN  LOW  OUTQ  USE  LOW   COL  SESS  PGID STATE
+0xfffff8000798cc00      ttyu0     0    0    0    0     0    0    0     0     0     0 IC
+0xfffff8000798c800      ttyu1 23040    0    0 2304 23064    0 2307    17   826   876 ICOi
+0xfffff8000b800c00      ttyv0  1920    0    0  192  1984    0  199     7   818   818 Oil
+0xfffff8000b800800      ttyv1  1920    0    0  192  1984    0  199     7   819   819 Oil
+0xfffff8000b800400      ttyv2  1920    0    0  192  1984    0  199     7   820   820 Oil
+0xfffff8000b800000      ttyv3  1920    0    0  192  1984    0  199     7   821   821 Oil
+0xfffff8000b7ffc00      ttyv4  1920    0    0  192  1984    0  199     7   822   822 Oil
+0xfffff8000b7ff800      ttyv5  1920    0    0  192  1984    0  199     7   823   823 Oil
+0xfffff8000b7ff400      ttyv6  1920    0    0  192  1984    0  199     7   824   824 Oil
+0xfffff8000b7ff000      ttyv7  1920    0    0  192  1984    0  199     7   825   825 Oil
+0xfffff8000b7fec00      ttyv8     0    0    0    0     0    0    0     0     0     0 -
+0xfffff8000b7fe800      ttyv9     0    0    0    0     0    0    0     0     0     0 -
+0xfffff8000b7fe400      ttyva     0    0    0    0     0    0    0     0     0     0 -
+0xfffff8000b7fe000      ttyvb     0    0    0    0     0    0    0     0     0     0 -
+0xfffff8000bf27000      pts/0  1920    0    0  192  1984    0  199     0   840   882 Oi
+0xfffff8000a0c4400    console     0    0    0    0     0    0    0     0     0     0 s
+0xfffff8000a0c4400    console     0    0    0    0     0    0    0     0     0     0 s
+0xfffff8000a0c4400    console     0    0    0    0     0    0    0     0     0     0 s
+0xfffff8000a0c4400    console     0    0    0    0     0    0    0     0     0     0 s
+
 # end
