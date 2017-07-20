@@ -247,10 +247,12 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, shmsegs, CTLTYPE_OPAQUE | CTLFLAG_RD |
     CTLFLAG_MPSAFE | CTLFLAG_VPS, NULL, 0, sysctl_shmsegs, "",
     "Current number of shared memory segments allocated");
 
-static struct sx sysvshmsx;
-#define	SYSVSHM_LOCK()		sx_xlock(&sysvshmsx)
-#define	SYSVSHM_UNLOCK()	sx_xunlock(&sysvshmsx)
-#define	SYSVSHM_ASSERT_LOCKED()	sx_assert(&sysvshmsx, SA_XLOCKED)
+static VPS_DEFINE(struct sx, sysvshmsx);
+#define	V_sysvshmsx		VPSV(sysvshmsx)
+
+#define	SYSVSHM_LOCK()		sx_xlock(&V_sysvshmsx)
+#define	SYSVSHM_UNLOCK()	sx_xunlock(&V_sysvshmsx)
+#define	SYSVSHM_ASSERT_LOCKED()	sx_assert(&V_sysvshmsx, SA_XLOCKED)
 
 static int
 shm_find_segment_by_key(struct prison *pr, key_t key)
@@ -1133,7 +1135,7 @@ shminit(void)
 	V_shm_last_free = 0;
 	V_shm_nused = 0;
 	V_shm_committed = 0;
-	sx_init(&sysvshmsx, "sysvshmsx");
+	sx_init(&V_sysvshmsx, "sysvshmsx");
 #ifndef VPS
 	shmexit_hook = &shmexit_myhook;
 	shmfork_hook = &shmfork_myhook;
@@ -1218,7 +1220,7 @@ shmunload(void)
 	shmexit_hook = NULL;
 	shmfork_hook = NULL;
 #endif
-	sx_destroy(&sysvshmsx);
+	sx_destroy(&V_sysvshmsx);
 	return (0);
 }
 
