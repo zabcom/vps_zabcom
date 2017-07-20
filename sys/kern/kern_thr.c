@@ -240,9 +240,8 @@ thread_create(struct thread *td, struct rtprio *rtp,
 	    __rangeof(struct thread, td_startcopy, td_endcopy));
 	newtd->td_proc = td->td_proc;
 #ifdef VPS
-	/* XXX-BZ is this right?  Should we not inherit from td? */
-	newtd->td_vps = newtd->td_ucred->cr_vps;
-	newtd->td_vps_acc = newtd->td_ucred->cr_vps->vps_acc;
+	newtd->td_vps = td->td_ucred->cr_vps;
+	newtd->td_vps_acc = td->td_ucred->cr_vps->vps_acc;
 #endif
 	newtd->td_rb_list = newtd->td_rbp_list = newtd->td_rb_inact = 0;
 	thread_cow_get(newtd, td);
