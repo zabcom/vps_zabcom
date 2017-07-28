@@ -69,23 +69,9 @@ vpsctl migrate eventtually paniced while doing the snapshot.
 
 root@rabbit4:/ # vpsctl suspend testvps
 root@rabbit4:/ # vpsctl snapshot testvps /var/tmp/testvps.snap
-vps_ctx_extend: size=8 with the following non-sleepable locks held:
-exclusive sleep mutex jail mutex (jail mutex) r = 0 (0xfffff8000da3a040) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/sys/jail.h:257
-stack backtrace:
-#0 0xffffffff80ac0da0 at witness_debugger+0x70
-#1 0xffffffff80ac21ce at witness_warn+0x45e
-#2 0xffffffff8249d388 at vps_dumpobj_space+0x68
-#3 0xffffffff824a9e0d at vps_snapshot_prison_one+0x18d
-#4 0xffffffff824a6ff9 at vps_snapshot+0xff9
-#5 0xffffffff8247d0df at vps_ioc_snapshot+0x9f
-#6 0xffffffff8092c3b0 at devfs_ioctl+0xc0
-#7 0xffffffff810842e0 at VOP_IOCTL_APV+0xe0
-#8 0xffffffff80b3e404 at vn_ioctl+0x124
-#9 0xffffffff8092ca8f at devfs_ioctl_f+0x1f
-#10 0xffffffff80ac69ad at kern_ioctl+0x2cd
-#11 0xffffffff80ac666f at sys_ioctl+0x16f
-#12 0xffffffff80f0e2c9 at amd64_syscall+0x859
-#13 0xffffffff80eeeff4 at Xfast_syscall+0x104
+
+...
+
 lock order reversal:
  1st 0xfffff801367dd078 vm map (user) (vm map (user)) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_snapst/../../vps/vps_snapst.c:3225
  2nd 0xfffff800221f5068 nfs (nfs) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_cache.c:2192

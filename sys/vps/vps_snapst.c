@@ -1629,6 +1629,7 @@ vps_snapshot_prison_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 	struct vps_dumpobj *o1;
 	struct vnode *rootvp;
 	caddr_t cpos;
+	size_t iplen;
 	int error = 0;
 	int i;
 
@@ -1637,11 +1638,18 @@ vps_snapshot_prison_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	mtx_assert(&pr->pr_mtx, MA_OWNED);
 
+	/*
+	 * Calculate space needed for IP addresses upfront so we can
+	 * pre-allocate it as well while dropping the lock.  Otherwise
+	 * we'd do an M_WAITOK alloc while holding a non-sleepable lock.
+	 */
+	iplen = roundup(pr->pr_ip4s * 0x4, 8) + pr->pr_ip6s * 0x10;
+
 	pr->pr_ref++;
 	prison_unlock(pr);
 
 	o1 = vdo_create(ctx, VPS_DUMPOBJT_PRISON, M_WAITOK);
-	vdpr = vdo_space(ctx, sizeof(*vdpr), M_WAITOK);
+	vdpr = vdo_space(ctx, sizeof(*vdpr) + iplen, M_WAITOK);
 
 	prison_lock(pr);
 	pr->pr_ref--;
@@ -1664,8 +1672,10 @@ vps_snapshot_prison_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 	strlcpy(vdpr->pr_path, pr->pr_path, sizeof(vdpr->pr_path));
 	vdpr->pr_root = NULL;
 
+#if 0
 	vdo_space(ctx, roundup(vdpr->pr_ip4s * 0x4, 8) +
 	    vdpr->pr_ip6s * 0x10, M_WAITOK);
+#endif
 
 	cpos = vdpr->pr_ipdata;
 
