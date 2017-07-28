@@ -168,7 +168,9 @@ main(int argc, char **argv, char **envv)
 		return (-1);
 	}
 
-	if ((vpsfd = open(_PATH_VPSDEV, O_RDWR)) == -1) {
+	/* The showdump command does not need the vpsfd. */
+	if ((strcmp(argv[1], "showdump") != 0) &&
+	    ((vpsfd = open(_PATH_VPSDEV, O_RDWR)) == -1)) {
 		fprintf(stderr, "open(%s): %s\n",
 				_PATH_VPSDEV, strerror(errno));
 		return (-1);

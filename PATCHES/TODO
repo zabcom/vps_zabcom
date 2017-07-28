@@ -158,13 +158,6 @@ vps_snapshot_fdset: unsupported cap_rights: fc_nioctls=2 fc_fcntls=00000008
 
 ------------------------------------------
 
-root@rabbit3:/home/test # vpsctl showdump /var/tmp/testvps.snap
-open(/dev/vps): No such file or directory
-
-That is surprising;  wouldn't expect that to need the device node?
-
-------------------------------------------
-
 
 
 
