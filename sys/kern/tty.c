@@ -1168,28 +1168,6 @@ tty_rel_free(struct tty *tp)
 }
 
 void
-tty_silent_remove_dev_tp(struct tty *tp)
-{
-	struct cdev *dev;
-
-	tty_lock(tp);
-
-	/* TTY can be deallocated. */
-	dev = tp->t_dev;
-	tp->t_dev = NULL;
-	tty_unlock(tp);
-
-	if (dev != NULL) {
-		sx_xlock(&tty_list_sx);
-		TAILQ_REMOVE(&tty_list, tp, t_list);
-		tty_list_count--;
-		sx_xunlock(&tty_list_sx);
-	}
-
-	destroy_dev(dev);
-}
-
-void
 tty_rel_pgrp(struct tty *tp, struct pgrp *pg)
 {
 

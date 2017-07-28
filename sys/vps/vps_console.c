@@ -361,7 +361,7 @@ vps_console_alloc(struct vps *vps, struct thread *td)
 	savevps = td->td_vps;
 	td->td_vps = vps;
 
-	if ((error = pts_alloc(FREAD|FWRITE, td, fp_ma)) != 0) {
+	if ((error = pts_alloc2(FREAD|FWRITE, td, fp_ma, -1, 0)) != 0) {
 		DBGCORE("%s: pts_alloc(): %d\n",
 			__func__, error);
 		fdrop(fp_ma, td);
@@ -373,12 +373,11 @@ vps_console_alloc(struct vps *vps, struct thread *td)
 	vps->console_fp_ma = fp_ma;
 	vps->console_tty = tp = fp_ma->f_data;
 
-	/* Destroy the original slave device later. */
-	tty_silent_remove_dev_tp(tp);
-	if (tp->t_dev != NULL)
-		printf("%s:%d tty_silent_remove_dev_tp seems to have failed "
-		    "on tp %p\n", __func__, __LINE__, tp);
-
+	/*
+	 * We called pts_alloc2() not creating the slave device, so add it
+	 * ourselves.  This is kind-of racy as someone could try to open
+	 * it in between, but then how could they while we are still in here.
+	 */
 	/* Expose slave device in vps instance. */
 
 	DBGCORE("%s: creating tty dev with ucred=%p vps=%p; fp_ma=%p\n",

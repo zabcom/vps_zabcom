@@ -753,11 +753,12 @@ int
 pts_alloc(int fflags, struct thread *td, struct file *fp)
 {
 
-	return (pts_alloc2(fflags, td, fp, -1));
+	return (pts_alloc2(fflags, td, fp, -1, 1));
 }
 
 int
-pts_alloc2(int fflags, struct thread *td, struct file *fp, int want_unit)
+pts_alloc2(int fflags, struct thread *td, struct file *fp, int want_unit,
+    int want_ttymakedev)
 #else
 int
 pts_alloc(int fflags, struct thread *td, struct file *fp)
@@ -817,6 +818,18 @@ pts_alloc(int fflags, struct thread *td, struct file *fp)
 	knlist_init_mtx(&psc->pts_outpoll.si_note, tp->t_mtx);
 
 	/* Expose the slave device as well. */
+#ifdef VPS
+	/*
+	 * In the VPS case when allocating the console we do not
+	 * require or want this to happen;  we'll call it ourselves
+	 * with the proper ucred and name.
+	 * If we run this and try to undo we also have to remove
+	 * it from the tty_list to avoid list corruption adding the
+	 * same entry twice and it gets ugly; so simply avoid the
+	 * work we never need in first place.
+	 */
+	if (want_ttymakedev)
+#endif
 	tty_makedev(tp, td->td_ucred, "pts/%u", psc->pts_unit);
 
 	finit(fp, fflags, DTYPE_PTS, tp, &ptsdev_ops);
@@ -904,7 +917,7 @@ sys_posix_openpt(struct thread *td, struct posix_openpt_args *uap)
 
 	/* Allocate the actual pseudo-TTY. */
 #ifdef VPS
-	error = pts_alloc2(FFLAGS(uap->flags & O_ACCMODE), td, fp, unit);
+	error = pts_alloc2(FFLAGS(uap->flags & O_ACCMODE), td, fp, unit, 1);
 #else
 	error = pts_alloc(FFLAGS(uap->flags & O_ACCMODE), td, fp);
 #endif
