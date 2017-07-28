@@ -25,25 +25,9 @@ vps_pager_getpages()
 
 
 ------------------------------------------
-LOR and panic while just sitting in a vps shell for a while not doing anything;
+panic while just sitting in a vps shell for a while not doing anything;
 I guess it's a lock leak in an error case?
 
-lock order reversal:                                                                                                                                                                    [0/1958]
- 1st 0xfffff80010909d50 nfs (nfs) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_mount.c:896
- 2nd 0xfffff80008bfc240 devfs (devfs) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_subr.c:2604
-stack backtrace:
-#0 0xffffffff80ac0da0 at witness_debugger+0x70
-#1 0xffffffff80ac0c93 at witness_checkorder+0xe23
-#2 0xffffffff80a3374e at lockmgr_lock_fast_path+0x1ce
-#3 0xffffffff81085810 at VOP_LOCK1_APV+0xe0
-#4 0xffffffff80b3fbda at _vn_lock+0x6a
-#5 0xffffffff80b2e9c2 at vget+0x82
-#6 0xffffffff8092982d at devfs_allocv+0xcd
-#7 0xffffffff80929343 at devfs_root+0x43
-#8 0xffffffff80b2566d at vfs_donmount+0x123d
-#9 0xffffffff80b24402 at sys_nmount+0x72
-#10 0xffffffff80f0e2c9 at amd64_syscall+0x859
-#11 0xffffffff80eef5c4 at Xfast_syscall+0x104
 root@rabbit3:~ # spin lock 0xffffffff81cdd700 (sched lock 0) held by 0xfffff80007731000 (tid 100003) too long
 panic: spin lock held too long
 cpuid = 3
