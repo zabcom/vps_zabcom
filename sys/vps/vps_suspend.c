@@ -179,6 +179,7 @@ vps_suspend_relinkvnodes(struct vps *vps)
 	struct filedesc *fdp;
 	struct file *fp;
 	struct proc *p;
+	struct vnode *vp;
 	char *freebuf;
 	char *retbuf;
 	char *path;
@@ -208,8 +209,14 @@ vps_suspend_relinkvnodes(struct vps *vps)
 				continue;
 
 			fhold(fp);
-			error = vn_fullpath(curthread, fp->f_vnode,
-			    &retbuf, &freebuf);
+			vp = fp->f_vnode;
+			if (vp != NULL)
+				VREF(vp);
+			FILEDESC_SUNLOCK(fdp);
+			error = vn_fullpath(curthread, vp, &retbuf, &freebuf);
+			FILEDESC_SLOCK(fdp);
+			if (vp != NULL)
+				vrele(vp);
 			if (error == 0)
 				free(freebuf, M_TEMP);
 

@@ -63,51 +63,6 @@ root@rabbit3:~ # vps_suspend_relink_delete: get_next_dirent() error=2
 
 ------------------------------------------
 
-root@rabbit4:/ # vpsctl suspend testvps
-vps_suspend_relink_delete: get_next_dirent() error=2
-acquiring duplicate lock of same type: "filedesc structure"
- 1st filedesc structure @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_suspend/../../vps/vps_suspend.c:202
- 2nd filedesc structure @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_cache.c:2114
-stack backtrace:
-#0 0xffffffff80ac0da0 at witness_debugger+0x70
-#1 0xffffffff80ac0c93 at witness_checkorder+0xe23
-#2 0xffffffff80a67d18 at _sx_slock+0x68
-#3 0xffffffff80b18a33 at vn_fullpath+0x73
-#4 0xffffffff82496582 at vps_suspend+0x582
-#5 0xffffffff8247cd91 at vps_ioc_suspend+0xb1
-#6 0xffffffff8092c3b0 at devfs_ioctl+0xc0
-#7 0xffffffff810842e0 at VOP_IOCTL_APV+0xe0
-#8 0xffffffff80b3e404 at vn_ioctl+0x124
-#9 0xffffffff8092ca8f at devfs_ioctl_f+0x1f
-#10 0xffffffff80ac69ad at kern_ioctl+0x2cd
-#11 0xffffffff80ac666f at sys_ioctl+0x16f
-#12 0xffffffff80f0e2c9 at amd64_syscall+0x859
-#13 0xffffffff80eeeff4 at Xfast_syscall+0x104
-lock order reversal:
- 1st 0xfffff8000d9d88e0 filedesc structure (filedesc structure) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_suspend/../../vps/vps_suspend.c:202
- 2nd 0xfffff800221e89a0 devfs (devfs) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_cache.c:2192
-stack backtrace:
-#0 0xffffffff80ac0da0 at witness_debugger+0x70
-#1 0xffffffff80ac0c93 at witness_checkorder+0xe23
-#2 0xffffffff80a335ee at lockmgr_lock_fast_path+0x6e
-#3 0xffffffff81085810 at VOP_LOCK1_APV+0xe0
-#4 0xffffffff80b3f68a at _vn_lock+0x6a
-#5 0xffffffff80b18c9c at vn_vptocnp+0x12c
-#6 0xffffffff80b18712 at vn_fullpath1+0x92
-#7 0xffffffff80b18a6f at vn_fullpath+0xaf
-#8 0xffffffff82496582 at vps_suspend+0x582
-#9 0xffffffff8247cd91 at vps_ioc_suspend+0xb1
-#10 0xffffffff8092c3b0 at devfs_ioctl+0xc0
-#11 0xffffffff810842e0 at VOP_IOCTL_APV+0xe0
-#12 0xffffffff80b3e404 at vn_ioctl+0x124
-#13 0xffffffff8092ca8f at devfs_ioctl_f+0x1f
-#14 0xffffffff80ac69ad at kern_ioctl+0x2cd
-#15 0xffffffff80ac666f at sys_ioctl+0x16f
-#16 0xffffffff80f0e2c9 at amd64_syscall+0x859
-#17 0xffffffff80eeeff4 at Xfast_syscall+0x104
-
-------------------------------------------
-
 vpsctl migrate eventtually paniced while doing the snapshot.
 
 ------------------------------------------
@@ -202,6 +157,14 @@ vps_snapshot_fdset: unsupported cap_rights: fc_nioctls=2 fc_fcntls=00000008
 ------------------------
 
 ------------------------------------------
+
+root@rabbit3:/home/test # vpsctl showdump /var/tmp/testvps.snap
+open(/dev/vps): No such file or directory
+
+That is surprising;  wouldn't expect that to need the device node?
+
+------------------------------------------
+
 
 
 
