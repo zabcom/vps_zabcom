@@ -63,6 +63,146 @@ root@rabbit3:~ # vps_suspend_relink_delete: get_next_dirent() error=2
 
 ------------------------------------------
 
+root@rabbit4:/ # vpsctl suspend testvps
+vps_suspend_relink_delete: get_next_dirent() error=2
+acquiring duplicate lock of same type: "filedesc structure"
+ 1st filedesc structure @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_suspend/../../vps/vps_suspend.c:202
+ 2nd filedesc structure @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_cache.c:2114
+stack backtrace:
+#0 0xffffffff80ac0da0 at witness_debugger+0x70
+#1 0xffffffff80ac0c93 at witness_checkorder+0xe23
+#2 0xffffffff80a67d18 at _sx_slock+0x68
+#3 0xffffffff80b18a33 at vn_fullpath+0x73
+#4 0xffffffff82496582 at vps_suspend+0x582
+#5 0xffffffff8247cd91 at vps_ioc_suspend+0xb1
+#6 0xffffffff8092c3b0 at devfs_ioctl+0xc0
+#7 0xffffffff810842e0 at VOP_IOCTL_APV+0xe0
+#8 0xffffffff80b3e404 at vn_ioctl+0x124
+#9 0xffffffff8092ca8f at devfs_ioctl_f+0x1f
+#10 0xffffffff80ac69ad at kern_ioctl+0x2cd
+#11 0xffffffff80ac666f at sys_ioctl+0x16f
+#12 0xffffffff80f0e2c9 at amd64_syscall+0x859
+#13 0xffffffff80eeeff4 at Xfast_syscall+0x104
+lock order reversal:
+ 1st 0xfffff8000d9d88e0 filedesc structure (filedesc structure) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_suspend/../../vps/vps_suspend.c:202
+ 2nd 0xfffff800221e89a0 devfs (devfs) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_cache.c:2192
+stack backtrace:
+#0 0xffffffff80ac0da0 at witness_debugger+0x70
+#1 0xffffffff80ac0c93 at witness_checkorder+0xe23
+#2 0xffffffff80a335ee at lockmgr_lock_fast_path+0x6e
+#3 0xffffffff81085810 at VOP_LOCK1_APV+0xe0
+#4 0xffffffff80b3f68a at _vn_lock+0x6a
+#5 0xffffffff80b18c9c at vn_vptocnp+0x12c
+#6 0xffffffff80b18712 at vn_fullpath1+0x92
+#7 0xffffffff80b18a6f at vn_fullpath+0xaf
+#8 0xffffffff82496582 at vps_suspend+0x582
+#9 0xffffffff8247cd91 at vps_ioc_suspend+0xb1
+#10 0xffffffff8092c3b0 at devfs_ioctl+0xc0
+#11 0xffffffff810842e0 at VOP_IOCTL_APV+0xe0
+#12 0xffffffff80b3e404 at vn_ioctl+0x124
+#13 0xffffffff8092ca8f at devfs_ioctl_f+0x1f
+#14 0xffffffff80ac69ad at kern_ioctl+0x2cd
+#15 0xffffffff80ac666f at sys_ioctl+0x16f
+#16 0xffffffff80f0e2c9 at amd64_syscall+0x859
+#17 0xffffffff80eeeff4 at Xfast_syscall+0x104
+
+------------------------------------------
+
+vpsctl migrate eventtually paniced while doing the snapshot.
+
+------------------------------------------
+
+root@rabbit4:/ # vpsctl suspend testvps
+root@rabbit4:/ # vpsctl snapshot testvps /var/tmp/testvps.snap
+vps_ctx_extend: size=8 with the following non-sleepable locks held:
+exclusive sleep mutex jail mutex (jail mutex) r = 0 (0xfffff8000da3a040) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/sys/jail.h:257
+stack backtrace:
+#0 0xffffffff80ac0da0 at witness_debugger+0x70
+#1 0xffffffff80ac21ce at witness_warn+0x45e
+#2 0xffffffff8249d388 at vps_dumpobj_space+0x68
+#3 0xffffffff824a9e0d at vps_snapshot_prison_one+0x18d
+#4 0xffffffff824a6ff9 at vps_snapshot+0xff9
+#5 0xffffffff8247d0df at vps_ioc_snapshot+0x9f
+#6 0xffffffff8092c3b0 at devfs_ioctl+0xc0
+#7 0xffffffff810842e0 at VOP_IOCTL_APV+0xe0
+#8 0xffffffff80b3e404 at vn_ioctl+0x124
+#9 0xffffffff8092ca8f at devfs_ioctl_f+0x1f
+#10 0xffffffff80ac69ad at kern_ioctl+0x2cd
+#11 0xffffffff80ac666f at sys_ioctl+0x16f
+#12 0xffffffff80f0e2c9 at amd64_syscall+0x859
+#13 0xffffffff80eeeff4 at Xfast_syscall+0x104
+lock order reversal:
+ 1st 0xfffff801367dd078 vm map (user) (vm map (user)) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_snapst/../../vps/vps_snapst.c:3225
+ 2nd 0xfffff800221f5068 nfs (nfs) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_cache.c:2192
+stack backtrace:
+#0 0xffffffff80ac0da0 at witness_debugger+0x70
+#1 0xffffffff80ac0c93 at witness_checkorder+0xe23
+#2 0xffffffff80a335ee at lockmgr_lock_fast_path+0x6e
+#3 0xffffffff81085810 at VOP_LOCK1_APV+0xe0
+#4 0xffffffff80b3f68a at _vn_lock+0x6a
+#5 0xffffffff80b18c9c at vn_vptocnp+0x12c
+#6 0xffffffff80b18773 at vn_fullpath1+0xf3
+#7 0xffffffff80b18e7f at vn_fullpath1_failsafe+0x3f
+#8 0xffffffff824a9fff at vps_snapshot_vnode+0x7f
+#9 0xffffffff824aa688 at vps_snapshot_vmobject+0x558
+#10 0xffffffff824a7bdf at vps_snapshot+0x1bdf
+#11 0xffffffff8247d0df at vps_ioc_snapshot+0x9f
+#12 0xffffffff8092c3b0 at devfs_ioctl+0xc0
+#13 0xffffffff810842e0 at VOP_IOCTL_APV+0xe0
+#14 0xffffffff80b3e404 at vn_ioctl+0x124
+#15 0xffffffff8092ca8f at devfs_ioctl_f+0x1f
+#16 0xffffffff80ac69ad at kern_ioctl+0x2cd
+#17 0xffffffff80ac666f at sys_ioctl+0x16f
+lock order reversal:
+ 1st 0xfffff801367dd078 vm map (user) (vm map (user)) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_snapst/../../vps/vps_snapst.c:3225                                        [6/1974]
+ 2nd 0xfffff8000daa0040 filedesc structure (filedesc structure) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_lookup.c:378
+stack backtrace:
+#0 0xffffffff80ac0da0 at witness_debugger+0x70
+#1 0xffffffff80ac0c93 at witness_checkorder+0xe23
+#2 0xffffffff80a67d18 at _sx_slock+0x68
+#3 0xffffffff80b21673 at namei+0x233
+#4 0xffffffff80b3eed9 at vn_open_cred+0x209
+#5 0xffffffff80b1d015 at vop_stdvptocnp+0x165
+#6 0xffffffff81087a90 at VOP_VPTOCNP_APV+0xe0
+#7 0xffffffff80b18cd1 at vn_vptocnp+0x161
+#8 0xffffffff80b18773 at vn_fullpath1+0xf3
+#9 0xffffffff80b18e7f at vn_fullpath1_failsafe+0x3f
+#10 0xffffffff824a9fff at vps_snapshot_vnode+0x7f
+#11 0xffffffff824aa688 at vps_snapshot_vmobject+0x558
+#12 0xffffffff824a7bdf at vps_snapshot+0x1bdf
+#13 0xffffffff8247d0df at vps_ioc_snapshot+0x9f
+#14 0xffffffff8092c3b0 at devfs_ioctl+0xc0
+#15 0xffffffff810842e0 at VOP_IOCTL_APV+0xe0
+#16 0xffffffff80b3e404 at vn_ioctl+0x124
+#17 0xffffffff8092ca8f at devfs_ioctl_f+0x1f
+sched_switch() at sched_switch+0x4e0/frame 0xfffffe086075c900
+mi_switch() at mi_switch+0x18b/frame 0xfffffe086075c930
+thread_suspend_check() at thread_suspend_check+0x93/frame 0xfffffe086075c980
+amd64_syscall() at amd64_syscall+0x160/frame 0xfffffe086075cab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe086075cab0
+--- syscall (240, FreeBSD ELF64, sys_nanosleep), rip = 0x4236ba, rsp = 0x7fffffffe608, rbp = 0x7fffffffe640 ---
+sched_switch() at sched_switch+0x4e0/frame 0xfffffe0860018900
+mi_switch() at mi_switch+0x18b/frame 0xfffffe0860018930
+thread_suspend_check() at thread_suspend_check+0x93/frame 0xfffffe0860018980
+amd64_syscall() at amd64_syscall+0x160/frame 0xfffffe0860018ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe0860018ab0
+--- syscall (240, FreeBSD ELF64, sys_nanosleep), rip = 0x80093a75a, rsp = 0x7fffffffecc8, rbp = 0x7fffffffed10 ---
+vps_snapshot: error=22
+
+vps_snapshot_proc: vps_snapshot_proc_one(p=0xfffff8000d84b540) returned error
+
+vps_snapshot_fdset: unsupported cap_rights: fc_nioctls=2 fc_fcntls=00000008
+
+ioctl VPS_IOC_SNAPST: Invalid argument
+Kernel error messages:
+------------------------
+vps_snapshot: error=22
+vps_snapshot_proc: vps_snapshot_proc_one(p=0xfffff8000d84b540) returned error
+vps_snapshot_fdset: unsupported cap_rights: fc_nioctls=2 fc_fcntls=00000008
+------------------------
+
+------------------------------------------
+
 
 
 
