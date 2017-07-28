@@ -313,12 +313,11 @@ vps_console_alloc(struct vps *vps, struct thread *td)
 {
 	struct vps *savevps;
 	struct ucred *vps_ucred;
-	struct cdev *dev_orig;
 	struct cdev *dev;
 	struct file *fp_ma;
 	struct tty *tp;
 	int error;
-#if 1
+#ifdef DEBUG_CONSOLE_CRED
 	/* Additional debugging. */
 	struct ucred *saveucred;
 	struct ucred *dbgucred;
@@ -375,19 +374,26 @@ vps_console_alloc(struct vps *vps, struct thread *td)
 	vps->console_tty = tp = fp_ma->f_data;
 
 	/* Destroy the original slave device later. */
-	dev_orig = tp->t_dev;
+	tty_silent_remove_dev_tp(tp);
+	if (tp->t_dev != NULL)
+		printf("%s:%d tty_silent_remove_dev_tp seems to have failed "
+		    "on tp %p\n", __func__, __LINE__, tp);
 
 	/* Expose slave device in vps instance. */
 
 	DBGCORE("%s: creating tty dev with ucred=%p vps=%p; fp_ma=%p\n",
 		__func__, vps_ucred, vps_ucred->cr_vps, fp_ma);
 
-	tty_makedev(tp, vps_ucred, "console");
+	error = tty_makedevf(tp, vps_ucred, 0, "console");
+	if (error) {
+		printf("%s:%d tty_makedevf failed with %d\n",
+		     __func__, __LINE__, error);
+		/* XXX-BZ cleanup pts et al. */
+		return (error);
+	}
 
 	/* vps->console_tty->t_dev is the slave character device. */
 	dev = tp->t_dev;
-
-	destroy_dev(dev_orig);
 
 	/* Will be deleted automatically on delete of parent device. */
 	make_dev_alias_cred(dev, vps_ucred, "ttyv0");
@@ -413,7 +419,7 @@ vps_console_alloc(struct vps *vps, struct thread *td)
 	}
 	tty_unlock(tp);
 
-#if 1
+#ifdef DEBUG_CONSOLE_CRED
 	/* Additional debugging. */
 	td->td_ucred = saveucred;
 	crfree(dbgucred);

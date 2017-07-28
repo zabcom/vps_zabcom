@@ -221,6 +221,7 @@ int	pts_alloc_external(int fd, struct thread *td, struct file *fp,
 #ifdef VPS
 int	pts_alloc2(int fflags, struct thread *td, struct file *fp, int unit);
 #endif
+void	tty_silent_remove_dev_tp(struct tty *tp);
 
 /* Drivers and line disciplines also need to call these. */
 #include <sys/ttydisc.h>
