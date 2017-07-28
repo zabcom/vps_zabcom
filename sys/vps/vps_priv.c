@@ -216,6 +216,7 @@ vps_priv_setdefault(struct vps *vps, struct vps_param *vps_pr)
         BIT_SET(a_set, PRIV_NET_ADDIFADDR);
         BIT_SET(a_set, PRIV_NET_DELIFADDR);
         BIT_SET(a_set, PRIV_NET_LAGG);
+        BIT_SET(a_set, PRIV_NETINET_ADDRCTRL6);
 
 	/* sysctls are either hidden or virtual */
 	BIT_SET(a_set, PRIV_SYSCTL_WRITE);
