@@ -57,32 +57,9 @@ Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
 
 ------------------------------------------
 
-vpsctl suspend work, on resume we got this:
+This keeps happening on vpsctl resume:
 
 root@rabbit3:~ # vps_suspend_relink_delete: get_next_dirent() error=2
-panic: mutex process lock not owned at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_thread.c:1123
-cpuid = 3
-time = 1501241665
-KDB: stack backtrace:
-db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085f8994a0
-vpanic() at vpanic+0x19c/frame 0xfffffe085f899520
-panic() at panic+0x43/frame 0xfffffe085f899580
-__mtx_assert() at __mtx_assert+0xb4/frame 0xfffffe085f899590
-thread_unsuspend() at thread_unsuspend+0x2a/frame 0xfffffe085f8995c0
-vps_resume() at vps_resume+0x202/frame 0xfffffe085f899660
-vps_ioc_resume() at vps_ioc_resume+0xdc/frame 0xfffffe085f899690
-devfs_ioctl() at devfs_ioctl+0xc0/frame 0xfffffe085f8996e0
-VOP_IOCTL_APV() at VOP_IOCTL_APV+0xe0/frame 0xfffffe085f899710
-vn_ioctl() at vn_ioctl+0x124/frame 0xfffffe085f899820
-devfs_ioctl_f() at devfs_ioctl_f+0x1f/frame 0xfffffe085f899840
-kern_ioctl() at kern_ioctl+0x2cd/frame 0xfffffe085f8998a0
-sys_ioctl() at sys_ioctl+0x16f/frame 0xfffffe085f899980
-amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085f899ab0
-Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f899ab0
---- syscall (54, FreeBSD ELF64, sys_ioctl), rip = 0x8009ba6da, rsp = 0x7fffffffe948, rbp = 0x7fffffffea90 ---
-KDB: enter: panic
-[ thread pid 905 tid 100124 ]
-Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
 
 ------------------------------------------
 
