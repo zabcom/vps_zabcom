@@ -23,6 +23,54 @@ Lots of &prison0 vs. V_prison0  (no &)  but only in some places;  check that!
 vps_pager_getpages()
 
 
+
+------------------------------------------
+LOR and panic while just sitting in a vps shell for a while not doing anything;
+I guess it's a lock leak in an error case?
+
+lock order reversal:                                                                                                                                                                    [0/1958]
+ 1st 0xfffff80010909d50 nfs (nfs) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_mount.c:896
+ 2nd 0xfffff80008bfc240 devfs (devfs) @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_subr.c:2604
+stack backtrace:
+#0 0xffffffff80ac0da0 at witness_debugger+0x70
+#1 0xffffffff80ac0c93 at witness_checkorder+0xe23
+#2 0xffffffff80a3374e at lockmgr_lock_fast_path+0x1ce
+#3 0xffffffff81085810 at VOP_LOCK1_APV+0xe0
+#4 0xffffffff80b3fbda at _vn_lock+0x6a
+#5 0xffffffff80b2e9c2 at vget+0x82
+#6 0xffffffff8092982d at devfs_allocv+0xcd
+#7 0xffffffff80929343 at devfs_root+0x43
+#8 0xffffffff80b2566d at vfs_donmount+0x123d
+#9 0xffffffff80b24402 at sys_nmount+0x72
+#10 0xffffffff80f0e2c9 at amd64_syscall+0x859
+#11 0xffffffff80eef5c4 at Xfast_syscall+0x104
+root@rabbit3:~ # spin lock 0xffffffff81cdd700 (sched lock 0) held by 0xfffff80007731000 (tid 100003) too long
+panic: spin lock held too long
+cpuid = 3
+time = 1501167600
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085f7cd3c0
+vpanic() at vpanic+0x19c/frame 0xfffffe085f7cd440
+panic() at panic+0x43/frame 0xfffffe085f7cd4a0
+_mtx_lock_spin_cookie() at _mtx_lock_spin_cookie+0x328/frame 0xfffffe085f7cd520
+__mtx_lock_spin_flags() at __mtx_lock_spin_flags+0xe0/frame 0xfffffe085f7cd560
+sched_add() at sched_add+0xe4/frame 0xfffffe085f7cd5a0
+setrunnable() at setrunnable+0x90/frame 0xfffffe085f7cd5c0
+sleepq_broadcast() at sleepq_broadcast+0xe8/frame 0xfffffe085f7cd600
+wakeupshlk() at wakeupshlk+0x168/frame 0xfffffe085f7cd650
+__lockmgr_args() at __lockmgr_args+0x82e/frame 0xfffffe085f7cd6f0
+lockmgr_unlock_fast_path() at lockmgr_unlock_fast_path+0x184/frame 0xfffffe085f7cd740
+VOP_UNLOCK_APV() at VOP_UNLOCK_APV+0xe0/frame 0xfffffe085f7cd770
+vn_statfile() at vn_statfile+0x72/frame 0xfffffe085f7cd7c0
+kern_fstat() at kern_fstat+0xa8/frame 0xfffffe085f7cd810
+freebsd11_fstat() at freebsd11_fstat+0x1d/frame 0xfffffe085f7cd980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085f7cdab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f7cdab0
+--- syscall (0, FreeBSD ELF64, nosys), rip = 0x800638fca, rsp = 0x7fffffffd0e8, rbp = 0x7fffffffd190 ---
+KDB: enter: panic
+[ thread pid 991 tid 100086 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+
 ------------------------------------------
 
 
