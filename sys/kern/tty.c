@@ -79,6 +79,21 @@ static struct sx tty_list_sx;
 SX_SYSINIT(tty_list, &tty_list_sx, "tty list");
 static unsigned int tty_list_count = 0;
 
+#include <sys/kdb.h>
+#define	FOO()				\
+	do {				\
+		printf("%s:%d count %u check ...\n", __func__, __LINE__, tty_list_count); \
+		QMD_TAILQ_CHECK_TAIL(&tty_list, t_list);	\
+	} while (0)
+#define	FOO2(_tp)				\
+	do {				\
+		printf("%s:%d count %u check ...\n", __func__, __LINE__, tty_list_count); \
+		printf("%s:%d ... %p %s ...\n", __func__, __LINE__, _tp, ((_tp)->t_dev != NULL) ? tty_devname(_tp) : "N/A");	\
+		if ((_tp)->t_dev != NULL && strcmp("console", tty_devname(tp)) == 0) \
+			kdb_backtrace(); \
+		QMD_TAILQ_CHECK_TAIL(&tty_list, t_list);	\
+	} while (0)
+
 /* Character device of /dev/console. */
 #ifdef VPS
 struct cdev		*dev_console;
@@ -1160,11 +1175,63 @@ tty_rel_free(struct tty *tp)
 
 	if (dev != NULL) {
 		sx_xlock(&tty_list_sx);
+FOO2(tp);
 		TAILQ_REMOVE(&tty_list, tp, t_list);
 		tty_list_count--;
+FOO2(tp);
 		sx_xunlock(&tty_list_sx);
 		destroy_dev_sched_cb(dev, tty_dealloc, tp);
 	}
+}
+
+void
+tty_silent_remove_dev_tp(struct tty *tp)
+{
+	struct cdev *dev;
+
+	tty_lock(tp);
+
+#if 0
+	/* Simulate carrier removal. */
+	ttydisc_modem(tp, 0);
+
+	/* Wake up all blocked threads. */
+	tty_wakeup(tp, FREAD|FWRITE);
+	cv_broadcast(&tp->t_bgwait);
+	cv_broadcast(&tp->t_dcdwait);
+
+	tp->t_flags |= TF_GONE;
+
+#if 0
+	tp->t_session = NULL;
+	tp->t_sessioncnt--;
+#endif
+
+#define	TF_ACTIVITY	(TF_GONE|TF_OPENED|TF_HOOK|TF_OPENCLOSE)
+	if (tp->t_sessioncnt != 0 || (tp->t_flags & TF_ACTIVITY) != TF_GONE) {
+		/* TTY is still in use. */
+		tty_unlock(tp);
+printf("XXX-BZ %s:%d tp %p t_sessioncnt %d t_flags %#x\n", __func__, __LINE__, tp, tp->t_sessioncnt, tp->t_flags);
+		return;
+	}
+#endif
+
+	/* TTY can be deallocated. */
+	dev = tp->t_dev;
+	tp->t_dev = NULL;
+	tty_unlock(tp);
+
+	if (dev != NULL) {
+		sx_xlock(&tty_list_sx);
+FOO2(tp);
+		TAILQ_REMOVE(&tty_list, tp, t_list);
+		tty_list_count--;
+FOO2(tp);
+		sx_xunlock(&tty_list_sx);
+/* XXX-BZ only line not copied. */
+	}
+
+	destroy_dev(dev);
 }
 
 void
@@ -1247,6 +1314,7 @@ sysctl_kern_ttys(SYSCTL_HANDLER_ARGS)
 	int error;
 
 	sx_slock(&tty_list_sx);
+FOO();
 	lsize = tty_list_count * sizeof(struct xtty);
 	if (lsize == 0) {
 		sx_sunlock(&tty_list_sx);
@@ -1261,6 +1329,7 @@ sysctl_kern_ttys(SYSCTL_HANDLER_ARGS)
 		tty_unlock(tp);
 		xt++;
 	}
+FOO();
 	sx_sunlock(&tty_list_sx);
 
 	error = SYSCTL_OUT(req, xtlist, lsize);
@@ -1384,8 +1453,10 @@ tty_makedevf(struct tty *tp, struct ucred *cred, int flags,
 	}
 
 	sx_xlock(&tty_list_sx);
+FOO2(tp);
 	TAILQ_INSERT_TAIL(&tty_list, tp, t_list);
 	tty_list_count++;
+FOO2(tp);
 	sx_xunlock(&tty_list_sx);
 
 	return (0);
@@ -2104,12 +2175,14 @@ ttyconsdev_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 
 	/* Look up corresponding TTY by device name. */
 	sx_slock(&tty_list_sx);
+FOO();
 	TAILQ_FOREACH(tp, &tty_list, t_list) {
 		if (strcmp(dev_console_filename, tty_devname(tp)) == 0) {
 			dev_console->si_drv1 = tp;
 			break;
 		}
 	}
+FOO();
 	sx_sunlock(&tty_list_sx);
 
 	/* System console has no TTY associated. */
