@@ -144,6 +144,51 @@ vps_snapshot_fdset: unsupported cap_rights: fc_nioctls=2 fc_fcntls=00000008
 
 ------------------------------------------
 
+During vpsctl migrate ...
+
+done
+Transferring dump (0 MB) ...........(10%)..........(20%).....ioctl VPS_IOC_RESTOR: Bad address []
+Kernel error messages:
+------------------------
+------------------------
+.....(30%)..........(40%)..........(50%)..........(60%)..........(70%)..........(80%)..........(90%).........(100%) done
+Restoring on remote host ...
+
+------------------------------------------
+
+root@rabbit4:/ # spin lock 0xfffff8000772d000 (vps accounting) held by 0xfffff8004f37c000 (tid 100186) too long
+panic: spin lock held too long
+cpuid = 0
+time = 1501268453
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe083cb93700
+vpanic() at vpanic+0x19c/frame 0xfffffe083cb93780
+panic() at panic+0x43/frame 0xfffffe083cb937e0
+_mtx_lock_spin_cookie() at _mtx_lock_spin_cookie+0x328/frame 0xfffffe083cb93860
+__mtx_lock_spin_flags() at __mtx_lock_spin_flags+0xe0/frame 0xfffffe083cb938a0
+_vps_account_runnable() at _vps_account_runnable+0x45/frame 0xfffffe083cb938d0
+choosethread() at choosethread+0x69/frame 0xfffffe083cb938f0
+sched_switch() at sched_switch+0x3d0/frame 0xfffffe083cb93950
+mi_switch() at mi_switch+0x18b/frame 0xfffffe083cb93980
+critical_exit() at critical_exit+0x96/frame 0xfffffe083cb939a0
+sched_idletd() at sched_idletd+0xde/frame 0xfffffe083cb93a70
+fork_exit() at fork_exit+0x84/frame 0xfffffe083cb93ab0
+fork_trampoline() at fork_trampoline+0xe/frame 0xfffffe083cb93ab0
+--- trap 0, rip = 0, rsp = 0, rbp = 0 ---
+KDB: enter: panic
+[ thread pid 11 tid 100003 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+db> show alllocks
+Process 1357 (cron) thread 0xfffff8004f37c000 (100186)
+exclusive rw vm object (vm object) r = 0 (0xfffff8004f8e05a0) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vm/vm_fault.c:570
+shared sx vm map (user) (vm map (user)) r = 0 (0xfffff8004f87e078) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vm/vm_map.c:4011
+Process 1356 (cron) thread 0xfffff8000dd44580 (100192)
+exclusive sleep mutex vnode interlock (vnode interlock) r = 0 (0xfffff8000dd48098) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_subr.c:3046
+Process 1355 (cron) thread 0xfffff8000d0da580 (100113)
+shared lockmgr nfs (nfs) r = 0 (0xfffff8000bf2c068) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_subr.c:2604
+db>
+
+------------------------------------------
 
 
 
