@@ -75,6 +75,7 @@ __IDSTRING(vpsid, "$Id: if_vps.c 207 2013-12-17 12:23:41Z klaus $");
 #include <net/if_types.h>
 #include <net/if_dl.h>
 #include <net/netisr.h>
+#include <net/radix.h>
 #include <net/route.h>
 #include <net/vnet.h>
 
@@ -145,15 +146,18 @@ struct vps_if_rtentry {
 	struct vps *rt_vps;
 };
 
-void *vps_if_routehead_ip4;
-void *vps_if_routehead_ip6;
+struct radix_node_head *vps_if_routehead_ip4;
+struct radix_node_head *vps_if_routehead_ip6;
 
 static int
 vps_if_inithead(void)
 {
 
-	rn_inithead(&vps_if_routehead_ip4, 0);
-	rn_inithead(&vps_if_routehead_ip6, 0);
+	rn_inithead((void **)&vps_if_routehead_ip4, 0);
+	rn_inithead((void **)&vps_if_routehead_ip6, 0);
+
+	RADIX_NODE_HEAD_LOCK_INIT(vps_if_routehead_ip4);
+	RADIX_NODE_HEAD_LOCK_INIT(vps_if_routehead_ip6);
 
 	return (0);
 }
@@ -162,8 +166,11 @@ static int
 vps_if_detachhead(void)
 {
 
-	rn_detachhead(&vps_if_routehead_ip6);
-	rn_detachhead(&vps_if_routehead_ip4);
+	rn_detachhead((void **)&vps_if_routehead_ip6);
+	rn_detachhead((void **)&vps_if_routehead_ip4);
+
+	RADIX_NODE_HEAD_DESTROY(vps_if_routehead_ip6);
+	RADIX_NODE_HEAD_DESTROY(vps_if_routehead_ip4);
 
 	return (0);
 }
