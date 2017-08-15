@@ -313,13 +313,13 @@ vps_console_alloc(struct vps *vps, struct thread *td)
 {
 	struct vps *savevps;
 	struct ucred *vps_ucred;
+	struct ucred *saveucred;
 	struct cdev *dev;
 	struct file *fp_ma;
 	struct tty *tp;
 	int error;
 #ifdef DEBUG_CONSOLE_CRED
 	/* Additional debugging. */
-	struct ucred *saveucred;
 	struct ucred *dbgucred;
 
 	dbgucred = crget();
@@ -360,11 +360,15 @@ vps_console_alloc(struct vps *vps, struct thread *td)
 
 	savevps = td->td_vps;
 	td->td_vps = vps;
+	saveucred = td->td_ucred;
+	td->td_ucred = vps_ucred;
 
 	if ((error = pts_alloc2(FREAD|FWRITE, td, fp_ma, -1, 0)) != 0) {
 		DBGCORE("%s: pts_alloc(): %d\n",
 			__func__, error);
 		fdrop(fp_ma, td);
+		td->td_vps = savevps;
+		td->td_ucred = saveucred;
 		return (error);
 	}
 
@@ -387,7 +391,8 @@ vps_console_alloc(struct vps *vps, struct thread *td)
 	if (error) {
 		printf("%s:%d tty_makedevf failed with %d\n",
 		     __func__, __LINE__, error);
-		/* XXX-BZ cleanup pts et al. */
+		td->td_vps = savevps;
+		td->td_ucred = saveucred;
 		return (error);
 	}
 
@@ -404,6 +409,7 @@ vps_console_alloc(struct vps *vps, struct thread *td)
 	dev_unlock();
 
 	td->td_vps = savevps;
+	td->td_ucred = saveucred;
 
 	/* install tty hooks */
 	tty_lock(tp);
