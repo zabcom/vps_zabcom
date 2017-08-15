@@ -401,6 +401,8 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 {
 	struct vps_snapst_ctx *ctx;
 	struct vps_dumpheader *dumphdr;
+	struct iovec iov;
+	struct uio uio;
 	time_t starttime;
 	int error = 0;
 
@@ -432,7 +434,6 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 		goto out;
 	}
 
-	dev_ctx->cmd = VPS_IOC_SNAPST;
 	ctx->vps = vps;
 	ctx->pagesread = 0;
 	vps->vps_status = VPS_ST_SNAPSHOOTING;
@@ -503,8 +504,11 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 	/* Close the vps object. */
 	vdo_close(ctx);
 
+#if 1
+	/* XXX-BZ why is this duplicated? */
 	/* Close the root object. */
 	vdo_close(ctx);
+#endif
 
 	ctx->nsyspages = (((caddr_t)ctx->cpos - (caddr_t)ctx->data)
 	    >> PAGE_SHIFT);
@@ -552,44 +556,27 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 		(long long unsigned int)dumphdr->checksum,
 		dumphdr->nuserpages);
 
-	/* allocate userspace pages vm object and map it */
-	if ((ctx->vps_vmobject = vps_pager_ops.pgo_alloc(ctx,
-			ctx->nsyspages + ctx->nuserpages,
-			VM_PROT_READ, 0,
-			curthread->td_proc->p_ucred)) == NULL) {
-		ERRMSG(ctx, "%s: vm_object_allocate: %d\n",
-		    __func__, error);
-		/* XXX */
-		return (error);
+	dev_ctx->objsz = va->datalen;
+	dev_ctx->obj = vm_object_allocate(OBJT_DEFAULT, OFF_TO_IDX(round_page(
+	    dev_ctx->objsz)));
+
+	iov.iov_base = ctx->data;
+	iov.iov_len = dev_ctx->objsz;
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;
+	uio.uio_offset = 0;
+	uio.uio_resid = (ssize_t)dev_ctx->objsz;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_rw = UIO_WRITE;
+	uio.uio_td = curthread;
+
+	error = uiomove_object(dev_ctx->obj, dev_ctx->objsz, &uio);
+	if (error != 0) {
+		vm_object_deallocate(dev_ctx->obj);
+		dev_ctx->obj = NULL;
+		dev_ctx->objsz = 0;
+		/* XXX-BZ append error message. */
 	}
-
-	ctx->user_map = &curthread->td_proc->p_vmspace->vm_map;
-	vm_map_lock(ctx->user_map);
-	if (vm_map_findspace(ctx->user_map, vm_map_min(ctx->user_map),
-	                     (ctx->nsyspages + ctx->nuserpages) <<
-			     PAGE_SHIFT,
-	                     &ctx->user_map_start) != KERN_SUCCESS) {
-		error = ENOMEM;
-		vm_map_unlock(ctx->user_map);
-		ERRMSG(ctx, "%s: vm_map_findspace: %d\n", __func__, error);
-		/* XXX */
-		return (error);
-	}
-	error = vm_map_insert(ctx->user_map, ctx->vps_vmobject, 0,
-		ctx->user_map_start,
-		ctx->user_map_start +
-		((ctx->nsyspages + ctx->nuserpages) << PAGE_SHIFT),
-		VM_PROT_READ, VM_PROT_READ, 0);
-	if (error != KERN_SUCCESS)
-		panic("%s: vm_map_insert: error=%d\n", __func__, error);
-	vm_map_unlock(ctx->user_map);
-
-	DBGS("%s: snapshot at %zx - %zx\n", __func__,
-	    (size_t)ctx->user_map_start,
-	    (size_t)(ctx->user_map_start +
-	    ((ctx->nsyspages + ctx->nuserpages) << PAGE_SHIFT)));
-
-	va->database = (void *)ctx->user_map_start;
 
 	/*
  	 * Resources are freed in vps_snapshot_finish().
@@ -642,6 +629,8 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 		}
 	}
 
+	/* Signal to vps_dev that the snapshot is done and can be read from. */
+	dev_ctx->cmd = VPS_IOC_SNAPST;
 	DBGS("%s: total time: %lld seconds\n",
 		__func__, (long long int)(time_second - starttime));
 

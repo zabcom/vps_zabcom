@@ -56,6 +56,7 @@ __IDSTRING(vpsid, "$Id: vps_dev.c 189 2013-07-12 07:15:07Z klaus $");
 #include <sys/jail.h>
 
 #include <vm/pmap.h>
+#include <vm/vm_object.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -78,25 +79,25 @@ SYSCTL_INT(_debug, OID_AUTO, vps_dev_debug, CTLFLAG_RW, &debug_dev, 0, "");
 
 #endif /* DIAGNOSTIC */
 
-static int		vps_dev_refcnt = 0;
 static caddr_t		vps_dev_emptypage;
 static struct cdev	*vps_dev_p;
-static d_fdopen_t	vps_dev_fdopen;
 static d_open_t		vps_dev_open;
-static d_close_t	vps_dev_close;
 static d_ioctl_t	vps_dev_ioctl;
-static d_mmap_t		vps_dev_mmap;
+static d_mmap_single_t	vps_dev_mmap_single;
 
 static struct cdevsw vps_dev_cdevsw = {
 	.d_version =	D_VERSION,
 	.d_name =	"vps control device",
-	.d_fdopen =	vps_dev_fdopen,
 	.d_open =	vps_dev_open,
-	.d_close =	vps_dev_close,
 	.d_ioctl =	vps_dev_ioctl,
-	.d_mmap =	vps_dev_mmap,
-	.d_flags =	D_TRACKCLOSE,
+	.d_mmap_single =vps_dev_mmap_single,
 };
+
+static struct sx			vps_dev_ctx_lock;
+#define	VPS_DEV_CTX_LOCK_INIT()		sx_init(&vps_dev_ctx_lock, "VPSdevsx")
+#define	VPS_DEV_CTX_LOCK_DESTROY()	sx_destroy(&vps_dev_ctx_lock)
+#define	VPS_DEV_CTX_LOCK()		sx_xlock(&vps_dev_ctx_lock)
+#define	VPS_DEV_CTX_UNLOCK()		sx_xunlock(&vps_dev_ctx_lock)
 
 LIST_HEAD(vps_dev_ctx_le, vps_dev_ctx) vps_dev_ctx_head;
 
@@ -114,6 +115,7 @@ vps_dev_attach(void)
 	vps_dev_p = make_dev(&vps_dev_cdevsw, 123, UID_ROOT,
 	    GID_WHEEL, 0600, "vps");
 
+	VPS_DEV_CTX_LOCK_INIT();
 	LIST_INIT(&vps_dev_ctx_head);
 
 	DBGDEV("%s: init done\n", __func__);
@@ -125,12 +127,15 @@ static int
 vps_dev_detach(void)
 {
 
-	if (vps_dev_refcnt > 0)
+	if (!LIST_EMPTY(&vps_dev_ctx_head))
 		return (EBUSY);
+
 
 	destroy_dev(vps_dev_p);
 
 	free(vps_dev_emptypage, M_VPS_DEV);
+
+	VPS_DEV_CTX_LOCK_DESTROY();
 
 	DBGDEV("%s: cleanup done\n", __func__);
 
@@ -175,12 +180,15 @@ vps_dev_get_ctx(struct thread *td)
 		return (NULL);
 	}
 
+	VPS_DEV_CTX_LOCK();
 	LIST_FOREACH(ctx, &vps_dev_ctx_head, list)
-		if (ctx->fp == td->td_fpop) {
-			DBGDEV("%s: td->td_fpop=%p ctx=%p\n",
-				__func__, td->td_fpop, ctx);
+		if (ctx->td == td) {
+			DBGDEV("%s: td=%p ctx=%p\n",
+				__func__, td, ctx);
+			VPS_DEV_CTX_UNLOCK();
 			return (ctx);
 		}
+	VPS_DEV_CTX_UNLOCK();
 
 	DBGDEV("%s: ######## dev_ctx not found for td=%p td->td_fpop=%p "
 	    "pid=%d\n", __func__, td, td->td_fpop, td->td_proc->p_pid);
@@ -188,64 +196,58 @@ vps_dev_get_ctx(struct thread *td)
 	return (NULL);
 }
 
-static int
-vps_dev_fdopen(struct cdev *dev, int fflags, struct thread *td,
-    struct file *fp)
+static void
+vps_dev_cdevpriv_dtr(void *data)
 {
 	struct vps_dev_ctx *ctx;
+	vm_object_t obj;
 
-	if (jailed(td->td_ucred)) {
-		DBGDEV("%s: td is jailed --> denying any vps-device "
-		    "action !\n", __func__);
-		return (EPERM);
-	}
-
-	atomic_add_int(&vps_dev_refcnt, 1);
-
-	ctx = malloc(sizeof(*ctx), M_VPS_DEV, M_WAITOK | M_ZERO);
-	ctx->fp = fp;
-
-	LIST_INSERT_HEAD(&vps_dev_ctx_head, ctx, list);
-
-	DBGDEV("%s: done refcnt=%d ctx=%p\n",
-	    __func__, vps_dev_refcnt, ctx);
-
-	return (0);
+	ctx = (struct vps_dev_ctx *)data;
+	VPS_DEV_CTX_LOCK();
+	LIST_REMOVE(ctx, list);
+	VPS_DEV_CTX_UNLOCK();
+	obj = ctx->obj;
+	if (obj != NULL)
+		vm_object_deallocate(obj);
+	if (ctx->snapst && vps_func->vps_snapshot_finish)
+		vps_func->vps_snapshot_finish(ctx, NULL);
+	if (ctx->data)
+		free(ctx->data, M_VPS_DEV);
+	free(ctx, M_VPS_DEV);
 }
 
 static int
 vps_dev_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
-
-	return (EOPNOTSUPP);
-}
-
-static int
-vps_dev_close(struct cdev *dev, int flags, int fmt, struct thread *td)
-{
 	struct vps_dev_ctx *ctx;
+	int error;
 
-	ctx = vps_dev_get_ctx(td);
+	/*
+	 * Do not allow more than one open per process.
+	 */
+	VPS_DEV_CTX_LOCK();
+	LIST_FOREACH(ctx, &vps_dev_ctx_head, list) {
+		if (ctx->td == td) {
+			VPS_DEV_CTX_UNLOCK();
+			return (EBUSY);
+		}
+	}
+	ctx = malloc(sizeof(*ctx), M_VPS_DEV, M_WAITOK | M_ZERO);
+	ctx->td = td;
 
-	DBGDEV("%s: ctx=%p\n", __func__, ctx);
+	/*
+	 * Ideally we would like to do a vps_by_name(ctx, ...) here but
+	 * we are lacking information so defer to the ioctl for now.
+	 */
 
-	if (ctx == NULL)
-		return (0);
+	LIST_INSERT_HEAD(&vps_dev_ctx_head, ctx, list);
+	VPS_DEV_CTX_UNLOCK();
 
-	LIST_REMOVE(ctx, list);
-
-	if (ctx->snapst && vps_func->vps_snapshot_finish)
-		vps_func->vps_snapshot_finish(ctx, NULL);
-
-	if (ctx->data)
-		free(ctx->data, M_VPS_DEV);
-
-	free(ctx, M_VPS_DEV);
-
-	atomic_subtract_int(&vps_dev_refcnt, 1);
-
-	DBGDEV("%s: done refcnt=%d ctx=%p\n",
-	    __func__, vps_dev_refcnt, ctx);
+	error = devfs_set_cdevpriv(ctx, vps_dev_cdevpriv_dtr);
+	if (error != 0) {
+		vps_dev_cdevpriv_dtr(ctx);
+		return (error);
+	}
 
 	return (0);
 }
@@ -339,67 +341,31 @@ vps_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data,
 
 VPSFUNC
 static int
-vps_dev_mmap(struct cdev *dev, vm_ooffset_t offset,
-        vm_paddr_t *paddr, int nprot, vm_memattr_t *memattr)
+vps_dev_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t size,
+    struct vm_object **object, int nprot)
 {
-	struct vps_dev_ctx *ctx, *ctx2;
-	struct vps *vps;
+	struct vps_dev_ctx *ctx;
+	vm_object_t obj;
 	int error;
 
-	ctx = NULL;
-	LIST_FOREACH(ctx2, &vps_dev_ctx_head, list)
-		if (ctx2->td == curthread) {
-			ctx = ctx2;
-			break;
-		}
+	error = devfs_get_cdevpriv((void **)&ctx);
+	if (error != 0)
+		return (error);
 
-	if (ctx == NULL) {
-		/*
-		 * Returning error from this function leads to panic.
-		 * Better return an empty page than let the
-		 * user cause a kernel panic.
-		 */
-		DBGDEV("%s: ctx == NULL !\n", __func__);
-		goto invalid;
-	}
-
+	/* VPS_IOC_SNAPST and VPS_IOC_LIST use mmap. */
 	if (ctx->data == NULL && ctx->cmd != VPS_IOC_SNAPST) {
-		DBGDEV("%s: ctx->data == NULL !\n", __func__);
-		goto invalid;
+		return (EINVAL);
 	}
 
-	error = 0;
-	vps = TD_TO_VPS(curthread);
-
-	if (offset < 0) {
-		DBGDEV("%s: offset=%zu < 0\n",
-		    __func__, (size_t)offset);
-		goto invalid;
+	if (*offset < 0 || *offset >= round_page(ctx->objsz) ||
+	    size > (round_page(ctx->objsz) - *offset) ||
+	    (nprot & ~PROT_READ) != 0) {
+		return (EINVAL);
 	}
 
-	if (nprot != PROT_READ) {
-		DBGDEV("%s: nprot=%d != PROT_READ\n",
-		    __func__, nprot);
-		goto invalid;
-	}
-
-	if (1) {
-		/* VPS_IOC_LIST */
-
-		if (offset > ctx->length) {
-			DBGDEV("%s: offset=%zu > ctx->length=%zu\n",
-			    __func__, (size_t)offset, ctx->length);
-			goto invalid;
-		}
-
-		*paddr = (vm_paddr_t)vtophys(ctx->data + offset);
-	}
-
-	return (0);
-
-  invalid:
-	*paddr = (vm_paddr_t)vtophys(vps_dev_emptypage);
-
+	obj = ctx->obj;
+	vm_object_reference(obj);
+	*object = obj;
 	return (0);
 }
 

@@ -45,6 +45,8 @@
 #include <sys/sx.h>
 #include <sys/taskqueue.h>
 
+#include <vm/vm.h>
+
 /* For sysctl stuff. */
 #include <net/vnet.h>
 
@@ -145,6 +147,8 @@ struct vps_dev_ctx {
 	struct thread		*td;
 	caddr_t			data;
 	size_t			length;
+	vm_object_t		obj;
+	size_t			objsz;
 	u_long			cmd;
 	struct vps_snapst_ctx	*snapst;
 };

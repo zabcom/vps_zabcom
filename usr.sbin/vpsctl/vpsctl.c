@@ -561,7 +561,7 @@ vc_snapshot(int argc, char **argv, int outfd, int verbose)
 		fprintf(stderr, "ioctl VPS_IOC_SNAPST: %s\n",
 			strerror(errno));
 		fprintf(stderr,
-			"Kernel error messages:\n"
+			"VPS_IOC_SNAPST Kernel error messages:\n"
 			"------------------------\n"
 			"%s"
 			"------------------------\n",
@@ -570,6 +570,14 @@ vc_snapshot(int argc, char **argv, int outfd, int verbose)
 		close(out);
 		return (errno);
 	}
+
+	va.database = mmap(NULL, va.datalen, PROT_READ, MAP_SHARED, vpsfd, 0);
+	if (va.database == MAP_FAILED) {
+		fprintf(stderr, "mmap: %s %p %zu %#x\n", strerror(errno),
+		    va.database, va.datalen, vpsfd);
+		return (errno);
+	}
+
 	base = (void*)va.database;
 	len = va.datalen;
 	DBGfprintf(stderr, "base = %p, len = %d\n", base, len);
@@ -581,27 +589,6 @@ vc_snapshot(int argc, char **argv, int outfd, int verbose)
 
 	//fprintf(stderr, "errbuf: [%s]\n", errbuf);
 	free(errbuf);
-
-	/*
-	 * XXX
-	 * Since 9.0 on i386, writing out the mmaped area to a pipe
-	 * to ssh, produces random data.
-	 * A pipe to cat always reproduces the correct data.
-	 * For now touch every single page as a workaround before write().
-	 */
-#if defined(CPU_386)
-#if 0
-	for (tmpp = (char *)base; tmpp < (char *)base + len; tmpp += PAGE_SIZE)
-		tmpc = *tmpp;
-#else
-	{
-	int *base2;
-	base2 = malloc(len);
-	memcpy(base2, base, len);
-	base = base2;
-	}
-#endif
-#endif /* CPU_386 */
 
 	if (verbose) {
 		fprintf(stderr, "Transferring dump (%d MB) ", len/1024/1024);
@@ -628,6 +615,8 @@ vc_snapshot(int argc, char **argv, int outfd, int verbose)
 		}
 		i++;
 	}
+
+	munmap(va.database, va.datalen);
 
 	if (verbose) {
 		fprintf(stderr, "(100%%) done\n");
@@ -689,6 +678,7 @@ vc_restore(int argc, char **argv)
 	rlen = 0;
 	have_header = 0;
 	while ((rv = read(in, ((char*)buf)+rlen, len-rlen)) > 0) {
+		/* XXX-BZ this can't happen. */
 		if (rv == -1) {
 			fprintf(stderr, "read: %s\n", strerror(errno));
 			return (-1);
@@ -1467,6 +1457,7 @@ vc_migrate(int argc, char **argv)
 	argv2[2] = NULL;
 	argc2 = 2;
 	if ((error = vc_suspend(argc2, argv2))) {
+		fprintf(stderr, "vc_suspend failed\n");
 		return (error);
 	}
 	mig_did_suspend = 1;
@@ -1502,8 +1493,10 @@ vc_migrate(int argc, char **argv)
 	argv2[1] = NULL;
 	argv2[2] = NULL;
 	argc2 = 2;
-	if ((error = vc_snapshot(argc2, argv2, wfd, 1)))
+	if ((error = vc_snapshot(argc2, argv2, wfd, 1))) {
+		fprintf(stderr, "vc_snapshot failed\n");
 		goto resume;
+	}
 
 	fprintf(stderr, "Restoring on remote host ... ");
 

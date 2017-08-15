@@ -53,10 +53,13 @@ __IDSTRING(vpsid, "$Id: vps_user.c 189 2013-07-12 07:15:07Z klaus $");
 #include <sys/ioccom.h>
 #include <sys/socket.h>
 #include <sys/jail.h>
+#include <sys/uio.h>
 
 #include <net/if.h>
 #include <net/if_var.h>
 #include <netinet/in.h>
+
+#include <vm/vm_object.h>
 
 #include "vps_user.h"
 #include "vps_account.h"
@@ -90,7 +93,9 @@ vps_ioc_list(struct vps *vps, struct vps_dev_ctx *ctx, u_long cmd,
 {
 	struct vps *vps2;
 	struct vps_info *info;
-	int vpscnt;
+	struct iovec iov;
+	struct uio uio;
+	int error, vpscnt;
 
 	sx_slock(&vps_all_lock);
 
@@ -146,6 +151,33 @@ vps_ioc_list(struct vps *vps, struct vps_dev_ctx *ctx, u_long cmd,
 		++info;
 	}
 	sx_sunlock(&vps_all_lock);
+
+	ctx->objsz = ctx->length;
+	ctx->obj = vm_object_allocate(OBJT_DEFAULT, OFF_TO_IDX(round_page(
+	    ctx->objsz)));
+
+	iov.iov_base = ctx->data;
+	iov.iov_len = ctx->objsz;
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;
+	uio.uio_offset = 0;
+	uio.uio_resid = (ssize_t)ctx->objsz;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_rw = UIO_WRITE;
+	uio.uio_td = curthread;
+
+	error = uiomove_object(ctx->obj, ctx->objsz, &uio);
+	if (error != 0) {
+		vm_object_deallocate(ctx->obj);
+		ctx->obj = NULL;
+		ctx->objsz = 0;
+		free(ctx->data, M_VPS_DEV);
+		ctx->data = NULL;
+		ctx->length = 0;
+		*((int *)data) = 0;
+		/* XXX-BZ append error message. */
+		return (error);
+	}
 
 	/* Return count of vps info structures to user. */
 	*((int *)data) = vpscnt;
