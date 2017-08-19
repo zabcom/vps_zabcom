@@ -182,7 +182,7 @@ vps_dev_get_ctx(struct thread *td)
 
 	VPS_DEV_CTX_LOCK();
 	LIST_FOREACH(ctx, &vps_dev_ctx_head, list)
-		if (ctx->td == td) {
+		if (ctx->td == td || ctx->fp == td->td_fpop) {
 			DBGDEV("%s: td=%p ctx=%p\n",
 				__func__, td, ctx);
 			VPS_DEV_CTX_UNLOCK();
@@ -227,13 +227,14 @@ vps_dev_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 	 */
 	VPS_DEV_CTX_LOCK();
 	LIST_FOREACH(ctx, &vps_dev_ctx_head, list) {
-		if (ctx->td == td) {
+		if (ctx->td == td || ctx->fp == td->td_fpop) {
 			VPS_DEV_CTX_UNLOCK();
 			return (EBUSY);
 		}
 	}
 	ctx = malloc(sizeof(*ctx), M_VPS_DEV, M_WAITOK | M_ZERO);
 	ctx->td = td;
+	ctx->fp = td->td_fpop;
 
 	/*
 	 * Ideally we would like to do a vps_by_name(ctx, ...) here but
