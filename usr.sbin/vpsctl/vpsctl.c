@@ -1187,7 +1187,10 @@ vc_exec(int argc, char **argv, char **envv)
 		if ((rc = ioctl(vpsfd, cmd, argv[1])) == -1) {
 			fprintf(stderr, "ioctl %lx: %s\n",
 				cmd, strerror(errno));
-			close(vpsfd);
+			i = close(vpsfd);
+			if (i != 0)
+				fprintf(stderr, "close vpsfd %d: %s\n",
+				    vpsfd, strerror(errno));
 			exit(-1);
 		}
 		if (close(vpsfd) == -1) {
