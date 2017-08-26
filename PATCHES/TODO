@@ -190,6 +190,8 @@ db>
 
 ------------------------------------------
 
+VPS_ST_SNAPSHOOTING  is a typo. Fix once we have no outstanding chnages on these files.
+
 ------------------------------------------
 
 
