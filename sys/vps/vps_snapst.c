@@ -516,7 +516,12 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 	if (ctx->nsyspages << PAGE_SHIFT != (caddr_t)ctx->cpos -
 	    (caddr_t)ctx->data)
 		ctx->nsyspages += 1;
+#if 0
 	va->datalen = (ctx->nsyspages + ctx->nuserpages) << PAGE_SHIFT;
+#else
+	va->datalen = ctx->dsize;
+#endif
+
 	va->database = NULL;
 
 	dumphdr->byteorder = VPS_MD_DUMPHDR_BYTEORDER;
@@ -556,16 +561,16 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 		(long long unsigned int)dumphdr->checksum,
 		dumphdr->nuserpages);
 
-	dev_ctx->objsz = va->datalen;
-	dev_ctx->obj = vm_object_allocate(OBJT_DEFAULT, OFF_TO_IDX(round_page(
-	    dev_ctx->objsz)));
+	dev_ctx->objsz = round_page(va->datalen);
+	dev_ctx->obj = vm_object_allocate(OBJT_DEFAULT,
+	    OFF_TO_IDX(dev_ctx->objsz));
 
 	iov.iov_base = ctx->data;
-	iov.iov_len = dev_ctx->objsz;
+	iov.iov_len = va->datalen;
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;
-	uio.uio_resid = (ssize_t)dev_ctx->objsz;
+	uio.uio_resid = (ssize_t)va->datalen;
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_rw = UIO_WRITE;
 	uio.uio_td = curthread;
@@ -2052,6 +2057,7 @@ vps_snapshot_mbufchain(struct vps_snapst_ctx *ctx, struct vps *vps,
 				return (EINVAL);
 			}
 
+#if 1	/* XXX-BZ TODO. This panics the kernel.  Go and see why! */
 			/* checksum */
 			{
 				u_int32_t sum = 0, i;
@@ -2062,6 +2068,7 @@ vps_snapshot_mbufchain(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 				vdmb->mb_checksum = sum;
 			}
+#endif
 
 			if (vdo_append(ctx, m2->m_ext.ext_buf,
 			    roundup(m2->m_ext.ext_size, 8), M_NOWAIT)) {
