@@ -1171,6 +1171,8 @@ vps_libdump_objtype2str(int objt)
 		return ("VPS_DUMPOBJT_THREAD");
 	case VPS_DUMPOBJT_PGRP:
 		return ("VPS_DUMPOBJT_PGRP");
+	case VPS_DUMPOBJT_SAVEFPU:
+		return ("VPS_DUMPOBJT_SAVEFPU");
 	case VPS_DUMPOBJT_SESSION:
 		return ("VPS_DUMPOBJT_SESSION");
 	case VPS_DUMPOBJT_SYSENTVEC:
