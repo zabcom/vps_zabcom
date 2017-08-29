@@ -453,12 +453,6 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 
 	ctx->nuserpages = 0;
 	/* Gets extended dynamically on demand. */
-	ctx->userpagelistlength = 1024; /* 1024 items */
-	ctx->userpagelist = malloc(ctx->userpagelistlength *
-	    sizeof(void *), M_VPS_SNAPST, M_WAITOK|M_ZERO);
-
-	ctx->nuserpages = 0;
-	/* Gets extended dynamically on demand. */
 	ctx->page_ref_size = 1024; /* 1024 items */
 	ctx->page_ref = malloc(ctx->page_ref_size *
 	    sizeof(struct vps_page_ref), M_VPS_SNAPST, M_WAITOK|M_ZERO);
@@ -3664,9 +3658,6 @@ vps_snapshot_finish(struct vps_dev_ctx *dev_ctx, struct vps *vps)
 	/*
 	 * Clean up the memory mess.
 	 */
-	if (ctx->userpagelist)
-		free(ctx->userpagelist, M_VPS_SNAPST);
-
 	if (ctx->page_ref)
 		free(ctx->page_ref, M_VPS_SNAPST);
 

@@ -92,10 +92,8 @@ struct vps_snapst_ctx {
 					   kernel memory */
 	int nuserpages;			/* Count of pages from
 					   userspace memory */
-	int userpagelistlength;
 	/* dump */
 	struct vm_object *vmobj;	/* VM Object for dump */
-	struct vm_page **userpagelist;	/* Array of pointers to pages */
 	struct vm_page **syspagelist;	/* Array of pointers to pages */
 	/* restore */
 	int userpagesidx;		/* ... */
