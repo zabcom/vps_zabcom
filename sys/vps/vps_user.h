@@ -42,7 +42,7 @@
 #define VPS_ST_CREATING                  0x02
 #define VPS_ST_RUNNING                   0x04
 #define VPS_ST_SUSPENDED                 0x08
-#define VPS_ST_SNAPSHOOTING              0x10
+#define VPS_ST_SNAPSHOTTING              0x10
 #define VPS_ST_RESTORING                 0x20
 #define VPS_ST_DYING                     0x40
 #define VPS_ST_DEAD                      0x80

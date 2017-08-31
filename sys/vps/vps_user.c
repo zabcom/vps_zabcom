@@ -362,7 +362,7 @@ vps_ioc_resume(struct vps *vps, struct vps_dev_ctx *ctx, u_long cmd,
 	sx_slock(&vps_all_lock);
 	vps2 = vps_by_name(vps, va->vps_name);
 	if (vps2) {
-		if (vps2->vps_status == VPS_ST_SNAPSHOOTING &&
+		if (vps2->vps_status == VPS_ST_SNAPSHOTTING &&
 		    vps_func->vps_snapshot_finish)
 			vps_func->vps_snapshot_finish(ctx, vps2);
 		sx_xlock(&vps2->vps_lock);
@@ -396,7 +396,7 @@ vps_ioc_abort(struct vps *vps, struct vps_dev_ctx *ctx, u_long cmd,
 	sx_slock(&vps_all_lock);
 	vps2 = vps_by_name(vps, va->vps_name);
 	if (vps2) {
-		if (vps2->vps_status == VPS_ST_SNAPSHOOTING &&
+		if (vps2->vps_status == VPS_ST_SNAPSHOTTING &&
 		    vps_func->vps_snapshot_finish)
 			vps_func->vps_snapshot_finish(ctx, vps2);
 		sx_xlock(&vps2->vps_lock);

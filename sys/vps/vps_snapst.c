@@ -506,7 +506,7 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 
 	ctx->vps = vps;
 	ctx->pagesread = 0;
-	vps->vps_status = VPS_ST_SNAPSHOOTING;
+	vps->vps_status = VPS_ST_SNAPSHOTTING;
 
 	if (vps_ctx_alloc(ctx, vps)) {
 		error = ENOMEM;
@@ -3705,7 +3705,7 @@ vps_snapshot_finish(struct vps_dev_ctx *dev_ctx, struct vps *vps)
 	if (vps == NULL)
 	   vps = ctx->vps;
 
-	if (vps != NULL && vps->vps_status != VPS_ST_SNAPSHOOTING )
+	if (vps != NULL && vps->vps_status != VPS_ST_SNAPSHOTTING)
 		return (EINVAL);
 
 	ctx->cmd = 0;

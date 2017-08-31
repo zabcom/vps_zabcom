@@ -79,8 +79,8 @@ vps_statusstr(int status)
 		return ("running");
 	case VPS_ST_SUSPENDED:
 		return ("suspended");
-	case VPS_ST_SNAPSHOOTING:
-		return ("snapshooting");
+	case VPS_ST_SNAPSHOTTING:
+		return ("snapshotting");
 	case VPS_ST_RESTORING:
 		return ("restoring");
 	case VPS_ST_DYING:

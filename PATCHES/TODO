@@ -190,10 +190,6 @@ db>
 
 ------------------------------------------
 
-VPS_ST_SNAPSHOOTING  is a typo. Fix once we have no outstanding chnages on these files.
-
-------------------------------------------
-
 on snapshot machine:
 
 root@rabbit3:~ # panic: Bad link elm 0xfffff8000d873540 next->prev != elm
