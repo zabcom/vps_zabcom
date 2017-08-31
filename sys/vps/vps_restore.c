@@ -4876,11 +4876,15 @@ vps_restore_copyin(struct vps_snapst_ctx *ctx, struct vps_arg_snapst *va)
 	ctx->data = NULL;
 	ctx->vmobj = NULL;
 
-#if 0
-/* XXX-BZ this makes not much sense on a user space supplied malloced buffer. */
-/* XXX-BZ mabe the snapshot length must be page sized? */
-/* XXX-BZ we could fix this in vpsctl by allocating an extra page and moving things appropriately. */
-	/* Snapshot must be page-aligned! */
+	/*
+	 * Snapshot must be page-aligned!
+	 *
+	 * XXX-BZ This is a rather strange requirement as the user space buffer
+	 * will not always be page aligned (without special care in user space).
+	 * We changed vpsctl to over-allocate and memmove the data if needed.
+	 * With that this works currently and makes sure the user space pages
+	 * inside the buffer are actually page-aligned.
+	 */
 	if ((void *)trunc_page((unsigned long)va->database) !=
 	    va->database) {
 		ERRMSG(ctx, "%s: dump must be page aligned but is not: "
@@ -4888,7 +4892,6 @@ vps_restore_copyin(struct vps_snapst_ctx *ctx, struct vps_arg_snapst *va)
 		error = EFAULT;
 		goto fail;
 	}
-#endif
 
 	if (vm_page_count_min()) {
 		ERRMSG(ctx, "%s: low on memory: v_free_min=%u > "

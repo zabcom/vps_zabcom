@@ -639,7 +639,7 @@ vc_restore(int argc, char **argv)
 	int have_header;
 	unsigned int rlen;
 	/* int *base; */
-	void *buf;
+	void *buf, *p;
 	struct vps_conf vc;
 	char file_n[MAXPATHLEN];
 	char *errbuf;
@@ -673,11 +673,11 @@ vc_restore(int argc, char **argv)
 	len = statbuf.st_size;
 	*/
 
-	len = 0x100;
-	buf = malloc(len);
+	len = PAGE_SIZE;	/* Try hard to get something page aligned. */
+	p = buf = malloc(len);
 	rlen = 0;
 	have_header = 0;
-	while ((rv = read(in, ((char*)buf)+rlen, len-rlen)) > 0) {
+	while ((rv = read(in, ((char*)p)+rlen, len-rlen)) > 0) {
 		/* XXX-BZ this can't happen. */
 		if (rv == -1) {
 			fprintf(stderr, "read: %s\n", strerror(errno));
@@ -685,11 +685,20 @@ vc_restore(int argc, char **argv)
 		}
 		rlen += rv;
 		if (have_header == 0 && rlen >= sizeof (*dumphdr)) {
-			dumphdr = (struct vps_dumpheader *)buf;
+			dumphdr = (struct vps_dumpheader *)p;
 			len = dumphdr->size;
 			DBGfprintf(stderr, "size=%lu\n", dumphdr->size);
-			buf = realloc(buf, len);
+			p = buf = realloc(buf, len + PAGE_SIZE);
+			if (p == NULL) {
+				fprintf(stderr, "realloc: %s\n",
+				    strerror(errno));
+				return (-1);
+			}
 			have_header = 1;
+			if ((void *)trunc_page(p) != p) {
+				p = (void *)(trunc_page(buf) + PAGE_SIZE);
+				memmove(p, buf, rlen);
+			}
 		}
 	}
 
@@ -700,7 +709,7 @@ vc_restore(int argc, char **argv)
 	errbuf = malloc(va.msglen);
 	va.msgbase = errbuf;
 	strncpy(va.vps_name, argv[0], sizeof(va.vps_name));
-	va.database = buf;
+	va.database = p;
 	va.datalen = rlen;
 
 	if ((ioctl(vpsfd, VPS_IOC_RESTOR, &va)) == -1) {
