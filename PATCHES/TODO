@@ -63,10 +63,6 @@ root@rabbit3:~ # vps_suspend_relink_delete: get_next_dirent() error=2
 
 ------------------------------------------
 
-vpsctl migrate eventtually paniced while doing the snapshot.
-
-------------------------------------------
-
 root@rabbit4:/ # vpsctl suspend testvps
 root@rabbit4:/ # vpsctl snapshot testvps /var/tmp/testvps.snap
 
@@ -141,18 +137,6 @@ vps_snapshot: error=22
 vps_snapshot_proc: vps_snapshot_proc_one(p=0xfffff8000d84b540) returned error
 vps_snapshot_fdset: unsupported cap_rights: fc_nioctls=2 fc_fcntls=00000008
 ------------------------
-
-------------------------------------------
-
-During vpsctl migrate ...
-
-done
-Transferring dump (0 MB) ...........(10%)..........(20%).....ioctl VPS_IOC_RESTOR: Bad address []
-Kernel error messages:
-------------------------
-------------------------
-.....(30%)..........(40%)..........(50%)..........(60%)..........(70%)..........(80%)..........(90%).........(100%) done
-Restoring on remote host ...
 
 ------------------------------------------
 
@@ -233,6 +217,33 @@ Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe08602e4ab0
 KDB: enter: panic
 [ thread pid 1 tid 100185 ]
 Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+
+
+(kgdb) l *proc_reap+0x657
+0xffffffff80a1b147 is at atomic.h:442.
+437     ATOMIC_ASM(add,      short, "addw %w1,%0", "ir",  v);
+438     ATOMIC_ASM(subtract, short, "subw %w1,%0", "ir",  v);
+439
+440     ATOMIC_ASM(set,      int,   "orl %1,%0",   "ir",  v);
+441     ATOMIC_ASM(clear,    int,   "andl %1,%0",  "ir", ~v);
+442     ATOMIC_ASM(add,      int,   "addl %1,%0",  "ir",  v);
+443     ATOMIC_ASM(subtract, int,   "subl %1,%0",  "ir",  v);
+444
+445     ATOMIC_ASM(set,      long,  "orq %1,%0",   "ir",  v);
+446     ATOMIC_ASM(clear,    long,  "andq %1,%0",  "ir", ~v);
+
+(kgdb) l *proc_reap+0x630
+0xffffffff80a1b120 is in proc_reap (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_exit.c:1011).
+1006            /*
+1007             * Free any domain policy that's still hiding around.
+1008             */
+1009            vm_domain_policy_cleanup(&p->p_vm_dom_policy);
+1010
+1011            KASSERT(FIRST_THREAD_IN_PROC(p),
+1012                ("proc_reap: no residual thread!"));
+1013            uma_zfree(proc_zone, p);
+1014            atomic_add_int(&V_nprocs, -1);
+1015    #ifdef VPS
 ------------------------------------------
 
 Another panic we saw on restore was 0 + 0x40 I think:
