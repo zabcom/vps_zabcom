@@ -380,8 +380,9 @@ vps_pager_put_object(vm_object_t object, long desired)
 static int
 vps_pager_getpages(vm_object_t object, vm_page_t *m, int count, int *rbehind, int *rahead)
 {
-#if 0
-	/* XXX-BZ TODO */
+#if 1
+	panic("XXX-BZ %s FIXME if ever called\n", __func__);
+#else
 	struct vps_snapst_ctx *ctx;
 	struct vps_page_ref *pref;
 	vm_memattr_t memattr;
