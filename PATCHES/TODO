@@ -194,6 +194,51 @@ VPS_ST_SNAPSHOOTING  is a typo. Fix once we have no outstanding chnages on these
 
 ------------------------------------------
 
+on snapshot machine:
+
+root@rabbit3:~ # panic: Bad link elm 0xfffff8000d873540 next->prev != elm
+cpuid = 1
+time = 1504193100
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085f974560
+vpanic() at vpanic+0x19c/frame 0xfffffe085f9745e0
+panic() at panic+0x43/frame 0xfffffe085f974640
+proc_reap() at proc_reap+0x657/frame 0xfffffe085f974690
+proc_to_reap() at proc_to_reap+0x383/frame 0xfffffe085f9746e0
+kern_wait6() at kern_wait6+0x2fd/frame 0xfffffe085f974790
+sys_wait4() at sys_wait4+0x78/frame 0xfffffe085f974980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085f974ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f974ab0
+--- syscall (7, FreeBSD ELF64, sys_wait4), rip = 0x800d645da, rsp = 0x7fffffffe538, rbp = 0x7fffffffe560 ---
+KDB: enter: panic
+[ thread pid 983 tid 100132 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+
+
+on restored machine:
+
+vps_suspend_relink_delete: get_next_dirent() error=2
+trap_pfault: proc=0xfffff8000dcc2540/2 map=0xfffff8000dc64000 eva=0000000000000000 prot=4 rv=1
+trap_pfault: proc=0xfffff8000dcc2540/2 map=0xfffff8000dc64000 eva=0000000000000000 prot=4 rv=1
+panic: Bad link elm 0xfffff8000dcc2540 next->prev != elm
+cpuid = 3
+time = 1504192997
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe08602e4560
+vpanic() at vpanic+0x19c/frame 0xfffffe08602e45e0
+panic() at panic+0x43/frame 0xfffffe08602e4640
+proc_reap() at proc_reap+0x657/frame 0xfffffe08602e4690
+proc_to_reap() at proc_to_reap+0x383/frame 0xfffffe08602e46e0
+kern_wait6() at kern_wait6+0x2fd/frame 0xfffffe08602e4790
+sys_wait4() at sys_wait4+0x78/frame 0xfffffe08602e4980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe08602e4ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe08602e4ab0
+--- syscall (7, FreeBSD ELF64, sys_wait4), rip = 0x42353a, rsp = 0x7fffffffe778, rbp = 0x7fffffffe810 ---
+KDB: enter: panic
+[ thread pid 1 tid 100185 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+------------------------------------------
+
 
 
 
