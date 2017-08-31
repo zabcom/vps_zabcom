@@ -303,6 +303,26 @@ doreti_ast() at doreti_ast+0x1f/frame 0x7fffffffdfa0
 
 ------------------------------------------
 
+After migration the dead VPS hangs around.  Seems the interface count is still up..
+
+root@rabbit3:~ # vpsctl list
+Active VPS instaXXX-BZ proc_reap:1011 proc 0xfffff8000dcbfa80 threads 0xfffff8000dcbfa90
+nces: 1
+Name                 State    VFS Root                     %CPU   Virtual Size
+dead_testvps         dead                                     0              0
+root@rabbit3:~ # vpsctl show dead_testvps
+Name:          dXXX-BZ proc_reap:1011 proc 0xfffff8000dcbfa80 threads 0xfffff8000dcbfa90
+ead_testvps
+Status:        dead
+VFS root:
+Processes:            0
+Sockets:              0
+Interfaces:           2
+Restore count:        0
+
+--------------------------------------------------------------------------------
+
+
 
 
 
