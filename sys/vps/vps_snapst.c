@@ -386,6 +386,76 @@ vps_ctx_extend_hard(struct vps_snapst_ctx *ctx, struct vps *vps,
 	return (0);
 }
 
+VPSFUNC
+static int
+vps_snapshot_dump_userpages(struct vps_snapst_ctx *ctx, int cidx,
+    struct vps_dev_ctx *dev_ctx, int didx)
+{
+	vm_page_t cm, dm;
+	int rv;
+
+	/* XXX-BZ FIXME proper locking and page dirtying/handling. */
+
+	VM_OBJECT_WLOCK(ctx->page_ref[cidx].obj);
+	VM_OBJECT_WLOCK(dev_ctx->obj);
+
+	cm = vm_page_grab(ctx->page_ref[cidx].obj, ctx->page_ref[cidx].pidx,
+	    VM_ALLOC_NORMAL|VM_ALLOC_NOBUSY);
+	dm = vm_page_grab(dev_ctx->obj, didx, VM_ALLOC_NORMAL|VM_ALLOC_NOBUSY);
+
+	/* For src page make sure it's resident. */
+	if (cm->valid != VM_PAGE_BITS_ALL) {
+		vm_page_xbusy(cm);
+		if (vm_pager_has_page(ctx->page_ref[cidx].obj,
+		    ctx->page_ref[cidx].pidx, NULL, NULL)) {
+			rv = vm_pager_get_pages(ctx->page_ref[cidx].obj, &cm,
+			    1, NULL, NULL);
+			if (rv != VM_PAGER_OK) {
+				printf("%s: vm_obj %p idx %jd valid %x "
+				    "pager error %d\n", __func__,
+				    ctx->page_ref[cidx].obj,
+				    ctx->page_ref[cidx].pidx, cm->valid, rv);
+				vm_page_lock(cm);
+				vm_page_free(cm);
+				vm_page_unlock(cm);
+				/* XXX-BZ TODO dm */
+				VM_OBJECT_WUNLOCK(dev_ctx->obj);
+				VM_OBJECT_WUNLOCK(ctx->page_ref[cidx].obj);
+				return (EIO);
+			}
+		} else
+			vm_page_zero_invalid(cm, TRUE);
+		vm_page_xunbusy(cm);
+	}
+	vm_page_lock(cm);
+	vm_page_hold(cm);
+	if (cm->queue == PQ_NONE)
+		vm_page_deactivate(cm);
+	else
+		/* Requeue to maintain LRU ordering. */
+		vm_page_requeue(cm);
+	vm_page_unlock(cm);
+	VM_OBJECT_WUNLOCK(dev_ctx->obj);
+	VM_OBJECT_WUNLOCK(ctx->page_ref[cidx].obj);
+
+	pmap_copy_page(cm, dm);
+
+#if 0
+	vm_page_xunbusy(dm);
+	vm_page_xunbusy(cm);
+
+	vm_page_dirty(dm);
+	vm_pager_page_unswapped(dm);
+#endif
+
+        vm_page_lock(cm);
+        vm_page_unhold(cm);
+        vm_page_unlock(cm);
+
+	return (0);
+}
+
+
 /*
  * * * * * Snapshot functions. * * * *
  */
@@ -404,7 +474,7 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 	struct iovec iov;
 	struct uio uio;
 	time_t starttime;
-	int error = 0;
+	int c, d, error = 0;
 
 #ifdef DIAGNOSTIC
 	vps_snapst_print_errormsgs = debug_snapst;
@@ -510,11 +580,7 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 	if (ctx->nsyspages << PAGE_SHIFT != (caddr_t)ctx->cpos -
 	    (caddr_t)ctx->data)
 		ctx->nsyspages += 1;
-#if 0
 	va->datalen = (ctx->nsyspages + ctx->nuserpages) << PAGE_SHIFT;
-#else
-	va->datalen = ctx->dsize;
-#endif
 
 	va->database = NULL;
 
@@ -555,16 +621,22 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 		(long long unsigned int)dumphdr->checksum,
 		dumphdr->nuserpages);
 
+	/*
+	 * Create (default) object used for transfering data out via mmap.
+	 * The size is in full pages already.  We may have some trailing
+	 * space at the end of the syspages before the user space pages.
+	 */
 	dev_ctx->objsz = round_page(va->datalen);
 	dev_ctx->obj = vm_object_allocate(OBJT_DEFAULT,
 	    OFF_TO_IDX(dev_ctx->objsz));
 
+	/* Get the syspages into the object. */
 	iov.iov_base = ctx->data;
-	iov.iov_len = va->datalen;
+	iov.iov_len = dumphdr->nsyspages << PAGE_SHIFT;
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_offset = 0;
-	uio.uio_resid = (ssize_t)va->datalen;
+	uio.uio_resid = iov.iov_len;
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_rw = UIO_WRITE;
 	uio.uio_td = curthread;
@@ -575,6 +647,23 @@ vps_snapshot(struct vps_dev_ctx *dev_ctx, struct vps *vps,
 		dev_ctx->obj = NULL;
 		dev_ctx->objsz = 0;
 		/* XXX-BZ append error message. */
+		goto out;
+	}
+
+	/* Get the user space process page content into the buffer. */
+	c = 0;
+	d = OFF_TO_IDX(round_page(dumphdr->nsyspages << PAGE_SHIFT));
+	while (c < dumphdr->nuserpages) {
+		error = vps_snapshot_dump_userpages(ctx, c, dev_ctx, d);
+		if (error != 0) {
+			vm_object_deallocate(dev_ctx->obj);
+			dev_ctx->obj = NULL;
+			dev_ctx->objsz = 0;
+			/* XXX-BZ append error message. */
+			goto out;
+		}
+		c++;
+		d++;
 	}
 
 	/*
