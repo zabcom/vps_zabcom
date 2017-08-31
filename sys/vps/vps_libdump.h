@@ -484,11 +484,11 @@ struct vps_dump_proc {
 
 	struct {
 		uint32 pl_nlimits;
-		uint32 _pad1;
+		uint32 pl_refcnt;
 		struct {
 			sint64 rlim_cur;
 			sint64 rlim_max;
-		} pl_rlimit[0x10];
+		} pl_rlimit[RLIM_NLIMITS];
 	} p_limit;
 };
 

@@ -3588,12 +3588,13 @@ vps_snapshot_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 	/* plimit */
 	/* XXX this is COW ... */
 
-	KASSERT(RLIM_NLIMITS < (sizeof(vdp->p_limit.pl_rlimit) /
+	KASSERT(RLIM_NLIMITS <= (sizeof(vdp->p_limit.pl_rlimit) /
 		sizeof(vdp->p_limit.pl_rlimit[0])),
 		("%s: vdp->p_limit.pl_rlimit too small\n",
 		__func__));
 
 	vdp->p_limit.pl_nlimits = RLIM_NLIMITS;
+	vdp->p_limit.pl_refcnt = p->p_limit->pl_refcnt;
 
 	for (i = 0; i < RLIM_NLIMITS; i++) {
 		vdp->p_limit.pl_rlimit[i].rlim_cur =

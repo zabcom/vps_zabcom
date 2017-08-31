@@ -3640,6 +3640,7 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	/* XXX check: vdp->p_limit.pl_nlimits == RLIM_NLIMITS */
 
 	np->p_limit = lim_alloc();
+	np->p_limit->pl_refcnt = vdp->p_limit.pl_refcnt;
 
 	for (i = 0; i < RLIM_NLIMITS; i++) {
 		np->p_limit->pl_rlimit[i].rlim_cur =
