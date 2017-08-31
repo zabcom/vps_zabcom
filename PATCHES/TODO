@@ -235,6 +235,25 @@ KDB: enter: panic
 Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
 ------------------------------------------
 
+Another panic we saw on restore was 0 + 0x40 I think:
+
+Most likely missing save/restore state?
+
+(kgdb) l *lim_cur+0x39
+0xffffffff80a57ba9 is in lim_cur (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_resource.c:1212).
+1207            struct proc *p = td->td_proc;
+1208
+1209            MPASS(td == curthread);
+1210            KASSERT(which >= 0 && which < RLIM_NLIMITS,
+1211                ("request for invalid resource limit"));
+1212            *rlp = td->td_limit->pl_rlimit[which];
+1213            if (p->p_sysent->sv_fixlimit != NULL)
+1214                    p->p_sysent->sv_fixlimit(rlp, which);
+1215    }
+1216
+
+------------------------------------------
+
 
 
 
