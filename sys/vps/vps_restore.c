@@ -3651,7 +3651,10 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	/* --- */
 	np->p_cpulimit = vdp->p_cpulimit;
 
-	knlist_init(np->p_klist, &np->p_mtx, NULL, NULL, NULL, NULL);
+	mtx_init(&np->p_mtx, "process lock", NULL, MTX_DEF | MTX_DUPOK | MTX_NEW);
+	knlist_alloc(&np->p_mtx);
+	/* XXX-BZ what else do we need to restore for this? */
+
 	STAILQ_INIT(&np->p_ktr);
 	strlcpy(np->p_comm, vdp->p_comm, sizeof(np->p_comm));
 
@@ -4716,6 +4719,11 @@ vps_restore_vps(struct vps_snapst_ctx *ctx, const char *vps_name,
 	}
 
 	while ((nexttype = vdo_typeofnext(ctx)) != VPS_DUMPOBJT_PGRP) {
+		if (nexttype == 0)
+			/* Believed to be seen when we had no procs in a VPS. */
+			panic("%s:%d nexttype %d is undeclared and leads to "
+			    "an endless loop; fixme by skippping this case?\n",
+			    __func__, __LINE__, nexttype);
 		switch (nexttype) {
 		case VPS_DUMPOBJT_SYSVSEM_VPS:
 			if (vps_func->sem_restore_vps)
@@ -4868,6 +4876,10 @@ vps_restore_copyin(struct vps_snapst_ctx *ctx, struct vps_arg_snapst *va)
 	ctx->data = NULL;
 	ctx->vmobj = NULL;
 
+#if 0
+/* XXX-BZ this makes not much sense on a user space supplied malloced buffer. */
+/* XXX-BZ mabe the snapshot length must be page sized? */
+/* XXX-BZ we could fix this in vpsctl by allocating an extra page and moving things appropriately. */
 	/* Snapshot must be page-aligned! */
 	if ((void *)trunc_page((unsigned long)va->database) !=
 	    va->database) {
@@ -4876,6 +4888,7 @@ vps_restore_copyin(struct vps_snapst_ctx *ctx, struct vps_arg_snapst *va)
 		error = EFAULT;
 		goto fail;
 	}
+#endif
 
 	if (vm_page_count_min()) {
 		ERRMSG(ctx, "%s: low on memory: v_free_min=%u > "
@@ -4900,8 +4913,9 @@ vps_restore_copyin(struct vps_snapst_ctx *ctx, struct vps_arg_snapst *va)
 		goto fail;
 	dumphdr = (struct vps_dumpheader *)ctx->data;
 
-	if (vld_checkheader(dumphdr)) {
-		ERRMSG(ctx, "%s: dump is invalid\n", __func__);
+	error = vld_checkheader(dumphdr);
+	if (error != 0) {
+		ERRMSG(ctx, "%s: dump is invalid: %d\n", __func__, error);
 		vld_printheader(dumphdr);
 		error = EINVAL;
 		goto fail;
@@ -5044,6 +5058,7 @@ vps_restore_copyin(struct vps_snapst_ctx *ctx, struct vps_arg_snapst *va)
 	if (vdo_checktree(ctx)) {
 		ERRMSG(ctx, "%s: dump tree is invalid !\n", __func__);
 		vdo_printtree(ctx);
+		/* XXX-BZ direct return??? */
 		return (EINVAL);
 	}
 	vdo_makeabsolute(ctx);
