@@ -244,6 +244,136 @@ Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
 1013            uma_zfree(proc_zone, p);
 1014            atomic_add_int(&V_nprocs, -1);
 1015    #ifdef VPS
+
+
+
+on reboot:
+panic: Bad link elm 0xfffff80007735540 prev->next != elm
+cpuid = 3
+time = 1504262883
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe083cb6e560
+vpanic() at vpanic+0x19c/frame 0xfffffe083cb6e5e0
+panic() at panic+0x43/frame 0xfffffe083cb6e640
+proc_reap() at proc_reap+0x678/frame 0xfffffe083cb6e690
+proc_to_reap() at proc_to_reap+0x383/frame 0xfffffe083cb6e6e0
+kern_wait6() at kern_wait6+0x2fd/frame 0xfffffe083cb6e790
+sys_wait4() at sys_wait4+0x78/frame 0xfffffe083cb6e980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe083cb6eab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe083cb6eab0
+--- syscall (7, FreeBSD ELF64, sys_wait4), rip = 0x42353a, rsp = 0x7fffffffe7a8, rbp = 0x7fffffffe810 ---
+KDB: enter: panic
+[ thread pid 1 tid 100002 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+db> show reg
+cs                        0x20
+ds                        0x3b
+es                        0x3b
+fs                        0x13
+gs                        0x1b
+ss                        0x28
+rax                       0x12
+rcx                       0x80
+rdx         0xfffffe083cb6e450
+rbx         0xffffffff8147ce08  thread_off_td_plist+0x2aa0
+rsp         0xfffffe083cb6e550
+rbp         0xfffffe083cb6e560
+rsi                       0x80
+rdi         0xffffffff81cc39e0  cnputs_mtx+0x18
+r8          0xffffffff80aa7690  putchar
+r9                       0x1d0
+r10         0xffffffff81bb5640  vga_conssoftc
+r11                       0x10
+r12         0xfffff80007737601
+r13         0xfffff80007735678
+r14         0xfffffe083cb6e620
+r15         0xfffff8000773b580
+rip         0xffffffff80aa132b  kdb_enter+0x3b
+rflags                    0x82
+kdb_enter+0x3b: movq    $0,kdb_why
+db> show alllocks
+Process 1 (init) thread 0xfffff8000773b580 (100002)
+exclusive sx proctree_0xfffff80007199800 (proctree_0xfffff80007199800) r = 0 (0xfffffe0000da92c8) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_exit.c:1287
+db> show allpcpu
+Current CPU: 3
+
+cpuid        = 0
+dynamic pcpu = 0x9b7c00
+curthread    = 0xfffff8000773b000: pid 11 tid 100003 "idle: cpu0"
+curpcb       = 0xfffffe083cb73b80
+fpcurthread  = none
+idlethread   = 0xfffff8000773b000: tid 100003 "idle: cpu0"
+curpmap      = 0xffffffff81ee4548
+tssp         = 0xffffffff81f16d10
+commontssp   = 0xffffffff81f16d10
+rsp0         = 0xfffffe083cb73b80
+gs32p        = 0xffffffff81f1d568
+ldt          = 0xffffffff81f1d5a8
+tss          = 0xffffffff81f1d598
+curvnet      = 0
+spin locks held:
+cpuid        = 1
+dynamic pcpu = 0xfffffe08bb0efc00
+curthread    = 0xfffff8000773a580: pid 11 tid 100004 "idle: cpu1"
+curpcb       = 0xfffffe083cb78b80
+fpcurthread  = none
+idlethread   = 0xfffff8000773a580: tid 100004 "idle: cpu1"
+curpmap      = 0xffffffff81ee4548
+tssp         = 0xffffffff81f16d78
+commontssp   = 0xffffffff81f16d78
+rsp0         = 0xfffffe083cb78b80
+gs32p        = 0xffffffff81f1d5d0
+ldt          = 0xffffffff81f1d610
+tss          = 0xffffffff81f1d600
+curvnet      = 0
+spin locks held:
+
+cpuid        = 2
+dynamic pcpu = 0xfffffe08bb0f7c00
+curthread    = 0xfffff8000773a000: pid 11 tid 100005 "idle: cpu2"
+curpcb       = 0xfffffe083cb7db80
+fpcurthread  = none
+idlethread   = 0xfffff8000773a000: tid 100005 "idle: cpu2"
+curpmap      = 0xffffffff81ee4548
+tssp         = 0xffffffff81f16de0
+commontssp   = 0xffffffff81f16de0
+rsp0         = 0xfffffe083cb7db80
+gs32p        = 0xffffffff81f1d638
+ldt          = 0xffffffff81f1d678
+tss          = 0xffffffff81f1d668
+curvnet      = 0
+spin locks held:
+cpuid        = 3
+dynamic pcpu = 0xfffffe08bb0ffc00
+curthread    = 0xfffff8000773b580: pid 1 tid 100002 "init"
+curpcb       = 0xfffffe083cb6eb80
+fpcurthread  = none
+idlethread   = 0xfffff80007739580: tid 100006 "idle: cpu3"
+curpmap      = 0xfffff8000d4f1130
+tssp         = 0xffffffff81f16e48
+commontssp   = 0xffffffff81f16e48
+rsp0         = 0xfffffe083cb6eb80
+gs32p        = 0xffffffff81f1d6a0
+ldt          = 0xffffffff81f1d6e0
+tss          = 0xffffffff81f1d6d0
+curvnet      = 0
+spin locks held:
+
+db>
+db> trace 100002
+Tracing pid 1 tid 100002 td 0xfffff8000773b580
+kdb_enter() at kdb_enter+0x3b/frame 0xfffffe083cb6e560
+vpanic() at vpanic+0x1b9/frame 0xfffffe083cb6e5e0
+panic() at panic+0x43/frame 0xfffffe083cb6e640
+proc_reap() at proc_reap+0x678/frame 0xfffffe083cb6e690
+proc_to_reap() at proc_to_reap+0x383/frame 0xfffffe083cb6e6e0
+kern_wait6() at kern_wait6+0x2fd/frame 0xfffffe083cb6e790
+sys_wait4() at sys_wait4+0x78/frame 0xfffffe083cb6e980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe083cb6eab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe083cb6eab0
+--- syscall (7, FreeBSD ELF64, sys_wait4), rip = 0x42353a, rsp = 0x7fffffffe7a8, rbp = 0x7fffffffe810 ---
+
+
 ------------------------------------------
 
 Another panic we saw on restore was 0 + 0x40 I think:
@@ -301,6 +431,44 @@ postsig() at postsig+0x2a6/frame 0xfffffe0860389a70
 ast() at ast+0x367/frame 0xfffffe0860389ab0
 doreti_ast() at doreti_ast+0x1f/frame 0x7fffffffdfa0
 
+
+(kgdb) l *postsig+0x2a6
+0xffffffff80a62f36 is at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_sig.c:3032.
+3027                     * Default action, where the default is to kill
+3028                     * the process.  (Other cases were ignored above.)
+3029                     */
+3030                    mtx_unlock(&ps->ps_mtx);
+3031                    proc_td_siginfo_capture(td, &ksi.ksi_info);
+3032                    sigexit(td, sig);
+3033                    /* NOTREACHED */
+3034            } else {
+3035                    /*
+3036                     * If we get here, the signal must be caught.
+(kgdb) l *sigexit+0x171
+0xffffffff80a61f91 is in sigexit (signalvar.h:298).
+293
+294     static __inline void
+295     ksiginfo_copy(ksiginfo_t *src, ksiginfo_t *dst)
+296     {
+297             (dst)->ksi_info = src->ksi_info;
+298             (dst)->ksi_flags = (src->ksi_flags & KSI_COPYMASK);
+299     }
+300
+301     static __inline void
+302     ksiginfo_set_sigev(ksiginfo_t *dst, struct sigevent *sigev)
+(kgdb) l *lim_cur+0x39
+0xffffffff80a57bc9 is in lim_cur (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_resource.c:1212).
+1207            struct proc *p = td->td_proc;
+1208
+1209            MPASS(td == curthread);
+1210            KASSERT(which >= 0 && which < RLIM_NLIMITS,
+1211                ("request for invalid resource limit"));
+1212            *rlp = td->td_limit->pl_rlimit[which];
+1213            if (p->p_sysent->sv_fixlimit != NULL)
+1214                    p->p_sysent->sv_fixlimit(rlp, which);
+1215    }
+1216
+
 ------------------------------------------
 
 After migration the dead VPS hangs around.  Seems the interface count is still up..
@@ -319,6 +487,11 @@ Processes:            0
 Sockets:              0
 Interfaces:           2
 Restore count:        0
+
+* still two interfaces;  never hit vps_destroy, need to add a panic there and trace back how we should get there next
+* printfs are there not seen so trace the callgraph on how to get there
+
+* also seeing two references left and I assume those are the two interfaces.
 
 --------------------------------------------------------------------------------
 
