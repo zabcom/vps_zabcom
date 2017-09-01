@@ -3516,11 +3516,11 @@ vps_restore_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 	if (error != 0)
 		goto out;
 
-	ntd->td_proc = p;
-	ntd->td_ucred = crhold(p->p_ucred);
 	ntd->td_vps = vps;
 	ntd->td_vps_acc = vps->vps_acc;
-
+	PROC_LOCK(p);
+	thread_cow_get_proc(ntd, p);
+	PROC_UNLOCK(p);
 	thread_link(ntd, p);
 
 	/* not yet */
