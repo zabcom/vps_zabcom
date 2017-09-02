@@ -218,6 +218,7 @@ KDB: enter: panic
 [ thread pid 1 tid 100185 ]
 Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
 
+This seems to be p_reaplist not properly saved and restored.
 
 (kgdb) l *proc_reap+0x657
 0xffffffff80a1b147 is at atomic.h:442.
@@ -400,6 +401,56 @@ Restore count:        0
 
 --------------------------------------------------------------------------------
 
+Fatal trap 12: page fault while in kernel mode
+cpuid = 4; apic id = 06
+fault virtual address   = 0x28
+fault code              = supervisor read data, page not present
+instruction pointer     = 0x20:0xffffffff80a161e9
+stack pointer           = 0x28:0xfffffe085ffba630
+frame pointer           = 0x28:0xfffffe085ffba640
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 1 ()
+[ thread pid 1 tid 100184 ]
+Stopped at      knlist_detach+0x9:      movq    0x28(%rbx),%rdi
+db> where
+Tracing pid 1 tid 100184 td 0xfffff8000df85000
+knlist_detach() at knlist_detach+0x9/frame 0xfffffe085ffba640
+proc_reap() at proc_reap+0x2d3/frame 0xfffffe085ffba690
+proc_to_reap() at proc_to_reap+0x383/frame 0xfffffe085ffba6e0
+kern_wait6() at kern_wait6+0x2fd/frame 0xfffffe085ffba790
+sys_wait4() at sys_wait4+0x78/frame 0xfffffe085ffba980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085ffbaab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085ffbaab0
+--- syscall (7, FreeBSD ELF64, sys_wait4), rip = 0x42353a, rsp = 0x7fffffffe778, rbp = 0x7fffffffe810 ---
+
+(kgdb) l *proc_reap+0x2d3
+0xffffffff80a1c7a3 is in proc_reap (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_exit.c:950).
+945                     procdesc_reap(p);
+946             sx_xunlock(&V_proctree_lock);
+947
+948             PROC_LOCK(p);
+949             knlist_detach(p->p_klist);
+950             p->p_klist = NULL;
+951             PROC_UNLOCK(p);
+952
+953             /*
+954              * Removal from allproc list and process group list paired with
+(kgdb) l *knlist_detach+0x9
+0xffffffff80a161e9 is in knlist_detach (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_event.c:2427).
+2422
+2423    void
+2424    knlist_detach(struct knlist *knl)
+2425    {
+2426
+2427            KNL_ASSERT_LOCKED(knl);
+2428            knl->kl_autodestroy = 1;
+2429            if (knlist_empty(knl)) {
+2430                    knlist_destroy(knl);
+2431                    free(knl, M_KQUEUE);
+
+--------------------------------------------------------------------------------
 
 
 
