@@ -2137,8 +2137,10 @@ vps_restore_pathtovnode(struct vps_snapst_ctx *ctx, struct vps *vps,
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
 		vdfp->fp_path, curthread);
 	error = namei(&nd);
-	if (error)
+	if (error) {
+		ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 		return (error);
+	}
 
 	/* XXX VREF() ?! */
 	*vnp = nd.ni_vp;
@@ -2230,14 +2232,20 @@ vps_restore_vnode(struct vps_snapst_ctx *ctx, struct vps *vps,
 {
 	int error;
 
-	if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_FILE_INODENUM)
+	if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_FILE_INODENUM) {
 		error = vps_restore_inodenumtovnode(ctx, vps, vnp);
-	else if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_FILE_PATH)
+		if (error)
+			ERRMSG(ctx, "%s:%d: VPS_DUMPOBJT_FILE_INODENUM %d\n",
+			    __func__, __LINE__, error);
+	} else if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_FILE_PATH) {
 		error = vps_restore_pathtovnode(ctx, vps, vnp);
-	else {
+		if (error)
+			ERRMSG(ctx, "%s:%d: VPS_DUMPOBJT_FILE_PATH %d\n",
+			    __func__, __LINE__, error);
+	} else {
 		ERRMSG(ctx, "%s: vdo_typeofnext(ctx)=%d\n",
 		    __func__, vdo_typeofnext(ctx));
-		return (EINVAL);
+		error = EINVAL;
 	}
 
 	return (error);
@@ -3546,6 +3554,7 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	struct thread *ntd;
 	struct nameidata nd;
 	caddr_t cpos;
+	u_int crflags;
 	int error = 0;
 	int i;
 
@@ -3653,7 +3662,7 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	np->p_cpulimit = vdp->p_cpulimit;
 
 	mtx_init(&np->p_mtx, "process lock", NULL, MTX_DEF | MTX_DUPOK | MTX_NEW);
-	knlist_alloc(&np->p_mtx);
+	np->p_klist = knlist_alloc(&np->p_mtx);
 	/* XXX-BZ what else do we need to restore for this? */
 
 	STAILQ_INIT(&np->p_ktr);
@@ -3667,6 +3676,9 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	np->p_stype = vdp->p_stype;
 	np->p_step = vdp->p_step;
 	np->p_args = NULL;
+
+	np->p_reaper = np;
+	LIST_INIT(&np->p_reaplist);	/* XXX-BZ proper save/restore. */
 
 	DBGR("%s: pid=%d p_flag=%08x p_oppid=%d\n",
 	    __func__, np->p_pid, np->p_flag, np->p_oppid);
@@ -3688,15 +3700,22 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	curthread->td_ucred = np->p_ucred;
 	prison_proc_hold(np->p_ucred->cr_prison);
 
+	crflags = curthread->td_ucred->cr_flags;
+	curthread->td_ucred->cr_flags &= ~CRED_FLAG_CAPMODE;
+
 	/* sysentvec */
-	if ((error = vps_restore_sysentvec(ctx, vps, np)))
+	if ((error = vps_restore_sysentvec(ctx, vps, np))) {
+		ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 		goto out;
+	}
 
 	/* ktrace */
 	if (vdp->p_have_tracevp) {
 		if ((error = vps_restore_vnode(ctx, vps,
-		    &np->p_tracevp)))
+		    &np->p_tracevp))) {
+			ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 			goto out;
+		}
 		/*
 		DBGR("%s: p_tracevp: path [%s] got vnode %p\n",
 		    __func__, o2->data, np->p_tracevp);
@@ -3714,20 +3733,26 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	/* textvp */
 	if (vdp->p_have_textvp) {
 		if ((error = vps_restore_vnode(ctx, vps,
-		    &np->p_textvp)))
+		    &np->p_textvp))) {
+			ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 			goto out;
+		}
 		DBGR("%s: p_textvp: path [...] got vnode %p\n",
 		    __func__, np->p_textvp);
 	}
 
 	/* vmspace */
-	if ((error = vps_restore_vmspace(ctx, vps, np, vdp->p_vmspace)))
+	if ((error = vps_restore_vmspace(ctx, vps, np, vdp->p_vmspace))) {
+		ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 		goto out;
+	}
 
 	TAILQ_INIT(&np->p_threads);
 	while (vdo_typeofnext(ctx) == VPS_DUMPOBJT_THREAD) {
-		if ((error = vps_restore_thread(ctx, vps, np)))
+		if ((error = vps_restore_thread(ctx, vps, np))) {
+			ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 			goto out;
+		}
 		vps_account(vps, VPS_ACC_THREADS, VPS_ACC_ALLOC, 1);
 	}
 	/* XXX lookup by id */
@@ -3738,30 +3763,40 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 
 	vps_account(vps, VPS_ACC_PROCS, VPS_ACC_ALLOC, 1);
 
-	if ((error = vps_restore_fdset(ctx, vps, np, vdp->p_fd)))
+	if ((error = vps_restore_fdset(ctx, vps, np, vdp->p_fd))) {
+		ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 		goto out;
+	}
 
 	while (vdo_nextischild(ctx, o1)) {
 
 		switch (vdo_typeofnext(ctx)) {
 		case VPS_DUMPOBJT_PARGS:
-			if ((error = vps_restore_pargs(ctx, vps, np)))
+			if ((error = vps_restore_pargs(ctx, vps, np))) {
+				ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 				goto out;
+			}
 			break;
 		case VPS_DUMPOBJT_SYSVSEM_PROC:
 			if (vps_func->sem_restore_proc && (error =
-			    vps_func->sem_restore_proc(ctx, vps, np)))
+			    vps_func->sem_restore_proc(ctx, vps, np))) {
+				ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 				goto out;
+			}
 			break;
 		case VPS_DUMPOBJT_SYSVSHM_PROC:
 			if (vps_func->shm_restore_proc && (error =
-			    vps_func->shm_restore_proc(ctx, vps, np)))
+			    vps_func->shm_restore_proc(ctx, vps, np))) {
+				ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 				goto out;
+			}
 			break;
 		case VPS_DUMPOBJT_SYSVMSG_PROC:
 			if (vps_func->msg_restore_proc && (error =
-			    vps_func->msg_restore_proc(ctx, vps, np)))
+			    vps_func->msg_restore_proc(ctx, vps, np))) {
+				ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
 				goto out;
+			}
 			break;
 		default:
 			DBGR("%s: unknown type=%d\n",
@@ -3770,6 +3805,7 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 		}
 
 	}
+	curthread->td_ucred->cr_flags = crflags;
 
 	/* proc tree */
 	save_vps = curthread->td_vps;
@@ -3793,7 +3829,7 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	sx_xunlock(&VPS_VPS(vps, allproc_lock));
 
 	if (TAILQ_EMPTY(&np->p_threads)) {
-		ERRMSG(ctx, "%s: process has no threads !\n", __func__);
+		ERRMSG(ctx, "%s:%d: process has no threads !\n", __func__, __LINE__);
 		error = 0;
 		goto out;
 	}
@@ -3838,8 +3874,8 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 			(void)vn_close(vp, FWRITE, curthread->td_ucred,
 			    curthread);
 		} else
-			ERRMSG(ctx, "%s: ktrace / vn_open error: %d\n",
-			    __func__, error1);
+			ERRMSG(ctx, "%s:%d: ktrace / vn_open error: %d\n",
+			    __func__, __LINE__, error1);
 	}
 
   out:
@@ -4138,7 +4174,8 @@ vps_restore_proc(struct vps_snapst_ctx *ctx, struct vps *vps)
 		if (PTRTO64(VPS_VPS(vps, initpgrp)) < 0x1000 ||
 		    PTRTO64(VPS_VPS(vps, initproc)) < 0x1000) {
 			ERRMSG(ctx, "%s: STOP\n", __func__);
-			return (EINVAL);
+			error = EINVAL;
+			/* FALL THROUGH for unlock. */
 		}
 	}
 
@@ -5144,6 +5181,10 @@ vps_restore(struct vps_dev_ctx *dev_ctx, struct vps_arg_snapst *va)
 
 	vps = NULL;
 	vps_save = curthread->td_vps;
+	KASSERT(curthread->td_vps == curthread->td_ucred->cr_vps,
+	    ("%s:%d curthread->td_vps=%p curthread->td_ucred->cr_vps=%p\n",
+	    __func__, __LINE__,
+	    curthread->td_vps, curthread->td_ucred->cr_vps));
 
 	ctx = malloc(sizeof(*ctx), M_VPS_RESTORE, M_WAITOK|M_ZERO);
 	LIST_INIT(&ctx->errormsgs);
@@ -5309,8 +5350,9 @@ vps_restore(struct vps_dev_ctx *dev_ctx, struct vps_arg_snapst *va)
 	curvnet = NULL;
 	curthread->td_vps = vps_save;
 	KASSERT(curthread->td_vps == curthread->td_ucred->cr_vps,
-	    ("%s: curthread->td_vps=%p curthread->td_ucred->cr_vps=%p\n",
-	    __func__, curthread->td_vps, curthread->td_ucred->cr_vps));
+	    ("%s:%d curthread->td_vps=%p curthread->td_ucred->cr_vps=%p\n",
+	    __func__, __LINE__,
+	    curthread->td_vps, curthread->td_ucred->cr_vps));
 
 	vps_restore_mod_refcnt--;
 
