@@ -206,8 +206,8 @@ struct {								\
 #if (defined(_KERNEL) && defined(INVARIANTS))
 #define	QMD_SLIST_CHECK_PREVPTR(prevp, elm) do {			\
 	if (*(prevp) != (elm))						\
-		panic("Bad prevptr *(%p) == %p != %p",			\
-		    (prevp), *(prevp), (elm));				\
+		panic("%s:%d Bad prevptr *(%p) == %p != %p",		\
+		    __func__, __LINE__, (prevp), *(prevp), (elm));	\
 } while (0)
 #else
 #define	QMD_SLIST_CHECK_PREVPTR(prevp, elm)
@@ -482,7 +482,8 @@ struct {								\
 	if (LIST_FIRST((head)) != NULL &&				\
 	    LIST_FIRST((head))->field.le_prev !=			\
 	     &LIST_FIRST((head)))					\
-		panic("Bad list head %p first->prev != head", (head));	\
+		panic("%s:%d Bad list head %p first->prev != head",	\
+		    __func__, __LINE__, (head));			\
 } while (0)
 
 /*
@@ -495,7 +496,8 @@ struct {								\
 	if (LIST_NEXT((elm), field) != NULL &&				\
 	    LIST_NEXT((elm), field)->field.le_prev !=			\
 	     &((elm)->field.le_next))					\
-	     	panic("Bad link elm %p next->prev != elm", (elm));	\
+		panic("%s:%d Bad link elm %p next->prev != elm",	\
+		    __func__, __LINE__, (elm));				\
 } while (0)
 
 /*
@@ -505,7 +507,8 @@ struct {								\
  */
 #define	QMD_LIST_CHECK_PREV(elm, field) do {				\
 	if (*(elm)->field.le_prev != (elm))				\
-		panic("Bad link elm %p prev->next != elm", (elm));	\
+		panic("%s:%d Bad link elm %p prev->next != elm",	\
+		    __func__, __LINE__, (elm));				\
 } while (0)
 #else
 #define	QMD_LIST_CHECK_HEAD(head, field)
@@ -661,7 +664,8 @@ struct {								\
 	if (!TAILQ_EMPTY(head) &&					\
 	    TAILQ_FIRST((head))->field.tqe_prev !=			\
 	     &TAILQ_FIRST((head)))					\
-		panic("Bad tailq head %p first->prev != head", (head));	\
+		panic("%s:%d Bad tailq head %p first->prev != head",	\
+		    __func__, __LINE__, (head));			\
 } while (0)
 
 /*
@@ -671,7 +675,8 @@ struct {								\
  */
 #define	QMD_TAILQ_CHECK_TAIL(head, field) do {				\
 	if (*(head)->tqh_last != NULL)					\
-	    	panic("Bad tailq NEXT(%p->tqh_last) != NULL", (head)); 	\
+		panic("%s:%d Bad tailq NEXT(%p->tqh_last) != NULL",	\
+		    __func__, __LINE__, (head)); 			\
 } while (0)
 
 /*
@@ -684,7 +689,8 @@ struct {								\
 	if (TAILQ_NEXT((elm), field) != NULL &&				\
 	    TAILQ_NEXT((elm), field)->field.tqe_prev !=			\
 	     &((elm)->field.tqe_next))					\
-		panic("Bad link elm %p next->prev != elm", (elm));	\
+		panic("%s:%d Bad link elm %p next->prev != elm",	\
+		    __func__, __LINE__, (elm));				\
 } while (0)
 
 /*
@@ -694,7 +700,8 @@ struct {								\
  */
 #define	QMD_TAILQ_CHECK_PREV(elm, field) do {				\
 	if (*(elm)->field.tqe_prev != (elm))				\
-		panic("Bad link elm %p prev->next != elm", (elm));	\
+		panic("%s:%d Bad link elm %p prev->next != elm",	\
+		    __func__, __LINE__, (elm));				\
 } while (0)
 #else
 #define	QMD_TAILQ_CHECK_HEAD(head, field)
