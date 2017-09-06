@@ -2730,15 +2730,16 @@ vps_snapshot_fdset(struct vps_snapst_ctx *ctx, struct vps *vps,
 		vdfd->fd_entries[i].cap_rights[1] =
 		    fdp->fd_ofiles[i].fde_caps.fc_rights.cr_rights[1];
 
-		if (fdp->fd_ofiles[i].fde_caps.fc_nioctls != -1 &&
-		    fdp->fd_ofiles[i].fde_caps.fc_fcntls != CAP_FCNTL_ALL) {
+		if (fdp->fd_ofiles[i].fde_nioctls != -1 &&
+		    (fdp->fd_ofiles[i].fde_fcntls & ~CAP_FCNTL_ALL) != 0) {
 			error = EINVAL;
 			ERRMSG(ctx, "%s: unsupported cap_rights: "
 			    "fc_nioctls=%d fc_fcntls=%08x\n", __func__,
-			    fdp->fd_ofiles[i].fde_caps.fc_nioctls,
-			    fdp->fd_ofiles[i].fde_caps.fc_fcntls);
+			    fdp->fd_ofiles[i].fde_nioctls,
+			    fdp->fd_ofiles[i].fde_fcntls);
 			goto out;
 		}
+		/* XXX-BZ properly save (and restore). cap_rights. */
 
 		DBGS("%s: idx=%d fp=%p\n", __func__, i, fp);
 
