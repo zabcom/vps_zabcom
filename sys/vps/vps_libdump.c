@@ -190,6 +190,7 @@ void vps_libdump_printheader(struct vps_dumpheader *h);
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <err.h>
