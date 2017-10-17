@@ -463,6 +463,9 @@ struct vps_dump_proc {
 
 	PTR(p_vmspace);
 
+	sint32 p_reaper_pid;
+	sint32 p_reapsubtree;
+
 	struct {
 		uint32 ps_maxsig;
 		uint32 ps_sigwords;
