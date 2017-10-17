@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_clock.h"
 #include "opt_cpu.h"
+#include "opt_ddb.h"
 #include "opt_hwpmc_hooks.h"
 #include "opt_isa.h"
 #include "opt_kdb.h"
@@ -69,6 +70,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/uio.h>
 #include <sys/vmmeter.h>
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
+
 #ifdef HWPMC_HOOKS
 #include <sys/pmckern.h>
 PMC_SOFT_DEFINE( , , page_fault, all);
@@ -945,3 +951,66 @@ amd64_syscall(struct thread *td, int traced)
 	if (td->td_frame->tf_rip >= VM_MAXUSER_ADDRESS)
 		set_pcb_flags(td->td_pcb, PCB_FULL_IRET);
 }
+
+
+#ifdef DDB
+void
+db_print_trapframe(struct trapframe *frame)
+{
+
+#define	DB_TRAPF_PREG(regn) \
+    db_printf(" %-12s\t0x%016jx\n", #regn, (uintmax_t)frame->regn)
+#define	DB_TRAPF_P32(regn) \
+    db_printf(" %-12s\t0x%08x\n", #regn, frame->regn)
+#define	DB_TRAPF_P16(regn) \
+    db_printf(" %-12s\t0x%04x\n", #regn, frame->regn)
+
+	DB_TRAPF_PREG(tf_rdi);
+	DB_TRAPF_PREG(tf_rsi);
+	DB_TRAPF_PREG(tf_rdx);
+	DB_TRAPF_PREG(tf_rcx);
+	DB_TRAPF_PREG(tf_r8);
+	DB_TRAPF_PREG(tf_r9);
+	DB_TRAPF_PREG(tf_rax);
+	DB_TRAPF_PREG(tf_rbx);
+	DB_TRAPF_PREG(tf_rbp);
+	DB_TRAPF_PREG(tf_r10);
+	DB_TRAPF_PREG(tf_r11);
+	DB_TRAPF_PREG(tf_r12);
+	DB_TRAPF_PREG(tf_r13);
+	DB_TRAPF_PREG(tf_r14);
+	DB_TRAPF_PREG(tf_r15);
+	DB_TRAPF_P32(tf_trapno);
+	DB_TRAPF_P16(tf_fs);
+	DB_TRAPF_P16(tf_gs);
+	DB_TRAPF_PREG(tf_addr);
+	DB_TRAPF_P32(tf_flags);
+	DB_TRAPF_P16(tf_es);
+	DB_TRAPF_P16(tf_ds);
+        /* below portion defined in hardware */
+	DB_TRAPF_PREG(tf_err);
+	DB_TRAPF_PREG(tf_rip);
+	DB_TRAPF_PREG(tf_cs);
+	DB_TRAPF_PREG(tf_rflags);
+        /* the amd64 frame always has the stack registers */
+	DB_TRAPF_PREG(tf_rsp);
+	DB_TRAPF_PREG(tf_ss);
+
+#undef DB_TRAPF_P16
+#undef DB_TRAPF_P32
+#undef DB_TRAPF_PREG
+}
+
+DB_SHOW_COMMAND(frame, amd64_print_trapframe)
+{
+	struct trapframe *frame;
+
+	if (!have_addr) {
+		db_printf("show frame <addr>\n");
+		return;
+	}
+
+	frame = (struct trapframe *)addr;
+	db_print_trapframe(frame);
+}
+#endif
