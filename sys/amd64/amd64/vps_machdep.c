@@ -45,6 +45,7 @@ __IDSTRING(vpsid, "$Id$");
 #include <machine/cpu.h>
 #include <machine/pcb.h>
 #include <machine/frame.h>
+#include <machine/md_var.h>
 #include <machine/vmparam.h>
 #include <machine/vps_md.h>
 
@@ -86,6 +87,9 @@ vps_md_print_thread(struct thread *td)
 int
 vps_md_snapshot_thread(struct vps_dump_thread *vdtd, struct thread *td)
 {
+
+	/* Ensure that thre thread's pcb is up to date. */
+	fpuexit(td);
 
 	return (0);
 }
