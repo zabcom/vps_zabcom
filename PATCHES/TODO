@@ -375,6 +375,260 @@ Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe083cb6eab0
 --- syscall (7, FreeBSD ELF64, sys_wait4), rip = 0x42353a, rsp = 0x7fffffffe7a8, rbp = 0x7fffffffe810 ---
 
 
+Further debugging seeing this on the original machine
+after migrating a VPS off.
+
+ 354355 root@rabbit3:~ # ps ax^M^M
+ 354356  PID TT  STAT     TIME COMMAND^M
+ 354357 XXX-BZ proc_reap:937 p 0xfffff80008e05000^M
+ 354358 XXX-BZ proc_reap:939 p 0xfffff80008e05000^M
+ 354359 XXX-BZ reaper_abandon_children:139 proc 0xfffff80008e05000 exiting 1^M
+ 354360 XXX-BZ proc_reap:941 p 0xfffff80008e05000^M
+ 354361 panic: proc_reap:943 Bad link elm 0xfffff80008e05000 next->prev != elm^M
+ 354362 cpuid = 2^M
+ 354363 time = 1505213136^M
+ 354364 KDB: stack backtrace:^M
+ 354365 db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085f69a560^M
+ 354366 vpanic() at vpanic+0x19c/frame 0xfffffe085f69a5e0^M
+ 354367 panic() at panic+0x43/frame 0xfffffe085f69a640^M
+ 354368 proc_reap() at proc_reap+0x712/frame 0xfffffe085f69a690^M
+ 354369 proc_to_reap() at proc_to_reap+0x383/frame 0xfffffe085f69a6e0^M
+ 354370 kern_wait6() at kern_wait6+0x2fd/frame 0xfffffe085f69a790^M
+ 354371 sys_wait4() at sys_wait4+0x78/frame 0xfffffe085f69a980^M
+
+    937 printf("XXX-BZ %s:%d p %p\n", __func__, __LINE__, p);
+    938         LIST_REMOVE(p, p_sibling);
+    939 printf("XXX-BZ %s:%d p %p\n", __func__, __LINE__, p);
+    940         reaper_abandon_children(p, true);
+    941 printf("XXX-BZ %s:%d p %p\n", __func__, __LINE__, p);
+    942 #if 1
+    943         LIST_REMOVE(p, p_reapsibling);                          // XXX-BZ kaboom due to list corruption
+    944 #endif
+    945 printf("XXX-BZ %s:%d p %p\n", __func__, __LINE__, p);
+
+Getting the panic for a process in the base system.
+db> show all proc
+shows an early abort running out of processes.
+
+Seems we are exactly 1 process short on the V_allproc
+list compared to V_nprocs.
+
+So the question is where on snpashot or "teardown" do we
+get this one process out of sync (corrupted) on the base system?
+Will that be all problems?  Best lead for the moment to go after
+these two data structures.
+
+XXX-BZ fork1:885 V_nprocs ++46, nprocs_new 46
+XXX-BZ fork1:885 V_nprocs ++47, nprocs_new 47
+XXX-BZ exit1:467 ++V_nprocs_zomb --1
+XXX-BZ proc_reap:938 p 0xfffff800586bb540
+XXX-BZ proc_reap:940 p 0xfffff800586bb540
+XXX-BZ reaper_abandon_children:139 proc 0xfffff800586bb540 exiting 1
+XXX-BZ proc_reap:942 p 0xfffff800586bb540
+XXX-BZ proc_reap:946 p 0xfffff800586bb540
+XXX-BZ proc_reap:950 p 0xfffff800586bb540
+XXX-BZ proc_reap:1029 V_nprocs --46
+XXX-BZ proc_reap:1031 V_nprocs_zomb 1--
+XXX-BZ exit1:467 ++V_nprocs_zomb --1
+XXX-BZ proc_reap:938 p 0xfffff80058e49540
+XXX-BZ proc_reap:940 p 0xfffff80058e49540
+XXX-BZ reaper_abandon_children:139 proc 0xfffff80058e49540 exiting 1
+XXX-BZ proc_reap:942 p 0xfffff80058e49540
+XXX-BZ proc_reap:946 p 0xfffff80058e49540
+XXX-BZ proc_reap:950 p 0xfffff80058e49540
+XXX-BZ proc_reap:1029 V_nprocs --45
+XXX-BZ proc_reap:1031 V_nprocs_zomb 1--
+XXX-BZ exit1:467 ++V_nprocs_zomb --1
+XXX-BZ proc_reap:938 p 0xfffff800586c0540
+XXX-BZ proc_reap:940 p 0xfffff800586c0540
+XXX-BZ reaper_abandon_children:139 proc 0xfffff800586c0540 exiting 1
+XXX-BZ proc_reap:942 p 0xfffff800586c0540
+panic: proc_reap:944 Bad link elm 0xfffff800586c0540 next->prev != elm
+cpuid = 3
+time = 1505218797
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085f924560
+vpanic() at vpanic+0x19c/frame 0xfffffe085f9245e0
+panic() at panic+0x43/frame 0xfffffe085f924640
+proc_reap() at proc_reap+0x76e/frame 0xfffffe085f924690
+proc_to_reap() at proc_to_reap+0x383/frame 0xfffffe085f9246e0
+kern_wait6() at kern_wait6+0x2fd/frame 0xfffffe085f924790
+sys_wait4() at sys_wait4+0x78/frame 0xfffffe085f924980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085f924ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f924ab0
+--- syscall (7, FreeBSD ELF64, sys_wait4), rip = 0x800e185da, rsp = 0x7fffffffe058, rbp = 0x7fffffffe130 ---
+KDB: enter: panic
+[ thread pid 1049 tid 100121 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+db> show proc 0xfffff800586c0540
+Process 1111 (sleep) at 0xfffff800586c0540:
+ state: ZOMBIE
+ uid: 0  gids: 0, 5
+ parent: pid 1049 at 0xfffff8000d91da80
+ ABI: FreeBSD ELF64
+ arguments: sleep 3600
+ threads: 1
+100133                   Inactv                              sleep
+ repear: 0xfffff80007737540
+ reapsubtree: 1042
+db> show proc 0xfffff80007737540
+Process 1 (init) at 0xfffff80007737540:
+ state: NORMAL
+ uid: 0  gids: 0
+ parent: pid 0 at 0xffffffff81ef1940
+ ABI: FreeBSD ELF64
+ arguments: /sbin/init --
+ threads: 1
+100002                   S       wait    0xfffff80007737540  [init]
+ repear: 0xffffffff81ef1940
+ reapsubtree: 1
+db> show proc 1042
+Process 1042 (login) at 0xfffff80007735a80:
+ state: NORMAL
+ uid: 0  gids: 0, 5
+ parent: pid 1 at 0xfffff80007737540
+ ABI: FreeBSD ELF64
+ arguments: login [pam]
+ threads: 1
+100094                   S       wait    0xfffff80007735a80  login
+ repear: 0xfffff80007737540
+ reapsubtree: 1042
+db> show all proc
+  pid  ppid  pgrp   uid  state   wmesg   wchan               cmd
+ 1075     0     0     0  DL      bored   0xffffffff80dad830  [vps_console]
+ 1059     0     0     0  DL      pause   0xffffffff81cd4032  [vps_account]
+ 1049  1042  1049     0  R+      CPU 3                       csh
+ 1042     1  1042     0  Ss+     wait    0xfffff80007735a80  login
+ 1041     1  1041     0  Ss+     ttyin   0xfffff8000d09b0b0  getty
+ 1040     1  1040     0  Ss+     ttyin   0xfffff8000d09b4b0  getty
+ 1039     1  1039     0  Ss+     ttyin   0xfffff8000d09b8b0  getty
+ 1038     1  1038     0  Ss+     ttyin   0xfffff8000d09bcb0  getty
+ 1037     1  1037     0  Ss+     ttyin   0xfffff8000d09d0b0  getty
+ 1036     1  1036     0  Ss+     ttyin   0xfffff8000d09d4b0  getty
+ 1035     1  1035     0  Ss+     ttyin   0xfffff8000d09d8b0  getty
+ 1034     1  1034     0  Ss+     ttyin   0xfffff8000d09dcb0  getty
+  991     1   991     0  Ss      nanslp  0xffffffff81cd52c1  cron
+  987     1   987     0  Ss      select  0xfffff8000d01cb40  sshd
+  956     1   956     0  Ss      select  0xfffff8000d01cbc0  powerd
+  917     1   917     0  Ss      rpcsvc  0xfffff8000bffa8a0  NLM: master
+  913     1   913     0  Ss      select  0xfffff8000d02d8c0  rpc.statd
+  792     1   792     0  Ss      select  0xfffff8000d02dac0  rpcbind
+  782     1   782     0  Ss      select  0xfffff8000d01d340  syslogd
+  668     1   668     0  Ss      select  0xfffff8000dbeb840  devd
+   34     0     0     0  SL      -       0xffffffff81ee7850  [newnfs 0]
+   22     0     0     0  DL      vlruwt  0xfffff8000d0dea80  [vnlru]
+   21     0     0     0  DL      syncer  0xffffffff81e6e780  [syncer]
+   20     0     0     0  DL      -       0xffffffff81e6dc0c  [bufspacedaemon]
+   19     0     0     0  DL      psleep  0xffffffff81e6cf04  [bufdaemon]
+   18     0     0     0  DL      psleep  0xffffffff81e76d9c  [vmdaemon]
+   17     0     0     0  DL      (threaded)                  [pagedaemon]
+100079                   D       psleep  0xffffffff81f23f05  [pagedaemon]
+100080                   D       launds  0xffffffff81e76d44  [laundry: dom0]
+100082                   D       umarcl  0xffffffff81e766e8  [uma]
+   16     0     0     0  DL      idle    0xfffff80007736540  [enc_daemon0]
+   15     0     0     0  DL      -       0xffffffff81ba8338  [rand_harvestq]
+    9     0     0     0  DL      waiting 0xffffffff81f18e70  [sctp_iterator]
+    8     0     0     0  DL      -       0xffffffff81e6c774  [soaiod4]
+    7     0     0     0  DL      -       0xffffffff81e6c774  [soaiod3]
+    6     0     0     0  DL      -       0xffffffff81e6c774  [soaiod2]    5     0     0     0  DL      -       0xffffffff81e6c774  [soaiod1]
+   14     0     0     0  DL      (threaded)                  [usb]
+100055                   D       -       0xfffffe0000f32d10  [usbus0]
+100056                   D       -       0xfffffe0000f32d68  [usbus0]
+100057                   D       -       0xfffffe0000f32dc0  [usbus0]
+100058                   D       -       0xfffffe0000f32e18  [usbus0]
+100059                   D       -       0xfffffe0000f32e70  [usbus0]
+100061                   D       -       0xfffffe0001018d10  [usbus1]
+100062                   D       -       0xfffffe0001018d68  [usbus1]
+100063                   D       -       0xfffffe0001018dc0  [usbus1]
+100064                   D       -       0xfffffe0001018e18  [usbus1]
+100065                   D       -       0xfffffe0001018e70  [usbus1]
+    4     0     0     0  DL      (threaded)                  [cam]
+100037                   D       -       0xffffffff81a7b600  [doneq0]
+100077                   D       -       0xffffffff81a7b448  [scanner]
+    3     0     0     0  DL      crypto_ 0xffffffff81e74af0  [crypto returns]
+    2     0     0     0  DL      crypto_ 0xffffffff81e74998  [crypto]
+   13     0     0     0  DL      (threaded)                  [geom]
+100028                   D       -       0xffffffff81ef1900  [g_event]
+100029                   D       -       0xffffffff81ef1908  [g_up]
+100030                   D       -       0xffffffff81ef1910  [g_down]
+   12     0     0     0  WL      (threaded)                  [intr]
+100007                   I                                   [swi1: netisr 0]
+100008                   I                                   [swi3: vm]
+100009                   I                                   [swi4: clock (0)]
+100010                   I                                   [swi4: clock (1)]
+100011                   I                                   [swi4: clock (2)]
+100012                   I                                   [swi4: clock (3)]
+100022                   I                                   [swi5: fast taskq]
+100024                   I                                   [swi6: task queue]
+100025                   I                                   [swi6: Giant taskq]
+100038                   I                                   [irq264: t5nex0:err]
+100039                   I                                   [irq265: t5nex0:evt]
+100040                   I                                   [irq266: t5nex0:0a0]
+100041                   I                                   [irq267: t5nex0:0a1]
+100042                   I                                   [irq268: t5nex0:0a2]
+100043                   I                                   [irq269: t5nex0:0a3]
+100044                   I                                   [irq270: t5nex0:0A0]
+100045                   I                                   [irq271: t5nex0:0A1]
+100046                   I                                   [irq272: t5nex0:1a0]
+100047                   I                                   [irq273: t5nex0:1a1]
+100048                   I                                   [irq274: t5nex0:1a2]
+100049                   I                                   [irq275: t5nex0:1a3]
+100050                   I                                   [irq276: t5nex0:1A0]
+100051                   I                                   [irq277: t5nex0:1A1]
+100052                   I                                   [irq278: isci0]
+100053                   I                                   [irq279: isci0]
+100054                   I                                   [irq16: ehci0]
+100060                   I                                   [irq23: ehci1]
+100066                   I                                   [irq290: ahci0]
+100067                   I                                   [swi0: uart uart]
+   11     0     0     0  RL      (threaded)                  [idle]
+100003                   Run     CPU 0                       [idle: cpu0]
+100004                   Run     CPU 1                       [idle: cpu1]
+100005                   Run     CPU 2                       [idle: cpu2]
+100006                   CanRun                              [idle: cpu3]
+    1     0     1     0  SLs     wait    0xfffff80007737540  [init]
+   10     0     0     0  DL      audit_w 0xffffffff81f19b58  [audit]
+    0     0     0     0  DLs     (threaded)                  [kernel]
+100000                   D       swapin  0xffffffff81ef1940  [swapper]
+100013                   D       -       0xfffff8000770bd00  [softirq_0]
+100014                   D       -       0xfffff8000770bb00  [softirq_1]
+100015                   D       -       0xfffff8000770b900  [softirq_2]
+100016                   D       -       0xfffff8000770b700  [softirq_3]
+100017                   D       -       0xfffff800077a5100  [if_io_tqg_0]
+100018                   D       -       0xfffff800077a4e00  [if_io_tqg_1]
+100019                   D       -       0xfffff800077a4c00  [if_io_tqg_2]
+100020                   D       -       0xfffff800077a4a00  [if_io_tqg_3]
+100021                   D       -       0xfffff800077a4800  [if_config_tqg_0]
+100023                   D       -       0xfffff800077a4400  [kqueue_ctx taskq]
+100026                   D       -       0xfffff800077a3d00  [thread taskq]
+100027                   D       -       0xfffff800077a3b00  [aiod_kick taskq]
+100031                   D       -       0xfffff800077a3500  [firmware taskq]
+100034                   D       -       0xfffff800077a2e00  [acpi_task_0]
+100035                   D       -       0xfffff800077a2e00  [acpi_task_1]
+100036                   D       -       0xfffff800077a2e00  [acpi_task_2]
+100068                   D       -       0xfffff80008d22200  [mca taskq]
+100073                   D       -       0xffffffff81cd4030  [deadlkres]
+100076                   D       -       0xfffff800077a2a00  [CAM taskq]
+100115                   D       -       0xfffff8000770a200  [t5nex0 tq0]
+100116                   D       -       0xfffff80007709e00  [t5nex0 tq1]
+100117                   D       -       0xfffff8000770a100  [t5nex0 tq2]
+100118                   D       -       0xfffff8000770b400  [t5nex0 tq3]
+oops, ran out of processes early!
+nprocs = 45, np = 0
+db> show proc 1049
+Process 1049 (csh) at 0xfffff8000d91da80:
+ state: NORMAL
+ uid: 0  gids: 0, 5
+ parent: pid 1042 at 0xfffff80007735a80
+ ABI: FreeBSD ELF64
+ arguments: -csh
+ threads: 1
+100121                   Run     CPU 3                       csh
+ repear: 0xfffff80007737540
+ reapsubtree: 1042
+
+
+
 ------------------------------------------
 
 After migration the dead VPS hangs around.  Seems the interface count is still up..
@@ -452,8 +706,848 @@ Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085ffbaab0
 
 --------------------------------------------------------------------------------
 
+Not all processes are restored on the far end it seems; well or they exit..
+
+5782574 XXX-BZ proc_reap:942 p 0xfffff8001702d000^M
+5782575 XXX-BZ proc_reap:946 p 0xfffff8001702d000^M
+5782576 XXX-BZ proc_reap:950 p 0xfffff8001702d000^M
+5782577 XXX-BZ proc_reap:1029 V_nprocs --46^M
+5782578 XXX-BZ proc_reap:1031 V_nprocs_zomb 1--^M
+5782579 XXX-BZ fork1:885 V_nprocs ++47, nprocs_new 47^M
+5782580 XXX-BZ fork1:885 V_nprocs ++48, nprocs_new 48^M
+5782581 vps1: bpf attached^M
+5782582 XXX-BZ fork1:885 V_nprocs ++49, nprocs_new 49^M
+5782583 XXX-BZ vps_restore_proc_one:3887 p 0xfffff80008d66000 pid 14^M
+5782584 XXX-BZ fork1:885 V_nprocs ++50, nprocs_new 50^M
+5782585 XXX-BZ vps_restore_proc_one:3887 p 0xfffff8000bfda540 pid 10^M
+5782586 XXX-BZ exit1:467 V_nprocs_zomb ++1^M
+5782587 XXX-BZ proc_reap:938 p 0xfffff80008d6b000^M
+5782588 XXX-BZ proc_reap:940 p 0xfffff80008d6b000^M
+5782589 XXX-BZ reaper_abandon_children:139 proc 0xfffff80008d6b000 exiting 1^M
+5782590 XXX-BZ proc_reap:942 p 0xfffff80008d6b000^M
+5782591 XXX-BZ proc_reap:946 p 0xfffff80008d6b000^M
+5782592 XXX-BZ proc_reap:950 p 0xfffff80008d6b000^M
+5782593 XXX-BZ vps_restore_proc_one:3887 p 0xfffff8000d1ad540 pid 2^M
+5782594 XXX-BZ proc_reap:1029 V_nprocs --49^M
+5782595 XXX-BZ proc_reap:1031 V_nprocs_zomb 1--^M
+5782596 XXX-BZ vps_restore_proc_one:3887 p 0xfffff8000d1ad000 pid 1^M
+5782597 lock order reversal:^M
 
 
+This also seems to indicate that they are attached to the wrong VPS
+initially as the process count (which I assume the base system)
+goes up by 4 at the same time we restore the 4 processes.
+
+
+--------------------------------------------------------------------------------
+
+
+XXX-BZ proc_reap:946 p 0xfffff8003a1ba540
+XXX-BZ proc_reap:950 p 0xfffff8003a1ba540
+XXX-BZ proc_reap:1029 V_nprocs --46
+XXX-BZ proc_reap:1031 V_nprocs_zomb 1--
+XXX-BZ fork1:885 V_nprocs ++47, nprocs_new 47
+spin lock 0xfffff80007712000 (vps accounting) held by 0xfffff8000d7d7580 (tid 100133) too long
+panic: spin lock held too long
+cpuid = 2
+time = 1505392988
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085f68a620
+vpanic() at vpanic+0x19c/frame 0xfffffe085f68a6a0
+panic() at panic+0x43/frame 0xfffffe085f68a700
+_mtx_lock_spin_cookie() at _mtx_lock_spin_cookie+0x328/frame 0xfffffe085f68a780
+__mtx_lock_spin_flags() at __mtx_lock_spin_flags+0xe0/frame 0xfffffe085f68a7c0
+_vps_account_runnable() at _vps_account_runnable+0x45/frame 0xfffffe085f68a7f0
+choosethread() at choosethread+0x69/frame 0xfffffe085f68a810
+sched_switch() at sched_switch+0x3d0/frame 0xfffffe085f68a870
+mi_switch() at mi_switch+0x18b/frame 0xfffffe085f68a8a0
+sleepq_switch() at sleepq_switch+0x10f/frame 0xfffffe085f68a8e0
+sleepq_catch_signals() at sleepq_catch_signals+0x308/frame 0xfffffe085f68a950
+sleepq_timedwait_sig() at sleepq_timedwait_sig+0x14/frame 0xfffffe085f68a990
+_sleep() at _sleep+0x304/frame 0xfffffe085f68aa30
+nfssvc_iod() at nfssvc_iod+0x109/frame 0xfffffe085f68aa70
+fork_exit() at fork_exit+0x84/frame 0xfffffe085f68aab0
+fork_trampoline() at fork_trampoline+0xe/frame 0xfffffe085f68aab0
+--- trap 0, rip = 0, rsp = 0, rbp = 0 ---
+KDB: enter: panic
+[ thread pid 34 tid 100089 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+db>
+db>
+db> show alllocks
+Process 1096 (sh) thread 0xfffff8000d7d7580 (100133)
+exclusive sleep mutex vm page (vm page) r = 0 (0xffffffff81f20080) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vm/vm_page.c:1523
+exclusive rw vm object (vm object) r = 0 (0xfffff8003a2ac2d0) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vm/vm_object.c:1757
+exclusive rw vm object (vm object) r = 0 (0xfffff8003a2ac000) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vm/vm_object.c:629
+Process 793 (syslogd) thread 0xfffff8000db4b000 (100117)
+exclusive sleep mutex ncl_iod_mutex (ncl_iod_mutex) r = 0 (0xffffffff81eec818) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/fs/nfsclient/nfs_clbio.c:1435
+exclusive lockmgr nfs (nfs) r = 0 (0xfffff8000dd79068) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_vnops.c:881
+db> show reg
+cs                        0x20
+ds                        0x3b
+es                        0x3b
+fs                        0x13
+gs                        0x1b
+ss                        0x28
+rax                       0x12
+rcx                       0x80
+rdx         0xfffffe085f68a510
+rbx         0xffffffff8148c8a9  thread_off_td_plist+0x2b81
+rsp         0xfffffe085f68a610
+rbp         0xfffffe085f68a620
+rsi                       0x80
+rdi         0xffffffff81cd69e0  cnputs_mtx+0x18
+r8          0xffffffff80aad710  putchar
+r9                       0x1d0
+r10         0xffffffff81bc8640  vga_conssoftc
+r11                       0x10
+r12         0xfffff8000d7d7501
+r13         0xfffff80007712018
+r14         0xfffffe085f68a6e0
+r15         0xfffff8000bf5b000
+rip         0xffffffff80aa736b  kdb_enter+0x3b
+rflags                    0x86
+kdb_enter+0x3b: movq    $0,kdb_why
+
+
+--------------------------------------------------------------------------------
+
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f97fab0
+--- syscall (4, FreeBSD ELF64, sys_write), rip = 0x80158a65a, rsp = 0x7fffffffd8e8, rbp = 0x7fffffffd910 ---
+vn_fullpath1_fallback: WARNING: looking up by vn_fullpath1_findparentdir(vp=0xfffff800338e7ce8, ...)
+XXX-BZ vps_deref:883 vps 0xfffff80008f81800 last 0 vps_refcnt 17 ucred 0xffffffff809fd430
+XXX-BZ vps_deref:883 vps 0xfffff80008f81800 last 0 vps_refcnt 17 ucred 0xffffffff809fd430
+XXX-BZ vps_deref:883 vps 0xfffff80008f81800 last 0 vps_refcnt 17 ucred 0xffffffff809fd430
+sched_switch() at sched_switch+0x4e0/frame 0xfffffe085f8ec900
+mi_switch() at mi_switch+0x18b/frame 0xfffffe085f8ec930
+thread_suspend_check() at thread_suspend_check+0x93/frame 0xfffffe085f8ec980
+amd64_syscall() at amd64_syscall+0x160/frame 0xfffffe085f8ecab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f8ecab0
+--- syscall (93, FreeBSD ELF64, sys_select), rip = 0x8015fa61a, rsp = 0x7fffffffce78, rbp = 0x7fffffffd8f0 ---
+
+
+Fatal trap 12: page fault while in kernel mode
+cpuid = 2; apic id = 06
+fault virtual address   = 0x408
+fault code              = supervisor read data, page not present
+instruction pointer     = 0x20:0xffffffff80a6cd1d
+stack pointer           = 0x28:0xfffffe085f984400
+frame pointer           = 0x28:0xfffffe085f9844b0
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 1131 (vpsctl)
+[ thread pid 1131 tid 100139 ]
+Stopped at      _sx_xlock_hard+0x4ad:   movl    0x408(%r15),%eax
+db> where
+Tracing pid 1131 tid 100139 td 0xfffff8000dc42580
+_sx_xlock_hard() at _sx_xlock_hard+0x4ad/frame 0xfffffe085f9844b0
+_sx_xlock() at _sx_xlock+0xc5/frame 0xfffffe085f9844f0
+sblock() at sblock+0x9d/frame 0xfffffe085f984510
+vps_snapshot_socket() at vps_snapshot_socket+0x8d/frame 0xfffffe085f984580
+vps_snapshot() at vps_snapshot+0x22d5/frame 0xfffffe085f984660
+vps_ioc_snapshot() at vps_ioc_snapshot+0x9f/frame 0xfffffe085f984690
+devfs_ioctl() at devfs_ioctl+0xc0/frame 0xfffffe085f9846e0
+VOP_IOCTL_APV() at VOP_IOCTL_APV+0xe0/frame 0xfffffe085f984710
+vn_ioctl() at vn_ioctl+0x124/frame 0xfffffe085f984820
+devfs_ioctl_f() at devfs_ioctl_f+0x1f/frame 0xfffffe085f984840
+kern_ioctl() at kern_ioctl+0x2cd/frame 0xfffffe085f9848a0
+sys_ioctl() at sys_ioctl+0x16f/frame 0xfffffe085f984980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085f984ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f984ab0
+--- syscall (54, FreeBSD ELF64, sys_ioctl), rip = 0x8009bb6da, rsp = 0x7fffffffb2a8, rbp = 0x7fffffffb550 ---
+
+db> show alllocks
+Process 1131 (vpsctl) thread 0xfffff8000dc42580 (100139)
+exclusive sx filedesc structure (filedesc structure) r = 0 (0xfffff8000defa040) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_snapst/../../vps/vps_snapst.c:2687
+shared sx allproc_0xfffff80008f81800 (allproc_0xfffff80008f81800) r = 0 (0xfffffe0002bbe2a8) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_snapst/../../vps/vps_snapst.c:1930
+exclusive sx vps instance 0xfffff80008f81800 lock (vps instance 0xfffff80008f81800 lock) r = 0 (0xfffff80008f81838) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_dev/../../vps/vps_user.c:431
+shared sx lock of all vps instances (lock of all vps instances) r = 0 (0xffffffff81f29c60) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_dev/../../vps/vps_user.c:425
+Process 789 (syslogd) thread 0xfffff8000dc45580 (100122)
+exclusive sleep mutex vm inactive pagequeue (vm pagequeue) r = 0 (0xffffffff81f27200) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vm/vm_page.c:2963
+exclusive sleep mutex vm page (vm page) r = 0 (0xffffffff81f21500) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_bio.c:2639
+exclusive rw vm object (vm object) r = 0 (0xfffff8000dc0fd20) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_bio.c:2747
+exclusive lockmgr bufwait (bufwait) r = 0 (0xfffffe07c63f7a50) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_subr.c:1756
+exclusive lockmgr nfs (nfs) r = 0 (0xfffff8000de3f5f0) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_vnops.c:881
+db> show reg
+cs                        0x20
+ds                        0x3b
+es                        0x3b
+fs                        0x13
+gs                        0x1b
+ss                        0x28
+rax                        0x3
+rcx                          0
+rdx                          0
+rbx         0xfffff8000df745b0
+rsp         0xfffffe085f984400
+rbp         0xfffffe085f9844b0
+rsi                          0
+rdi         0xfffff8000df745b0
+r8          0xffffffff8149d5f8  ttystates+0x2118
+r9                       0x118
+r10                          0
+r11                        0x2
+r12                          0
+r13                          0
+r14         0xfffff8000dc42580
+r15                          0
+rip         0xffffffff80a6cd1d  _sx_xlock_hard+0x4ad
+rflags                 0x10246  _binary_t5fw_cfg_uwire_txt_size+0xace7
+_sx_xlock_hard+0x4ad:   movl    0x408(%r15),%eax
+
+db> ps
+  pid  ppid  pgrp   uid  state   wmesg   wchan               cmd
+ 1132  1131  1129     0  S+      select  0xfffff8000da57d40  ssh
+ 1131  1129  1129     0  R+      CPU 2                       vpsctl
+ 1129  1060  1129     0  S+      wait    0xfffff80008e00000  sh
+ 1085     0     0     0  SL      select  0xfffff8000d060ec0  [vps_console]
+ 1070     0     0     0  DL      pause   0xffffffff81cd9031  [vps_account]
+ 1060  1045  1060     0  S+      pause   0xfffff8000d0e5b28  csh
+ 1045     1  1045     0  Ss+     wait    0xfffff8000bf50000  login
+ 1044     1  1044     0  Ss+     ttyin   0xfffff80007937cb0  getty
+ 1043     1  1043     0  Ss+     ttyin   0xfffff800079380b0  getty
+ 1042     1  1042     0  Ss+     ttyin   0xfffff800079384b0  getty
+ 1041     1  1041     0  Ss+     ttyin   0xfffff800079388b0  getty
+ 1040     1  1040     0  Ss+     ttyin   0xfffff80007938cb0  getty
+ 1039     1  1039     0  Ss+     ttyin   0xfffff800079390b0  getty
+ 1038     1  1038     0  Ss+     ttyin   0xfffff800079394b0  getty
+ 1037     1  1037     0  Ss+     ttyin   0xfffff800079398b0  getty
+  994     1   994     0  Ss      nanslp  0xffffffff81cda2c1  cron
+  990     1   990     0  Ss      select  0xfffff8000d07d540  sshd
+  959     1   959     0  Ss      select  0xfffff80008fc90c0  powerd
+  920     1   920     0  Ss      rpcsvc  0xfffff8000d06c7a0  NLM: master
+  916     1   916     0  Ss      select  0xfffff80008f93b40  rpc.statd
+  799     1   799     0  Ss      select  0xfffff80008f93a40  rpcbind
+  789     1   789     0  Rs      CPU 0                       syslogd
+  675     1   675     0  Ss      select  0xfffff8000d07d4c0  devd
+   34     0     0     0  SL      -       0xffffffff81eec850  [newnfs 0]
+   22     0     0     0  DL      vlruwt  0xfffff8000d0e6a80  [vnlru]
+   21     0     0     0  DL      syncer  0xffffffff81e73780  [syncer]
+   20     0     0     0  DL      -       0xffffffff81e72c0c  [bufspacedaemon]
+   19     0     0     0  DL      psleep  0xffffffff81e71f04  [bufdaemon]
+   18     0     0     0  DL      psleep  0xffffffff81e7bd9c  [vmdaemon]
+   17     0     0     0  DL      (threaded)                  [pagedaemon]
+100079                   D       psleep  0xffffffff81f28f05  [pagedaemon]
+100085                   D       launds  0xffffffff81e7bd44  [laundry: dom0]
+100086                   D       umarcl  0xffffffff81e7b6e8  [uma]
+   16     0     0     0  DL      idle    0xfffff8000bf50a80  [enc_daemon0]
+   15     0     0     0  DL      -       0xffffffff81bad338  [rand_harvestq]
+    9     0     0     0  DL      waiting 0xffffffff81f1de70  [sctp_iterator]
+    8     0     0     0  DL      -       0xffffffff81e71774  [soaiod4]
+    7     0     0     0  DL      -       0xffffffff81e71774  [soaiod3]
+    6     0     0     0  DL      -       0xffffffff81e71774  [soaiod2]
+    5     0     0     0  DL      -       0xffffffff81e71774  [soaiod1]
+   14     0     0     0  DL      (threaded)                  [usb]
+100055                   D       -       0xfffffe0000f32d10  [usbus0]
+100056                   D       -       0xfffffe0000f32d68  [usbus0]
+100057                   D       -       0xfffffe0000f32dc0  [usbus0]
+100058                   D       -       0xfffffe0000f32e18  [usbus0]
+100059                   D       -       0xfffffe0000f32e70  [usbus0]
+100061                   D       -       0xfffffe0001018d10  [usbus1]
+100062                   D       -       0xfffffe0001018d68  [usbus1]
+100063                   D       -       0xfffffe0001018dc0  [usbus1]
+100064                   D       -       0xfffffe0001018e18  [usbus1]
+100065                   D       -       0xfffffe0001018e70  [usbus1]
+    4     0     0     0  DL      (threaded)                  [cam]
+100037                   D       -       0xffffffff81a80600  [doneq0]
+100077                   D       -       0xffffffff81a80448  [scanner]
+    3     0     0     0  DL      crypto_ 0xffffffff81e79af0  [crypto returns]
+    2     0     0     0  DL      crypto_ 0xffffffff81e79998  [crypto]
+   13     0     0     0  DL      (threaded)                  [geom]
+100028                   D       -       0xffffffff81ef6900  [g_event]
+100029                   D       -       0xffffffff81ef6908  [g_up]
+100030                   D       -       0xffffffff81ef6910  [g_down]
+   12     0     0     0  WL      (threaded)                  [intr]
+100007                   I                                   [swi1: netisr 0]
+100008                   I                                   [swi3: vm]
+100009                   I                                   [swi4: clock (0)]
+100010                   I                                   [swi4: clock (1)]
+100011                   I                                   [swi4: clock (2)]
+100012                   I                                   [swi4: clock (3)]
+100022                   I                                   [swi5: fast taskq]
+100024                   I                                   [swi6: task queue]
+100025                   I                                   [swi6: Giant taskq]
+100038                   I                                   [irq264: t5nex0:err]
+100039                   I                                   [irq265: t5nex0:evt]
+100040                   I                                   [irq266: t5nex0:0a0]
+100041                   I                                   [irq267: t5nex0:0a1]
+100042                   I                                   [irq268: t5nex0:0a2]
+100043                   I                                   [irq269: t5nex0:0a3]
+100044                   I                                   [irq270: t5nex0:0A0]
+100045                   I                                   [irq271: t5nex0:0A1]
+100046                   I                                   [irq272: t5nex0:1a0]
+100047                   I                                   [irq273: t5nex0:1a1]
+100048                   I                                   [irq274: t5nex0:1a2]
+100049                   I                                   [irq275: t5nex0:1a3]
+100050                   I                                   [irq276: t5nex0:1A0]
+100051                   I                                   [irq277: t5nex0:1A1]
+100052                   I                                   [irq278: isci0]
+100053                   I                                   [irq279: isci0]
+100054                   I                                   [irq16: ehci0]
+100060                   I                                   [irq23: ehci1]
+100066                   I                                   [irq290: ahci0]
+100067                   I                                   [swi0: uart uart]
+   11     0     0     0  RL      (threaded)                  [idle]
+100003                   CanRun                              [idle: cpu0]
+100004                   Run     CPU 1                       [idle: cpu1]
+100005                   CanRun                              [idle: cpu2]
+100006                   Run     CPU 3                       [idle: cpu3]
+    1     0     1     0  SLs     wait    0xfffff80007737540  [init]
+   10     0     0     0  DL      audit_w 0xffffffff81f1eb58  [audit]
+    0     0     0     0  DLs     (threaded)                  [kernel]
+100000                   D       swapin  0xffffffff81ef6940  [swapper]
+100013                   D       -       0xfffff8000770bd00  [softirq_0]
+100014                   D       -       0xfffff8000770bb00  [softirq_1]
+100015                   D       -       0xfffff8000770b900  [softirq_2]
+100016                   D       -       0xfffff8000770b700  [softirq_3]
+100017                   D       -       0xfffff8000770b500  [if_io_tqg_0]
+100018                   D       -       0xfffff8000770b300  [if_io_tqg_1]
+100019                   D       -       0xfffff8000770b100  [if_io_tqg_2]
+100020                   D       -       0xfffff8000770ae00  [if_io_tqg_3]
+100021                   D       -       0xfffff800077a7100  [if_config_tqg_0]
+100023                   D       -       0xfffff800077a6c00  [kqueue_ctx taskq]
+100026                   D       -       0xfffff800077a6600  [thread taskq]
+100027                   D       -       0xfffff800077a6400  [aiod_kick taskq]
+100031                   D       -       0xfffff800077a5d00  [firmware taskq]
+100034                   D       -       0xfffff800077a5700  [acpi_task_0]
+100035                   D       -       0xfffff800077a5700  [acpi_task_1]
+100036                   D       -       0xfffff800077a5700  [acpi_task_2]
+100068                   D       -       0xfffff80008d16200  [mca taskq]
+100073                   D       -       0xffffffff81cd9033  [deadlkres]
+100076                   D       -       0xfffff800077a5300  [CAM taskq]
+100101                   D       -       0xfffff80008d15a00  [t5nex0 tq0]
+100102                   D       -       0xfffff80008d15500  [t5nex0 tq1]
+100103                   D       -       0xfffff80008d15900  [t5nex0 tq2]
+100104                   D       -       0xfffff800077a4200  [t5nex0 tq3]
+nprocs = 47, np = -1
+
+
+--------------------------------------------------------------------------------
+
+vpsctl shell   gives a weird process number for the csh that enters
+which probably can conflict;  that is a process moving between the
+vps systems (and possibly the reason for proc list corruption).
+
+--------------------------------------------------------------------------------
+
+Another panic on restore;  looks like inappropriate error handling.
+
+vps_restore_iface_ifaddr: ifa: have_addr=1 have_dstaddr=1 have_netmask=1
+vps_restore_iface_ifaddr: AF_INET: if_name=[lo0] addr=[0100007f] dst=[0100007f] mask=[000000ff]
+vps_restore_iface_ifaddr: in_control() error = 22
+vps_restore_iface_ifaddr: in_control() error = 22
+
+vps_restore: va->msgbase=0x8007f3980 va->msglen=65536
+vps_restore: error = 22
+vps_restore: total time: 0 seconds
+
+
+Fatal trap 12: page fault while in kernel mode
+cpuid = 7; apic id = 09
+fault virtual address   = 0x30
+XXX-BZ exit1:467 V_nprocs_zomb ++1
+fault code              = supervisor read data, page not present
+instruction pointer     = 0x20:0xffffffff8263c527
+stack pointer           = 0x28:0xfffffe0860312a00
+frame pointer           = 0x28:0xfffffe0860312a60
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+XXX-BZ reaper_abandon_children:139 proc 0xfffff8001313e540 exiting 1
+XXX-BZ proc_reap:940 p 0xfffff8001313e540
+XXX-BZ proc_reap:944 p 0xfffff8001313e540
+XXX-BZ proc_reap:1026 V_nprocs --46
+XXX-BZ proc_reap:1028 V_nprocs_zomb 1--
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 1046 (vps_account)
+[ thread pid 1046 tid 100173 ]
+Stopped at      vps_account_threads+0x1c7:      movq    0x30(%rax),%rdi
+db> where
+Tracing pid 1046 tid 100173 td 0xfffff8006817f000
+vps_account_threads() at vps_account_threads+0x1c7/frame 0xfffffe0860312a60
+vps_account_kproc() at vps_account_kproc+0x15/frame 0xfffffe0860312a70
+fork_exit() at fork_exit+0x84/frame 0xfffffe0860312ab0
+fork_trampoline() at fork_trampoline+0xe/frame 0xfffffe0860312ab0
+--- trap 0, rip = 0, rsp = 0, rbp = 0 ---
+db>
+
+--------------------------------------------------------------------------------
+
+vps1: bpf attached
+vps_restore_iface_ifaddr: AF_LINK: ignoring
+vps_restore_vnet_route: fibnum=0 af=2
+vps_restore_vnet_route_one: rt_have_mask=0 rt_have_gateway=1 rt_have_ifa=1
+XXX-BZ fork1:885 V_nprocs ++46, nprocs_new 46
+vps_restore_vnet_route: fibnum=0 af=28
+vps_restore_vnet_route_one: rt_have_mask=1 rt_have_gateway=1 rt_have_ifa=1
+vps_restore_vnet_route_one: rtrequest_fib: error=51
+vps_restore_vnet_route_one: rtrequest_fib: error=51
+
+vps_restore: va->msgbase=0x800672980 va->msglen=65536
+vps_restore: error = 51
+vps_restore: total time: 0 seconds
+
+
+Fatal trap 12: page fault while in kernel mode
+cpuid = 0; apic id = 02
+fault virtual address   = 0x30
+fault code              = supervisor read data, page not present
+instruction pointer     = 0x20:0xffffffff8263c527
+stack pointer           = 0x28:0xfffffe085ff02a00
+frame pointer           = 0x28:0xfffffe085ff02a60
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 1005 (vps_account)
+[ thread pid 1005 tid 100085 ]
+Stopped at      vps_account_threads+0x1c7:      movq    0x30(%rax),%rdi
+db> where
+Tracing pid 1005 tid 100085 td 0xfffff80034b1b000
+vps_account_threads() at vps_account_threads+0x1c7/frame 0xfffffe085ff02a60
+vps_account_kproc() at vps_account_kproc+0x15/frame 0xfffffe085ff02a70
+fork_exit() at fork_exit+0x84/frame 0xfffffe085ff02ab0
+fork_trampoline() at fork_trampoline+0xe/frame 0xfffffe085ff02ab0
+--- trap 0, rip = 0, rsp = 0, rbp = 0 ---
+db> show reg
+cs                        0x20
+ds                        0x3b
+es                        0x3b
+fs                        0x13
+gs                        0x1b
+ss                        0x28
+rax                          0
+rcx                      0x234
+rdx                        0x2
+rbx         0xfffff80008ddf000
+rsp         0xfffffe085ff02a00
+rbp         0xfffffe085ff02a60
+rsi                          0
+rdi                          0
+r8          0xfffff80034b1b000
+r9          0xffffffff81ef7548  vmspace0+0x130
+r10                 0x7ffc135a
+r11                          0
+r12                          0
+r13         0xfffff80034ceca80
+r14         0xfffffe085ff02ac0
+r15                          0
+rip         0xffffffff8263c527  vps_account_threads+0x1c7
+rflags                 0x10286  _binary_t5fw_cfg_uwire_txt_size+0xad27
+vps_account_threads+0x1c7:      movq    0x30(%rax),%rdi
+
+--------------------------------------------------------------------------------
+
+vps_restore_ucred_lookup: found ucred 0xfffff80034998b00 for 0xfffff80034bd9e00, ncr->ref=60                                                                                       [32/1815]
+vps_restore_vmobject: proc 0xfffff80034e92540 vdvmp=0xfffffe085dba1350 count=1 vdvmpr=0xfffffe085dba1358
+vps_restore_vmobject: proc 0xfffff80034e92540 found backing object 0xfffff80034e50d20 for object 0xfffff80034e50c30
+vps_restore_vmobject: proc 0xfffff80034e92540 object=0xfffff80034e50c30 put in list of vm objects, orig_ptr=0xfffff80034fa32d0
+vps_restore_vmobject: proc 0xfffff80034e92540 old obj=0xfffffe085dba1398: size=32 flags=3000 type=00 cred=0xfffff80034bd9e00 origptr=0xfffff80034fa2690
+vps_restore_ucred_lookup: found ucred 0xfffff80034998b00 for 0xfffff80034bd9e00, ncr->ref=61
+vps_restore_vmobject: proc 0xfffff80034e92540 vdvmp=0xfffffe085dba1400 count=2 vdvmpr=0xfffffe085dba1408
+vps_restore_vmobject: proc 0xfffff80034e92540 found backing object 0xfffff80034e50c30 for object 0xfffff80034eb7000
+vps_restore_vmobject: proc 0xfffff80034e92540 object=0xfffff80034eb7000 put in list of vm objects, orig_ptr=0xfffff80034fa2690
+vps_restore_vmspace: proc 0xfffff80034e92540 entry (00007ffffffdf000-00007ffffffff000, size=0000000000020000, prot=03, max_prot=07, object=0xfffff80034fa2690, offset=0000000000000000) efla
+gs=00001004; nvo=0xfffff80034eb7000
+vps_restore_vmspace: proc 0xfffff80034e92540 vm_map_entry=0xfffffe085dba1458: start=0x7ffffffff000 end=0x800000000000 orig_objXXX-BZ exit1:467 V_nprocs_zomb ++1
+=0xfffff8000773da50
+vps_restore_vmspace: proc 0xfffff80034e92540 ncr=0
+vps_restore_vmobject: proc 0xfffff80034e92540 old obj=0xfffffe085dba14b8: size=1 flags=0006 type=04 cred=0 origptr=0xfffff8000773da50
+vps_restore_vmobject: proc 0xfffff80034e92540 shared_page_obj
+vps_restore_vmobject: proc 0xfffff80034e92540 object=0xfffff8000775da50 put in list of vm objects, orig_ptr=0xfffff8000773da50XXX-BZ reaper_abandon_children:139 proc 0xfffff80034e91540 exi
+ting 1
+XXX-BZ proc_reap:940 p 0xfffff80034e91540
+XXX-BZ proc_reap:944 p 0xfffff80034e91540
+XXX-BZ proc_reap:1026 V_nprocs --48
+XXX-BZ proc_reap:1028 V_nprocs_zomb 1--
+XXX-BZ exit1:467 V_nprocs_zomb ++1
+
+vps_restore_vmspace: proc 0xfffff80034e92540 entry (00007ffffffff000-0000800000000000, size=0000000000001000, prot=05, max_prot=05, object=0xfffff8000773da50, offset=0000000000000000) efla
+gs=00000000; nvo=0xfffff8000775da50
+vps_restore_vmspace: proc 0xfffff80034e92540 restored vmspace orig=0xfffff80034ee3000 new=0xfffff80034a12000
+XXX-BZ vps_restore_proc_one:3749 vps0 0xfffff800071ae800 vps 0xfffff80008df4800 ctd->td_vps 0xfffff80008df4800 cred_vps 0xffffXXX-BZ reaper_abandon_children:139 proc 0xfffff80034e92000 exi
+ting 1
+XXX-BZ proc_reap:940 p 0xfffff80034e92000
+XXX-BZ proc_reap:944 p 0xfffff80034e92000
+XXX-BZ proc_reap:1026 V_nprocs --47
+XXX-BZ proc_reap:1028 V_nprocs_zomb 1--
+f80008df4800 ctx 0xfffff8000772c000 nproc 0xfffff80034e92540
+vps_restore_thread: old thread: tid=100107
+vps_restore_thread: created thread=0xfffff8003490f580 tid=100098
+vps_restore_fdset: fdset has 20 entries
+vps_restore_file: index= origidx= origptr=0xfffff800343b21e0 type=3 flag=00000003 offset=0
+vps_restore_ucred_lookup: found ucred 0xfffff80034998b00 for 0xfffff80034bd9e00, ncr->ref=63
+vps_restore_pipe: vdp: pi_have_dumped_pipe=1 pi_localend=0xfffff800343edbe0 pi_pair=0xfffff800343edbe0 pi_rpipe=0xfffff800343edbe0 pi_wpipe=0xfffff800343edd48
+
+
+Fatal trap 12: page fault while in kernel mode
+cpuid = 0; apic id = 02
+fault virtual address   = 0x0
+fault code              = supervisor read data, page not present
+instruction pointer     = 0x20:0xffffffff80aa0837
+stack pointer           = 0x28:0xfffffe085fde3c10
+frame pointer           = 0x28:0xfffffe085fde3c30
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 1096 (vpsctl)
+[ thread pid 1096 tid 100071 ]
+Stopped at      cap_rights_contains+0x27:       movq    (%r14),%rax
+db> where
+Tracing pid 1096 tid 100071 td 0xfffff800340d4000
+cap_rights_contains() at cap_rights_contains+0x27/frame 0xfffffe085fde3c30
+cap_check() at cap_check+0x15/frame 0xfffffe085fde3c60
+fget_unlocked() at fget_unlocked+0x15e/frame 0xfffffe085fde3cd0
+_fget() at _fget+0x35/frame 0xfffffe085fde3d10
+vps_restore_file() at vps_restore_file+0x777/frame 0xfffffe085fde3dd0
+vps_restore_proc() at vps_restore_proc+0xdae/frame 0xfffffe085fde40b0
+vps_restore() at vps_restore+0x1d52/frame 0xfffffe085fde4660
+vps_ioc_restore() at vps_ioc_restore+0x73/frame 0xfffffe085fde4690
+devfs_ioctl() at devfs_ioctl+0xc0/frame 0xfffffe085fde46e0
+VOP_IOCTL_APV() at VOP_IOCTL_APV+0xe0/frame 0xfffffe085fde4710
+vn_ioctl() at vn_ioctl+0x124/frame 0xfffffe085fde4820
+devfs_ioctl_f() at devfs_ioctl_f+0x1f/frame 0xfffffe085fde4840
+kern_ioctl() at kern_ioctl+0x2cd/frame 0xfffffe085fde48a0
+sys_ioctl() at sys_ioctl+0x16f/frame 0xfffffe085fde4980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085fde4ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085fde4ab0
+--- syscall (54, FreeBSD ELF64, sys_ioctl), rip = 0x8009bb6da, rsp = 0x7fffffffcec8, rbp = 0x7fffffffead0 ---
+db>
+db> show reg
+cs                        0x20
+ds                        0x3b
+es                        0x3b
+fs                        0x13
+gs                        0x1b
+ss                        0x28
+rax                          0
+rcx          0x20007ffffffffff
+rdx                          0
+rbx         0x3fffffffffffffff
+rsp         0xfffffe085fde3c10
+rbp         0xfffffe085fde3c30
+rsi                          0
+rdi         0xfffffe085fde3c78
+r8                           0
+r9                           0
+r10                          0
+r11                          0
+r12         0xfffff80034e1b148
+r13         0xfffff80034e1b174
+r14                          0
+r15         0xfffffe085fde3c78
+rip         0xffffffff80aa0837  cap_rights_contains+0x27
+rflags                 0x10246  _binary_t5fw_cfg_uwire_txt_size+0xace7
+cap_rights_contains+0x27:       movq    (%r14),%rax
+
+--------------------------------------------------------------------------------
+
+Freed UMA keg (rtentry) was not empty (16 items).  Lost 1 pages of memory.
+
+Why do we see this on the restore machine?
+
+keg_dtor() at keg_dtor+0x35/frame 0xfffffe085ff38f20
+zone_dtor() at zone_dtor+0x50c/frame 0xfffffe085ff38f80
+uma_zdestroy() at uma_zdestroy+0x53/frame 0xfffffe085ff38fa0
+vnet_route_uninit() at vnet_route_uninit+0x12e/frame 0xfffffe085ff38fd0
+vps_restore_vnet() at vps_restore_vnet+0x9af/frame 0xfffffe085ff390b0
+vps_restore() at vps_restore+0x15af/frame 0xfffffe085ff39660
+vps_ioc_restore() at vps_ioc_restore+0x73/frame 0xfffffe085ff39690
+devfs_ioctl() at devfs_ioctl+0xc0/frame 0xfffffe085ff396e0
+
+--------------------------------------------------------------------------------
+
+
+
+XXX-BZ vps_restore_proc_one:3745 vps0 0xfffff800071ae800 vps 0xfffff80008ddf000 ctd->td_vps 0xfffff80008ddf000 cred_vps 0xfffff80008ddf000 ctx 0xfffff8000772c000 nproc 0xfffff80034e78000
+vps_restore_vmspace: proc 0xfffff80034e78000 map=0xfffff80034a03000
+vps_restore_vmspace: proc 0xfffff80034e78000 vm_map_entry=0xfffffe085db9e488: start=0x400000 end=0x428000 orig_obj=0xfffff80034f5b690
+vps_restore_vmspace: proc 0xfffff80034e78000 ncr=0
+vps_restore_vmobject: proc 0xfffff80034e78000 old obj=0xfffffe085db9e4e8: size=47 flags=1000 type=02 cred=0 origptr=0xfffff80034f5b690
+vps_restore_vmobject: proc 0xfffff80034e78000 path [/sbin/ifconfig] got vnode 0xfffff80034e75000 v_object 0xfffff80034dc95a0
+vps_restore_vmobject: proc 0xfffff80034e78000 object=0xfffff80034dc95a0 put in list of vm objects, orig_ptr=0xfffff80034f5b690
+vps_restore_vmspace: proc 0xfffff80034e78000 entry (0000000000400000-0000000000428000, size=0000000000028000, prot=05, max_prot=07, object=0xfffff80034f5b690, offset=0000000000000000) eflags=0000040c; nvo=0xfffff80034dc95a0
+vps_restore_vmspace: proc 0xfffff80034e78000 vm_map_entry=0xfffffe085db9e598: start=0x627000 end=0x62e000 orig_obj=0xfffff80034f92690
+vps_restore_vmspace: proc 0xfffff80034e78000 ncr=0
+vps_restore_vmobject: proc 0xfffff80034e78000 old obj=0xfffffe085db9e5f8: size=7 flags=3000 type=00 cred=0xfffff80034ccf500 origptr=0xfffff80034f92690
+vps_restore_vmobject: proc 0xfffff80034e78000 vdvmp=0xfffffe085db9e660 count=1 vdvmpr=0xfffffe085db9e668
+vps_restore_vmobject: proc 0xfffff80034e78000 found backing object 0xfffff80034dc95a0 for object 0xfffff800348a05a0
+vps_restore_vmobject: proc 0xfffff80034e78000 object=0xfffff800348a05a0 put in list of vm objects, orig_ptr=0xfffff80034f92690
+vps_restore_vmspace: proc 0xfffff80034e78000 entry (0000000000627000-000000000062e000, size=0000000000007000, prot=03, max_prot=07, object=0xfffff80034f92690, offset=0000000000000000) eflags=00000004; nvo=0xfffff800348a05a0
+vps_restore_vmspace: proc 0xfffff80034e78000 vm_map_entry=0xfffffe085db9e6a8: start=0x62e000 end=0x631000 orig_obj=0xfffff80034f5e870
+vps_restore_vmspace: proc 0xfffff80034e78000 ncr=0
+vps_restore_vmobject: proc 0xfffff80034e78000 old obj=0xfffffe085db9e708: size=3 flags=3000 type=00 cred=0xfffff80034ccf500 origptr=0xfffff80034f5e870
+vps_restore_vmobject: proc 0xfffff80034e78000 vdvmp=0xfffffe085db9e770 count=1 vdvmpr=0xfffffe085db9e778
+vps_restore_vmobject: proc 0xfffff80034e78000 object=0xfffff80034dc92d0 put in list of vm objects, orig_ptr=0xfffff80034f5e870
+vps_restore_vmspace: proc 0xfffff80034e78000 entry (000000000062e000-0000000000631000, size=0000000000003000, prot=03, max_prot=07, object=0xfffff80034f5e870, offset=0000000000000000) eflags=00000000; nvo=0xfffff80034dc92d0
+vps_restore_vmspace: proc 0xfffff80034e78000 vm_map_entry=0xfffffe085db9e7b8: start=0x800627000 end=0x800649000 orig_obj=0xfffff80034dda690
+vps_restore_vmspace: proc 0xfffff80034e78000 ncr=0
+vps_restore_vmobject: proc 0xfffff80034e78000 old obj=0xfffffe085db9e818: size=36 flags=1000 type=02 cred=0 origptr=0xfffff80034dda690
+vps_restore_vmobject: proc 0xfffff80034e78000 path [/libexec/ld-elf.so.1] got vnode 0xfffff80034e74b10 v_object 0xfffff80034e60000
+vps_restore_vmobject: proc 0xfffff80034e78000 object=0xfffff80034e60000 put in list of vm objects, orig_ptr=0xfffff80034dda690
+vps_restore_vmspace: proc 0xfffff80034e78000 entry (0000000800627000-0000000800649000, size=0000000000022000, prot=05, max_prot=07, object=0xfffff80034dda690, offset=0000000000000000) eflags=0000040c; nvo=0xfffff80034e60000
+vps_restore_vmspace: proc 0xfffff80034e78000 vm_map_entry=0xfffffe085db9e8d0: start=0x800649000 end=0x800651000 orig_obj=0xfffff80034f91b40
+vps_restore_vmspace: proc 0xfffff80034e78000 ncr=0
+vps_restore_vmobject: proc 0xfffff80034e78000 old obj=0xfffffe085db9e930: size=8 flags=3000 type=00 cred=0xfffff80034ccf500 origptr=0xfffff80034f91b40
+vps_restore_vmobject: proc 0xfffff80034e78000 vdvmp=0xfffffe085db9e998 count=5 vdvmpr=0xfffffe085db9e9a0
+vps_restore_vmobject: proc 0xfffff80034e78000 object=0xfffff800345e5870 put in list of vm objects, orig_ptr=0xfffff80034f91b40
+vps_restore_vmspace: proc 0xfffff80034e78000 entry (0000000800649000-0000000800651000, size=0000000000008000, prot=03, max_prot=07, object=0xfffff80034f91b40, offset=0000000000000000) eflags=00000000; nvo=0xfffff800345e5870
+vps_restore_vmspace: proc 0xfffff80034e78000 vm_map_entry=0xfffffe085db9ea20: start=0x800849000 end=0x80084b000 orig_obj=0xfffff80034f930f0
+vps_restore_vmspace: proc 0xfffff80034e78000 ncr=0
+vps_restore_vmobject: proc 0xfffff80034e78000 old obj=0xfffffe085db9ea80: size=2 flags=3000 type=00 cred=0xfffff80034ccf500 origptr=0xfffff80034f930f0
+vps_restore_vmobject: proc 0xfffff80034e78000 vdvmp=0xfffffe085db9eae8 count=2 vdvmpr=0xfffffe085db9eaf0
+vps_restore_vmobject: proc 0xfffff80034e78000 object=0xfffff80034870780 put in list of vm objects, orig_ptr=0xfffff80034f930f0
+vps_restore_vmspace: proc 0xfffff80034e78000 entry (0000000800849000-000000080084b000, size=0000000000002000, prot=03, max_prot=07, object=0xfffff80034f930f0, offset=0000000000000000) eflags=00000000; nvo=0xfffff80034870780
+vps_restore_vmspace: proc 0xfffff80034e78000 vm_map_entry=0xfffffe085db9eb40: start=0x7fffdffff000 end=0x7ffffffdf000 orig_obj=0
+vps_restore_vmspace: proc 0xfffff80034e78000 no object
+vps_restore_vmspace: proc 0xfffff80034e78000 ncr=0
+vps_restore_vmspace: proc 0xfffff80034e78000 entry (00007fffdffff000-00007ffffffdf000, size=000000001ffe0000, prot=00, max_pro
+XXX-BZ fork1:885 V_nprocs ++48, nprocs_new 48
+vps_restore_vmspace: proc 0xfffff80034e78000 vm_map_entry=0xfffffe085db9eba0: start=0x7ffffffdf000 end=0x7ffffffff000 orig_obj=0xfffff80034f91d20
+vps_restore_vmspace: proc 0xfffff80034e78000 ncr=0
+vps_restore_vmobject: proc 0xfffff80034e78000 old obj=0xfffffe085db9ec00: size=32 flags=3000 type=00 cred=0xfffff80034ccf500 origptr=0xfffff80034f91d20
+vps_restore_vmobject: proc 0xfffff80034e78000 vdvmp=0xfffffe085db9ec68 count=3 vdvmpr=0xfffffe085db9ec70
+vps_restore_vmobject: proc 0xfffff80034e78000 object=0xfffff80034ea9e10 put in list of vm objects, orig_ptr=0xfffff80034f91d20
+vps_restore_vmspace: proc 0xfffff80034e78000 entry (00007ffffffdf000-00007ffffffff000, size=0000000000020000, prot=03, max_prot=07, object=0xfffff80034f91d20, offset=0000000000000000) eflags=00001000; nvo=0xfffff80034ea9e10
+vps_restore_vmspace: proc 0xfffff80034e78000 vm_map_entry=0xfffffe085db9ecd0: start=0x7ffffffff000 end=0x800000000000 orig_obj=0xfffff8000773da50
+vps_restore_vmspace: proc 0xfffff80034e78000 ncr=0
+vps_restore_vmobject: proc 0xfffff80034e78000 old obj=0xfffffe085db9ed30: size=1 flags=0006 type=04 cred=0 origptr=0xfffff8000773da50
+vps_restore_vmobject: proc 0xfffff80034e78000 shared_page_obj
+vps_restore_vmobject: proc 0xfffff80034e78000 object=0xfffff8000775da50 put in list of vm objects, orig_ptr=0xfffff8000773da50
+vps_restore_vmspace: proc 0xfffff80034e78000 entry (00007ffffffff000-0000800000000000, size=0000000000001000, prot=05, max_prot=05, object=0xfffff8000773da50, offset=0000000000000000) eflags=00000000; nvo=0xfffff8000775da50
+vps_restore_vmspace: proc 0xfffff80034e78000 restored vmspace orig=0xfffff80034f3f000 new=0xfffff80034a03000
+XXX-BZ vps_restore_proc_one:3750 vps0 0xfffff800071ae800 vps 0xfffff80008ddf000 ctd->td_vps 0xfffff80008ddf000 cred_vps 0xfffff80008ddf000 ctx 0xfffff8000772c000 nproc 0xfffff80034e78000
+XXX-BZ vps_restore_proc_one:3894 vps0 0xfffff800071ae800 vps 0xfffff80008ddf000 ctd->td_vps 0xfffff80008ddf000 cred_vps 0xfffff80008ddf000 ctx 0xfffff8000772c000 p 0xfffff80034e78000 pid 164
+vps_restore_proc: fixed up proc=0xfffff80034e78000/164 p->p_pgrp=0xfffff8000793e900 p->p_session=0xfffff800071b2200 p->p_pptr=0xfffff80034e77540 p->p_stype=00000000
+trap_pfault: proc=0xfffff80034e78000/164 map=0xfffff80034a03000 eva=0000000000000000 prot=4 rv=1
+
+db> show proc 0xfffff80034e78000
+Process 164 (ifconfig) at 0xfffff80034e78000:
+ state: NORMAL
+ uid: 0  gids: 0, 5
+ parent: pid 126 at 0xfffff80034e77540
+ ABI: FreeBSD ELF64
+ arguments: /sbin/ifconfig lo0 inet 127.0.0.1/8 alias
+ threads: 1
+100100                   Run     CPU 0                       ifconfig
+ repear: 0xfffff80034490a80
+ reapsubtree: 1037
+
+--------------------------------------------------------------------------------
+
+Call fpuexit(..) before saving the snapshot.
+
+--------------------------------------------------------------------------------
+
+vps_snapshot_vnodepath: vnode=0xfffff80034dc5b10 path=[/dev/null] error=0
+vps_snapshot_fdset: idx=1 fp=0xfffff800343b2280
+vps_snapshot_fdset: file=0xfffff800343b2280 flags=00000002 offset=0
+vps_snapshot_ucred: cr=0xfffff80034c64800
+vps_snapshot_vnodepath: vnode=0xfffff80034dc5b10 path=[/dev/null] error=0
+vps_snapshot_fdset: idx=2 fp=0xfffff800343b2280
+vps_snapshot_fdset: fp 0xfffff800343b2280 already dumped
+vps_snapshot_fdset: idx=3 fp=0xfffff800343b20f0
+vps_snapshot_fdset: file=0xfffff800343b20f0 flags=00000003 offset=0
+vps_snapshot_ucred: cr=0xfffff80034c64800
+
+
+Fatal trap 12: page fault while in kernel mode
+cpuid = 0; apic id = 02
+fault virtual address   = 0x408
+fault code              = supervisor read data, page not present
+instruction pointer     = 0x20:0xffffffff80a6cc5d
+stack pointer           = 0x28:0xfffffe085f7333f0
+frame pointer           = 0x28:0xfffffe085f7334a0
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 1091 (vpsctl)
+[ thread pid 1091 tid 100094 ]
+Stopped at      _sx_xlock_hard+0x4ad:   movl    0x408(%r15),%eax
+db> where
+Tracing pid 1091 tid 100094 td 0xfffff80034cdd580
+_sx_xlock_hard() at _sx_xlock_hard+0x4ad/frame 0xfffffe085f7334a0
+_sx_xlock() at _sx_xlock+0xc5/frame 0xfffffe085f7334e0
+sblock() at sblock+0x9d/frame 0xfffffe085f733500
+vps_snapshot_socket() at vps_snapshot_socket+0x23d/frame 0xfffffe085f733570
+vps_snapshot() at vps_snapshot+0x2793/frame 0xfffffe085f733660
+vps_ioc_snapshot() at vps_ioc_snapshot+0x9f/frame 0xfffffe085f733690
+devfs_ioctl() at devfs_ioctl+0xc0/frame 0xfffffe085f7336e0
+VOP_IOCTL_APV() at VOP_IOCTL_APV+0xe0/frame 0xfffffe085f733710
+vn_ioctl() at vn_ioctl+0x124/frame 0xfffffe085f733820
+devfs_ioctl_f() at devfs_ioctl_f+0x1f/frame 0xfffffe085f733840
+kern_ioctl() at kern_ioctl+0x2cd/frame 0xfffffe085f7338a0
+sys_ioctl() at sys_ioctl+0x16f/frame 0xfffffe085f733980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085f733ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f733ab0
+--- syscall (54, FreeBSD ELF64, sys_ioctl), rip = 0x8009bb6da, rsp = 0x7fffffffb2a8, rbp = 0x7fffffffb550 ---
+db> show reg
+cs                        0x20
+ds                        0x3b
+es                        0x3b
+fs                        0x13
+gs                        0x1b
+ss                        0x28
+rax                        0x3
+rcx                          0
+rdx                          0
+rbx         0xfffff80034bf6908
+rsp         0xfffffe085f7333f0
+rbp         0xfffffe085f7334a0
+rsi                          0
+rdi         0xfffff80034bf6908
+r8          0xffffffff8149d9d8  ttystates+0x2118
+r9                       0x118
+r10                        0x1
+r11                       0x1e
+r12                          0
+r13                          0
+r14         0xfffff80034cdd580
+r15                          0
+rip         0xffffffff80a6cc5d  _sx_xlock_hard+0x4ad
+rflags                 0x10246  _binary_t5fw_cfg_uwire_txt_size+0xace7
+_sx_xlock_hard+0x4ad:   movl    0x408(%r15),%eax
+db> show alllocks
+Process 1091 (vpsctl) thread 0xfffff80034cdd580 (100094)
+exclusive sx filedesc structure (filedesc structure) r = 0 (0xfffff80034f4f8e0) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_snapst/../../vps/vps_snapst.c:2698
+shared sx allproc_0xfffff80008ddf000 (allproc_0xfffff80008ddf000) r = 0 (0xfffffe0002eb42a8) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_snapst/../../vps/vps_snapst.c:1941
+exclusive sx vps instance 0xfffff80008ddf000 lock (vps instance 0xfffff80008ddf000 lock) r = 0 (0xfffff80008ddf038) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_dev/../../vps/vps_user.c:431
+shared sx lock of all vps instances (lock of all vps instances) r = 0 (0xffffffff81f29d60) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_dev/../../vps/vps_user.c:425
+Process 782 (syslogd) thread 0xfffff8003445d580 (100076)
+exclusive lockmgr nfs (nfs) r = 0 (0xfffff800344e2240) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_vnops.c:881
+db> show proc 1091
+Process 1091 (vpsctl) at 0xfffff80034e10a80:
+ state: NORMAL
+ uid: 0  gids: 0, 5
+ parent: pid 1089 at 0xfffff800340c1540
+ ABI: FreeBSD ELF64
+ arguments: vpsctl migrate testvps 192.0.2.4 norsync noconfsync
+ threads: 1
+100094                   Run     CPU 0                       vpsctl
+ repear: 0xfffff80007737540
+ reapsubtree: 1037
+
+
+(kgdb) l *_sx_xlock_hard+0x4ad
+0xffffffff80a6cc5d is in _sx_xlock_hard (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_sx.c:577).
+572                      * running or the state of the lock changes.
+573                      */
+574                     if ((sx->lock_object.lo_flags & SX_NOADAPTIVE) == 0) {
+575                             if ((x & SX_LOCK_SHARED) == 0) {
+576                                     owner = lv_sx_owner(x);
+577                                     if (TD_IS_RUNNING(owner)) {
+578                                             if (LOCK_LOG_TEST(&sx->lock_object, 0))
+579                                                     CTR3(KTR_LOCK,
+580                                                 "%s: spinning on %p held by %p",
+581                                                         __func__, sx, owner);
+(kgdb) p (*(struct thread *)0)->td_state
+Cannot access memory at address 0x408
+
+--------------------------------------------------------------------------------
+
+During snapshot:
+
+
+Fatal trap 12: page fault while in kernel mode
+cpuid = 0; apic id = 02
+fault virtual address   = 0x408
+fault code              = supervisor read data, page not present
+instruction pointer     = 0x20:0xffffffff80a6cc4d
+stack pointer           = 0x28:0xfffffe085f4a43f0
+frame pointer           = 0x28:0xfffffe085f4a44a0
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 49911 (vpsctl)
+[ thread pid 49911 tid 100263 ]
+Stopped at      _sx_xlock_hard+0x4ad:   movl    0x408(%r15),%eax
+db> where
+Tracing pid 49911 tid 100263 td 0xfffff8077674c000
+_sx_xlock_hard() at _sx_xlock_hard+0x4ad/frame 0xfffffe085f4a44a0
+_sx_xlock() at _sx_xlock+0xc5/frame 0xfffffe085f4a44e0
+sblock() at sblock+0x9d/frame 0xfffffe085f4a4500
+vps_snapshot_socket() at vps_snapshot_socket+0x23d/frame 0xfffffe085f4a4570
+vps_snapshot() at vps_snapshot+0x27e2/frame 0xfffffe085f4a4660
+vps_ioc_snapshot() at vps_ioc_snapshot+0x9f/frame 0xfffffe085f4a4690
+devfs_ioctl() at devfs_ioctl+0xc0/frame 0xfffffe085f4a46e0
+VOP_IOCTL_APV() at VOP_IOCTL_APV+0xe0/frame 0xfffffe085f4a4710
+vn_ioctl() at vn_ioctl+0x124/frame 0xfffffe085f4a4820
+devfs_ioctl_f() at devfs_ioctl_f+0x1f/frame 0xfffffe085f4a4840
+kern_ioctl() at kern_ioctl+0x2cd/frame 0xfffffe085f4a48a0
+sys_ioctl() at sys_ioctl+0x16f/frame 0xfffffe085f4a4980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085f4a4ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f4a4ab0
+--- syscall (54, FreeBSD ELF64, sys_ioctl), rip = 0x8009bb6da, rsp = 0x7fffffffe878, rbp = 0x7fffffffeb20 ---
+
+                                                                                                                                                                                    [26/1898]
+Fatal trap 12: page fault while in kernel mode
+cpuid = 0; apic id = 02
+fault virtual address   = 0x100000408
+fault code              = supervisor read data, page not present
+instruction pointer     = 0x20:0xffffffff80a6cc4d
+stack pointer           = 0x28:0xfffffe085f1cb380
+frame pointer           = 0x28:0xfffffe085f1cb430
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 1067 (vpsctl)
+[ thread pid 1067 tid 100098 ]
+Stopped at      _sx_xlock_hard+0x4ad:   movl    0x408(%r15),%eax
+db> where
+Tracing pid 1067 tid 100098 td 0xfffff8000dc17580
+_sx_xlock_hard() at _sx_xlock_hard+0x4ad/frame 0xfffffe085f1cb430
+_sx_xlock() at _sx_xlock+0xc5/frame 0xfffffe085f1cb470
+sblock() at sblock+0x9d/frame 0xfffffe085f1cb490
+vps_snapshot_socket() at vps_snapshot_socket+0x23d/frame 0xfffffe085f1cb500
+vps_snapshot_socket() at vps_snapshot_socket+0x17d/frame 0xfffffe085f1cb570
+vps_snapshot() at vps_snapshot+0x27eb/frame 0xfffffe085f1cb660
+vps_ioc_snapshot() at vps_ioc_snapshot+0x9f/frame 0xfffffe085f1cb690
+devfs_ioctl() at devfs_ioctl+0xc0/frame 0xfffffe085f1cb6e0
+VOP_IOCTL_APV() at VOP_IOCTL_APV+0xe0/frame 0xfffffe085f1cb710
+vn_ioctl() at vn_ioctl+0x124/frame 0xfffffe085f1cb820
+devfs_ioctl_f() at devfs_ioctl_f+0x1f/frame 0xfffffe085f1cb840
+kern_ioctl() at kern_ioctl+0x2cd/frame 0xfffffe085f1cb8a0
+sys_ioctl() at sys_ioctl+0x16f/frame 0xfffffe085f1cb980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085f1cbab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f1cbab0
+--- syscall (54, FreeBSD ELF64, sys_ioctl), rip = 0x800bcf6da, rsp = 0x7fffffffe878, rbp = 0x7fffffffeb20 ---
+db> show alllocks
+Process 1067 (vpsctl) thread 0xfffff8000dc17580 (100098)
+exclusive sx filedesc structure (filedesc structure) r = 0 (0xfffff8000dd448e0) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_snapst/../../vps/vps_snapst.c:2698
+shared sx allproc_0xfffff8000d001000 (allproc_0xfffff8000d001000) r = 0 (0xfffffe0002f092a8) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_snapst/../../vps/vps_snapst.c:194
+1
+exclusive sx vps instance 0xfffff8000d001000 lock (vps instance 0xfffff8000d001000 lock) r = 0 (0xfffff8000d001038) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_dev/../../
+vps/vps_user.c:431
+shared sx lock of all vps instances (lock of all vps instances) r = 0 (0xffffffff81f29d60) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/modules/vps_dev/../../vps/vps_user.c:425
+Process 758 (syslogd) thread 0xfffff8000d54c000 (100077)
+exclusive lockmgr nfs (nfs) r = 0 (0xfffff8000dae3068) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_vnops.c:881
+db> show reg
+cs                        0x20
+ds                        0x3b
+es                        0x3b
+fs                        0x13
+gs                        0x1b
+ss                        0x28
+rax                        0x3
+rcx                0x100000000
+rdx                          0
+rbx         0xfffffe0000c04a58
+rsp         0xfffffe085f1cb380
+rbp         0xfffffe085f1cb430
+rsi                0x100000000
+rdi         0xfffffe0000c04a58
+r8          0xffffffff8149d9d8  ttystates+0x2118
+r9                       0x118
+r10                        0x1
+r11                       0x1e
+r12                          0
+r13                          0
+r14         0xfffff8000dc17580
+r15                0x100000000
+rip         0xffffffff80a6cc4d  _sx_xlock_hard+0x4ad
+rflags                 0x10206  _binary_t5fw_cfg_uwire_txt_size+0xaca7
+_sx_xlock_hard+0x4ad:   movl    0x408(%r15),%eax
+
+--------------------------------------------------------------------------------
 
 
 # end
