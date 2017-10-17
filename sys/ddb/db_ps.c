@@ -218,6 +218,7 @@ db_ps(db_expr_t addr, bool hasaddr, db_expr_t count, char *modif)
 		if (p == NULL && np > 0)
 			p = LIST_FIRST(&V_zombproc);
 	}
+	db_printf("nprocs = %d, np = %d\n", V_nprocs, np);
 }
 
 static void
@@ -397,6 +398,10 @@ DB_SHOW_COMMAND(thread, db_show_thread)
 		db_printf(" last involuntary switch: %d ms ago\n",
 		    1000 * delta / hz);
 	}
+	db_printf(" td_frame: %p td_intr_frame %p\n",
+	    td->td_frame, td->td_intr_frame);
+	db_printf(" td_kstack: %#jx (%d pages, obj %p)\n",
+	    (uintmax_t)td->td_kstack, td->td_kstack_pages, td->td_kstack_obj);
 #ifdef VPS
 	db_printf(" td_vps: %p\n", td->td_vps);
 	if (td->td_ucred)
@@ -464,6 +469,8 @@ DB_SHOW_COMMAND(proc, db_show_proc)
 		if (db_pager_quit)
 			break;
 	}
+	db_printf(" repear: %p\n", p->p_reaper);
+	db_printf(" reapsubtree: %d\n", p->p_reapsubtree);
 }
 
 void
