@@ -1325,9 +1325,11 @@ vc_migrate(int argc, char **argv)
 	char *fsroot;
 	char cmd[0x100];
 	char file_n[MAXPATHLEN];
-	char cnt_rsync;
+	char cnt_rsync, cfg_sync;
 	char str_suspend[] = "suspend";
+#if BZ_NO_ABORT_STOP
 	char str_abort[] = "abort";
+#endif
 	int pid, rfd, wfd;
 	int argc2;
 	int error;
@@ -1379,6 +1381,10 @@ vc_migrate(int argc, char **argv)
 		cnt_rsync = 1;
 	else if (argc > 2 && strcmp(argv[2], "tworsync") == 0)
 		cnt_rsync = 2;
+	if (argc > 3 && strcmp(argv[3], "noconfsync") == 0)
+		cfg_sync = 0;
+	else
+		cfg_sync = 1;
 
 	fprintf(stderr, "Opening ssh transport ... ");
 
@@ -1388,6 +1394,7 @@ vc_migrate(int argc, char **argv)
 	fprintf(stderr, "done\n");
 
 	/* Always syncing config file. */
+	if (cfg_sync) {
 #if 0
 /* Don't use rsync here ... */
 	fprintf(stderr, "Copying config file ... ");
@@ -1433,6 +1440,7 @@ vc_migrate(int argc, char **argv)
 		write(wfd, file_buf, st.st_size);	
 	}
 #endif
+	}
 
 	/* Always create directories. */
 	if (vc.fsroot_priv[0] != '\0') {
@@ -1535,6 +1543,7 @@ vc_migrate(int argc, char **argv)
 		goto resume;
 	}
 
+#if BZ_NO_ABORT_STOP
 	fprintf(stderr, "Aborting local instance ... ");
 
 	/* Migration was successful so abort local instance. */
@@ -1554,6 +1563,9 @@ vc_migrate(int argc, char **argv)
 	vc_stop(argc2, argv2);
 
 	fprintf(stderr, "done\n");
+#else
+	fprintf(stderr, "XXX-BZ DEBUGGING... leaving VPS hanging around\n");
+#endif
 
 	vc_close_ssh_transport(pid);	
 
