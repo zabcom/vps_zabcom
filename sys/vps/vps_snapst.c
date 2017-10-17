@@ -843,7 +843,7 @@ vps_snapshot_vnodeinodenum(struct vps_snapst_ctx *ctx, struct vps *vps,
 		return (error);
 	}
 
-	DBGS("%s: vnode=%p fsid=%u fileid=%ld error=%d\n",
+	DBGS("%s: vnode=%p fsid=%lu fileid=%ld error=%d\n",
 	    __func__, vp, vattr.va_fsid, vattr.va_fileid, error);
 
 	o1 = vdo_create(ctx, VPS_DUMPOBJT_FILE_INODENUM, howalloc);
@@ -1504,7 +1504,17 @@ vps_snapshot_vnet_iface_ifaddr(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 		vdifaddr->have_netmask = 1;
 		vdsaddr = vdo_space(ctx, sizeof(*vdsaddr), M_WAITOK);
-		vdsaddr->sa_len = ifa->ifa_netmask->sa_len;
+		/*
+		 * Cannot restore the length and hand it to the ioctl
+		 * as in_socktrim() will "re-use" the field after
+		 * in_aifaddr_ioctl() has done initial length checks
+		 * which is we just restore will almost certainly
+		 * fail for at least the loopback entry.
+		 */
+		if (ifa->ifa_addr->sa_family == AF_INET)
+			vdsaddr->sa_len = sizeof(struct sockaddr_in);
+		else
+			vdsaddr->sa_len = ifa->ifa_netmask->sa_len;
 		vdsaddr->sa_family = ifa->ifa_netmask->sa_family;
 		KASSERT(vdsaddr->sa_len <= sizeof(vdsaddr->sa_data),
 		    ("%s: sa_len too big\n", __func__));
@@ -2471,6 +2481,8 @@ vps_snapshot_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 	/* If we couldn't allocate memory we try again. */
   again:
 
+	KASSERT(so != NULL, ("%s: so is NULL ctx %p vps %p\n",
+	    __func__, ctx, vps));
 	sblock(&so->so_snd, SBL_WAIT | SBL_NOINTR);
 	sblock(&so->so_rcv, SBL_WAIT | SBL_NOINTR);
 	SOCKBUF_LOCK(&so->so_snd);
@@ -3278,7 +3290,7 @@ vps_snapshot_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 VPSFUNC
 static int
 vps_snapshot_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
-    struct vmspace *vmspace)
+    struct vmspace *vmspace, struct proc *p)
 {
 	struct vps_restore_obj *vbo;
 	struct vps_dump_vmspace *vdvms;
@@ -3608,6 +3620,7 @@ vps_snapshot_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vdp->p_pptr_id = (p->p_pptr) ? p->p_pptr->p_pid : 0;
 	vdp->p_peers_id = (p->p_peers) ? p->p_peers->p_pid : 0;
 	vdp->p_leader_id = (p->p_leader) ? p->p_leader->p_pid : 0;
+	vdp->p_reaper_pid = (p->p_reaper) ? p->p_reaper->p_pid : 0;
 	vdp->p_pgrp_id = (p->p_pgrp) ? p->p_pgrp->pg_id : 0;
 	vdp->p_xthread_id = (p->p_xthread) ? p->p_xthread->td_tid : 0;
 
@@ -3626,6 +3639,7 @@ vps_snapshot_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vdp->p_traceflag = p->p_traceflag;
 	vdp->p_vmspace = p->p_vmspace;
 	vdp->p_fd = p->p_fd;
+	vdp->p_reapsubtree = p->p_reapsubtree;
 	strlcpy(vdp->p_comm, p->p_comm, min(sizeof(vdp->p_comm),
 	    sizeof(p->p_comm)));
 
@@ -3653,7 +3667,7 @@ vps_snapshot_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 	}
 
 	/* Dump vmspace. */
-	if ((error = vps_snapshot_vmspace(ctx, vps, p->p_vmspace)))
+	if ((error = vps_snapshot_vmspace(ctx, vps, p->p_vmspace, p)))
 		goto out;
 
 	/* Dump threads. */
