@@ -496,8 +496,10 @@ struct {								\
 	if (LIST_NEXT((elm), field) != NULL &&				\
 	    LIST_NEXT((elm), field)->field.le_prev !=			\
 	     &((elm)->field.le_next))					\
-		panic("%s:%d Bad link elm %p next->prev != elm",	\
-		    __func__, __LINE__, (elm));				\
+		panic("%s:%d Bad list elm %p next(%p)->prev(%p) != elm",\
+		    __func__, __LINE__, (elm), (elm)->field.le_next,	\
+		    ((elm)->field.le_next) ?				\
+			*((elm)->field.le_next)->field.le_prev : NULL);	\
 } while (0)
 
 /*
@@ -507,8 +509,10 @@ struct {								\
  */
 #define	QMD_LIST_CHECK_PREV(elm, field) do {				\
 	if (*(elm)->field.le_prev != (elm))				\
-		panic("%s:%d Bad link elm %p prev->next != elm",	\
-		    __func__, __LINE__, (elm));				\
+		panic("%s:%d Bad list elm %p prev(%p)->next(%p) != elm",\
+		    __func__, __LINE__, (elm), (elm)->field.le_prev,	\
+		    (*(elm)->field.le_prev) ?				\
+			(*(elm)->field.le_prev)->field.le_next : NULL);	\
 } while (0)
 #else
 #define	QMD_LIST_CHECK_HEAD(head, field)
