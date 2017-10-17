@@ -954,7 +954,7 @@ amd64_syscall(struct thread *td, int traced)
 
 
 #ifdef DDB
-void
+static void
 db_print_trapframe(struct trapframe *frame)
 {
 
