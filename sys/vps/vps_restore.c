@@ -959,6 +959,7 @@ vps_restore_kqueue(struct vps_snapst_ctx *ctx, struct vps *vps,
 	struct kqueue *kq;
 	struct thread *td;
 	struct file *fp;
+	cap_rights_t rights;
 	int error;
 	int dfl;
 
@@ -976,7 +977,7 @@ vps_restore_kqueue(struct vps_snapst_ctx *ctx, struct vps *vps,
 		    __func__, error);
 		return (error);
 	}
-	fget(td, td->td_retval[0], 0, &fp);
+	fget(td, td->td_retval[0], cap_rights_init(&rights), &fp);
 	DBGR("%s: kqueue installed at fd %zd\n",
 	    __func__, td->td_retval[0]);
 
@@ -1066,6 +1067,7 @@ vps_restore_pipe(struct vps_snapst_ctx *ctx, struct vps *vps,
 	struct vps_restore_obj *ro;
 	struct file *fp;
 	struct pipepair *npp;
+	cap_rights_t rights;
 	int filedes[2];
 	int error = 0;
 
@@ -1101,7 +1103,7 @@ vps_restore_pipe(struct vps_snapst_ctx *ctx, struct vps *vps,
 		 * in another run.
 		 */
 
-		fget(curthread, filedes[0], 0, &fp);
+		fget(curthread, filedes[0], cap_rights_init(&rights), &fp);
 		npp = (struct pipepair *)
 		    ((struct pipe *)fp->f_data)->pipe_pair;
 		fdrop(fp, curthread);
@@ -1112,21 +1114,21 @@ vps_restore_pipe(struct vps_snapst_ctx *ctx, struct vps *vps,
 		ro->orig_ptr = vdp->pi_pair;
 		ro->new_ptr = npp;
 		/* These references have to be released later. */
-		fget(curthread, filedes[0], 0, &fp);
+		fget(curthread, filedes[0], cap_rights_init(&rights), &fp);
 		ro->spare[0] = fp;
-		fget(curthread, filedes[1], 0, &fp);
+		fget(curthread, filedes[1], cap_rights_init(&rights), &fp);
 		ro->spare[1] = fp;
 		SLIST_INSERT_HEAD(&ctx->obj_list, ro, list);
 
 		if (vdp->pi_localend == vdp->pi_rpipe) {
 
 			/* We want the read endpoint. */
-			fget(curthread, filedes[0], 0, &fp);
+			fget(curthread, filedes[0], cap_rights_init(&rights), &fp);
 			fp->f_data = &npp->pp_rpipe;
 			fdrop(fp, curthread);
 
 			/* Close the write endpoint. */
-			fget(curthread, filedes[1], 0, &fp);
+			fget(curthread, filedes[1], cap_rights_init(&rights), &fp);
 			fdclose(curthread, fp, filedes[1]);
 			fdrop(fp, curthread);
 
@@ -1135,12 +1137,12 @@ vps_restore_pipe(struct vps_snapst_ctx *ctx, struct vps *vps,
 		} else if (vdp->pi_localend == vdp->pi_wpipe) {
 
 			/* We want the write endpoint. */
-			fget(curthread, filedes[1], 0, &fp);
+			fget(curthread, filedes[1], cap_rights_init(&rights), &fp);
 			fp->f_data = &npp->pp_wpipe;
 			fdrop(fp, curthread);
 
 			/* Close the read endpoint. */
-			fget(curthread, filedes[0], 0, &fp);
+			fget(curthread, filedes[0], cap_rights_init(&rights), &fp);
 			fdclose(curthread, fp, filedes[0]);
 			fdrop(fp, curthread);
 
@@ -2286,11 +2288,15 @@ vps_restore_file_vnode(struct vps_snapst_ctx *ctx, struct vps *vps,
 		/* XXX debugging */
 		if (error == ENOENT && !strcmp(vdfp->fp_path, "/dev/null"))
 			kdb_enter(KDB_WHY_BREAK, "VPS break to debugger");
-		error = 0;
+		/*
+		 * XXX-BZ there was an error = 0; here which
+		 * made no sense at all and lead to NULL pointer derreferences
+		 * later on in fhold();
+		 */
 #else
 		error = EINVAL;
-		goto out;
 #endif
+		goto out;
 	}
 
 	if (strncmp(vdfp->fp_path, "/VPSRELINKED_", 13) == 0) {
@@ -2533,6 +2539,8 @@ vps_restore_file(struct vps_snapst_ctx *ctx, struct vps *vps,
 	ncr = vps_restore_ucred_lookup(ctx, vps, vdf->f_cred);
 	save_ucred = curtd->td_ucred;
 	curtd->td_ucred = ncr;
+	/* Initialize so that things are not carried through. */
+	curtd->td_retval[0] = -1;
 
 	switch (vdf->f_type) {
 
@@ -2593,7 +2601,7 @@ vps_restore_file(struct vps_snapst_ctx *ctx, struct vps *vps,
 	}
 
 	idx = (int)curtd->td_retval[0];
-	DBGR("%s: open returned fd %d\n", __func__, idx);
+	DBGR("%s:%d open returned fd %d\n", __func__, __LINE__, idx);
 
 	cfd = curtd->td_proc->p_fd;
 
@@ -2974,7 +2982,7 @@ vps_restore_getuserpage(struct vps_snapst_ctx *ctx, int idx, int test)
 VPSFUNC
 static int
 vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
-    struct vm_object **nvo_out)
+    struct vm_object **nvo_out, struct proc *p)
 {
 	struct vps_dumpobj *o1, *o2;
 	struct vps_dump_vmobject *vdvmo;
@@ -2988,8 +2996,8 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 	int error = 0;
 
 	/*
-	DBGR("%s: o=%p: type=%d size=%d\n",
-	    __func__, o, o->type, o->size);
+	DBGR("%s: proc %p o=%p: type=%d size=%d\n",
+	    __func__, p, o, o->type, o->size);
 	*/
 
 	*nvo_out = NULL;
@@ -2999,16 +3007,16 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	vdvmo = (struct vps_dump_vmobject *)o1->data;
 
-	DBGR("%s: old obj=%p: size=%d flags=%04x type=%02x cred=%p "
+	DBGR("%s: proc %p old obj=%p: size=%d flags=%04x type=%02x cred=%p "
 	    "origptr=%p\n",
-	    __func__, vdvmo, (int)vdvmo->size, vdvmo->flags,
+	    __func__, p, vdvmo, (int)vdvmo->size, vdvmo->flags,
 	    vdvmo->type, vdvmo->cred, vdvmo->orig_ptr);
 
 	if (vdvmo->type == OBJT_VNODE && vdvmo->have_vnode) {
 		o2 = vdo_next(ctx);
 		if (o2->type != VPS_DUMPOBJT_FILE_PATH) {
-			ERRMSG(ctx, "%s: wrong object, expected "
-			    "VPS_DUMPOBJT_FILE_PATH\n", __func__);
+			ERRMSG(ctx, "%s: proc %p wrong object, expected "
+			    "VPS_DUMPOBJT_FILE_PATH\n", __func__, p);
 			error = EINVAL;
 			goto out;
 		}
@@ -3017,14 +3025,14 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
 			vdfp->fp_path, curthread);
 		if ((error = namei(&nd))) {
-			ERRMSG(ctx, "%s: namei([%s]): error = %d\n",
-			    __func__, vdfp->fp_path, error);
+			ERRMSG(ctx, "%s: proc %p namei([%s]): error = %d\n",
+			    __func__, p, vdfp->fp_path, error);
 			goto out;
 		}
 		if ((error = VOP_OPEN(nd.ni_vp, FREAD, curthread->td_ucred,
 			curthread, NULL))) {
-			ERRMSG(ctx, "%s: VOP_OPEN(...): error = %d\n",
-			    __func__, error);
+			ERRMSG(ctx, "%s: proc %p VOP_OPEN(...): error = %d\n",
+			    __func__, p, error);
 			VOP_UNLOCK(nd.ni_vp, 0);
 			NDFREE(&nd, NDF_ONLY_PNBUF);
 			goto out;
@@ -3036,11 +3044,11 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 		NDFREE(&nd, NDF_ONLY_PNBUF);
 
 		KASSERT(nvo->cred == NULL,
-		    ("%s: nvo=%p ->cred=%p\n",
-		    __func__, nvo, nvo->cred));
+		    ("%s: proc %p nvo=%p ->cred=%p\n",
+		    __func__, p, nvo, nvo->cred));
 
-		DBGR("%s: path [%s] got vnode %p v_object %p\n",
-		    __func__, vdfp->fp_path, nd.ni_vp, nvo);
+		DBGR("%s: proc %p path [%s] got vnode %p v_object %p\n",
+		    __func__, p, vdfp->fp_path, nd.ni_vp, nvo);
 
 	} else if (vdvmo->type == OBJT_DEFAULT ||
 	    vdvmo->type == OBJT_SWAP) {
@@ -3050,14 +3058,14 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 	} else if (vdvmo->type == OBJT_PHYS &&
 		   vdvmo->is_sharedpageobj != 0) {
 
-		DBGR("%s: shared_page_obj\n", __func__);
+		DBGR("%s: proc %p shared_page_obj\n", __func__, p);
 
 		nvo = shared_page_obj;
 		vm_object_reference(nvo);
 
 	} else if (vdvmo->type == OBJT_PHYS) {
 
-		DBGR("%s: OBJT_PHYS\n", __func__);
+		DBGR("%s: proc %p OBJT_PHYS\n", __func__, p);
 		nvo = vm_object_allocate(OBJT_PHYS, vdvmo->size);
 
 	} else {
@@ -3065,8 +3073,8 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 		 * XXX We don't support that yet.
 		 */
 
-		ERRMSG(ctx, "%s: unsupported vm object: vdvmo=%p type=%d\n",
-		    __func__, vdvmo, vdvmo->type);
+		ERRMSG(ctx, "%s: proc %p unsupported vm object: vdvmo=%p type=%d\n",
+		    __func__, p, vdvmo, vdvmo->type);
 		/* XXX missing the sibling list here */
 		error = EINVAL;
 		goto out;
@@ -3078,20 +3086,20 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 	}
 	if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_UCRED &&
 	    vdvmo->cred == NULL)
-		DBGR("%s: have ucred but vdvmo->cred == NULL!!!\n",
-		    __func__);
+		DBGR("%s: proc %p have ucred but vdvmo->cred == NULL!!!\n",
+		    __func__, p);
 
 	if (nvo != shared_page_obj) {
 		nvo->flags = vdvmo->flags;
 		nvo->charge = vdvmo->charge;
 		KASSERT(nvo->cred == NULL,
-		    ("%s: nvo->cred = %p\n", __func__, nvo->cred));
+		    ("%s: proc %p nvo->cred = %p\n", __func__, p, nvo->cred));
 		/*DBGR("%s: charge=%lu\n", __func__, nvo->charge);*/
 		if (vdvmo->cred != NULL) {
 			ncr = vps_restore_ucred_lookup(ctx, vps,
 			    vdvmo->cred);
 			KASSERT(ncr != NULL,
-			    ("%s: ucred not found\n", __func__));
+			    ("%s: proc %p ucred not found\n", __func__, p));
 			nvo->cred = ncr;
 			swap_reserve_by_cred(nvo->charge, nvo->cred);
 		}
@@ -3103,8 +3111,8 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 		int i;
 
 		/*
-		DBGR("%s: o2=%p: type=VMPAGE size=%d (pindex=%08x)\n",
-		    __func__, o2, o2->size, *((int*)o2->data) );
+		DBGR("%s: proc %p o2=%p: type=VMPAGE size=%d (pindex=%08x)\n",
+		    __func__, p, o2, o2->size, *((int*)o2->data) );
 		*/
 
 		o2 = vdo_next(ctx);
@@ -3112,8 +3120,8 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 		vdvmp = (struct vps_dump_vmpages *)o2->data;
 		vdvmpr = (struct vps_dump_vmpageref *)(vdvmp + 1);
 
-		DBGR("%s: vdvmp=%p count=%u vdvmpr=%p\n",
-		    __func__, vdvmp, (u_int)vdvmp->count, vdvmpr);
+		DBGR("%s: proc %p vdvmp=%p count=%u vdvmpr=%p\n",
+		    __func__, p, vdvmp, (u_int)vdvmp->count, vdvmpr);
 
 		for (i = 0; i < vdvmp->count; i++) {
 
@@ -3127,13 +3135,13 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 			pmap_remove_all(m);
 
 			KASSERT((m->oflags & VPO_SWAPINPROG) == 0,
-			    ("%s: m=%p oflags 0x%x & VPO_SWAPINPROG\n",
-			    __func__, m, m->oflags));
+			    ("%s: proc %p m=%p oflags 0x%x & VPO_SWAPINPROG\n",
+			    __func__, p, m, m->oflags));
 
 			KASSERT(vdvmpr->pr_vmobject == vdvmo->orig_ptr,
-			    ("%s: object mismatch ! "
+			    ("%s: proc %p object mismatch ! "
 			    "(vdvmpr->pr_vmobject=%p)\n",
-			    __func__, vdvmpr->pr_vmobject));
+			    __func__, p, vdvmpr->pr_vmobject));
 
 			vm_page_rename(m, nvo, vdvmpr->pr_pindex);
 
@@ -3162,9 +3170,9 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 			}
 
 		if (nvo->backing_object == NULL) {
-			ERRMSG(ctx, "%s: backing object not found "
+			ERRMSG(ctx, "%s: proc %p backing object not found "
 			    "(orig_ptr=%p)\n",
-			    __func__, vdvmo->backing_object);
+			    __func__, p, vdvmo->backing_object);
 			error = EINVAL;
 			goto out;
 		}
@@ -3177,8 +3185,8 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 		nvo->backing_object_offset = vdvmo->backing_object_offset;
 
-		DBGR("%s: found backing object %p for object %p\n",
-		    __func__, nvo->backing_object, nvo);
+		DBGR("%s: proc %p found backing object %p for object %p\n",
+		    __func__, p, nvo->backing_object, nvo);
 	}
 
 	/*
@@ -3194,16 +3202,16 @@ vps_restore_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	SLIST_INSERT_HEAD(&ctx->obj_list, vbo, list);
 
-	DBGR("%s: object=%p put in list of vm objects, orig_ptr=%p\n",
-	    __func__, nvo, vbo->orig_ptr);
+	DBGR("%s: proc %p object=%p put in list of vm objects, orig_ptr=%p\n",
+	    __func__, p, nvo, vbo->orig_ptr);
 
 	KASSERT(!(nvo->type != 2 && nvo != shared_page_obj &&
 	    nvo->ref_count != 1),
-	    ("%s: nvo=%p ->ref_count = %d\n",
-	    __func__, nvo, nvo->ref_count));
+	    ("%s: proc %p nvo=%p ->ref_count = %d\n",
+	    __func__, p, nvo, nvo->ref_count));
 
 	*nvo_out = nvo;
-	/*DBGR("%s: *nvo_out=%p nvo=%p\n", __func__, *nvo_out, nvo);*/
+	/*DBGR("%s: proc %p *nvo_out=%p nvo=%p\n", __func__, p, *nvo_out, nvo);*/
 
   out:
 	return (error);
@@ -3235,16 +3243,16 @@ vps_restore_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 			    ro->orig_ptr == orig_vmspace)
 				break;
 		if (ro == NULL) {
-			ERRMSG(ctx, "%s: vmspace orig_ptr=%p not found !\n",
-			    __func__, orig_vmspace);
+			ERRMSG(ctx, "%s: proc %p vmspace orig_ptr=%p not found !\n",
+			    __func__, p, orig_vmspace);
 			return (EINVAL);
 		}
 		p->p_vmspace = ro->new_ptr;
 		atomic_add_int(&p->p_vmspace->vm_refcnt, 1);
 
-		DBGR("%s: linked shared vmspace %p (orig %p) "
+		DBGR("%s: proc %p linked shared vmspace %p (orig %p) "
 		    "to proc %p/%d\n",
-		    __func__, p->p_vmspace, orig_vmspace, p, p->p_pid);
+		    __func__, p, p->p_vmspace, orig_vmspace, p, p->p_pid);
 
 		return (0);
 	}
@@ -3257,7 +3265,7 @@ vps_restore_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 	ns = vmspace_alloc(vdvms->vm_map.minoffset,
 	     vdvms->vm_map.maxoffset, NULL);
 
-	DBGR("%s: map=%p\n", __func__, &ns->vm_map);
+	DBGR("%s: proc %p map=%p\n", __func__, p, &ns->vm_map);
 
 	/* o1 --> vmspace */
 	/* o2 --> map entry */
@@ -3269,15 +3277,23 @@ vps_restore_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 		nvo = NULL;
 
-		DBGR("%s: vm_map_entry=%p: start=%p end=%p orig_obj=%p\n",
-		    __func__, vdvme, PTRFROM64(vdvme->start),
-		    PTRFROM64(vdvme->end), vdvme->map_object);
+		DBGR("%s:%d: proc %p vm_map_entry=%p: eflags %#x prot %#x "
+		    "maxprot %#x inherit %#x offset %p start=%p end=%p "
+		    "orig_obj=%p\n",
+		    __func__, __LINE__, p, vdvme,
+		    vdvme->eflags,
+		    vdvme->protection,
+		    vdvme->max_protection,
+		    vdvme->inheritance,
+		    PTRFROM64(vdvme->offset),
+		    PTRFROM64(vdvme->start), PTRFROM64(vdvme->end),
+		    vdvme->map_object);
 
 		if (vdvme->map_object == NULL) {
 
 			/* No VM objects, next map entry follows. */
 
-			DBGR("%s: no object\n", __func__);
+			DBGR("%s: proc %p no object\n", __func__, p);
 
 			/* Move on to next map entry. */
 
@@ -3293,9 +3309,9 @@ vps_restore_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 			if (nvo) {
 				/* Move on to next map entry. */
-				DBGR("%s: found vm_object (shared memory): "
+				DBGR("%s: proc %p found vm_object (shared memory): "
 				    "orig=%p nvo=%p\n",
-				    __func__, vdvme->map_object, nvo);
+				    __func__, p, vdvme->map_object, nvo);
 			}
 
 		}
@@ -3307,10 +3323,10 @@ vps_restore_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 			    vdvme->cred);
 		} else
 			ncr = NULL;
-		DBGR("%s: ncr=%p\n", __func__, ncr);
+		DBGR("%s: proc %p ncr=%p\n", __func__, p, ncr);
 
 		while (vdo_typeofnext(ctx) == VPS_DUMPOBJT_VMOBJECT) {
-			if ((error = vps_restore_vmobject(ctx, vps, &nvo)))
+			if ((error = vps_restore_vmobject(ctx, vps, &nvo, p)))
 				goto out;
 		}
 
@@ -3318,10 +3334,10 @@ vps_restore_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 		   so insert the entry. */
 		cow = 0;
 
-		DBGR("%s: entry (%016zx-%016zx, size=%016zx, prot=%02x, "
+		DBGR("%s: proc %p entry (%016zx-%016zx, size=%016zx, prot=%02x, "
 		    "max_prot=%02x, object=%p, offset=%016zx) eflags=%08x; "
 		    "nvo=%p\n",
-		    __func__, (size_t)vdvme->start, (size_t)vdvme->end,
+		    __func__, p, (size_t)vdvme->start, (size_t)vdvme->end,
 		    (size_t)(vdvme->end - vdvme->start),
 		    vdvme->protection, vdvme->max_protection,
 		    vdvme->map_object, (size_t)vdvme->offset,
@@ -3334,8 +3350,8 @@ vps_restore_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 		if ((error = vm_map_insert(&ns->vm_map, nvo, vdvme->offset,
 		    vdvme->start, vdvme->end, vdvme->protection,
 		    vdvme->max_protection, cow))) {
-			ERRMSG(ctx, "%s: vm_map_insert(): error %d\n",
-			    __func__, error);
+			ERRMSG(ctx, "%s: proc %p vm_map_insert(): error %d\n",
+			    __func__, p, error);
 			error = EINVAL;
 			if (nvo)
 				vm_object_deallocate(nvo);
@@ -3390,8 +3406,8 @@ vps_restore_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 	ro->new_ptr = ns;
 	SLIST_INSERT_HEAD(&ctx->obj_list, ro, list);
 
-	DBGR("%s: restored vmspace orig=%p new=%p\n",
-	    __func__, vdvms->vm_orig_ptr, ns);
+	DBGR("%s: proc %p restored vmspace orig=%p new=%p\n",
+	    __func__, p, vdvms->vm_orig_ptr, ns);
 
 	p->p_vmspace = ns;
 
@@ -3402,7 +3418,7 @@ vps_restore_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 	}
 
 	if (error) {
-		ERRMSG(ctx, "%s: error = %d\n", __func__, error);
+		ERRMSG(ctx, "%s: proc %p error = %d\n", __func__, p, error);
 	}
 
 	return (error);
@@ -3677,9 +3693,6 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	np->p_step = vdp->p_step;
 	np->p_args = NULL;
 
-	np->p_reaper = np;
-	LIST_INIT(&np->p_reaplist);	/* XXX-BZ proper save/restore. */
-
 	DBGR("%s: pid=%d p_flag=%08x p_oppid=%d\n",
 	    __func__, np->p_pid, np->p_flag, np->p_oppid);
 
@@ -3819,11 +3832,15 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 		VPS_VPS(vps, pidhash)], np, p_hash);
 	VPS_VPS(vps, nprocs)++;
 
-	/* These are ids rather than pointers. */
+	/* These are (p)ids rather than pointers. */
 	np->p_pptr = (struct proc *)((size_t)vdp->p_pptr_id);
 	np->p_peers = (struct proc *)((size_t)vdp->p_peers_id);
 	np->p_leader = (struct proc *)((size_t)vdp->p_leader_id);
+	np->p_reaper = (struct proc *)((size_t)vdp->p_reaper_pid);
 	np->p_pgrp = (struct pgrp *)((size_t)vdp->p_pgrp_id);
+
+	np->p_reapsubtree = vdp->p_reapsubtree;	/* pid_t */
+	LIST_INIT(&np->p_reaplist);	/* XXX-BZ proper save/restore. */
 
 	sx_xunlock(&VPS_VPS(vps, proctree_lock));
 	sx_xunlock(&VPS_VPS(vps, allproc_lock));
@@ -4138,6 +4155,11 @@ vps_restore_proc(struct vps_snapst_ctx *ctx, struct vps *vps)
 			PROC_UNLOCK (p->p_leader);
 		if ((p->p_pptr = pfind((intptr_t)p->p_pptr)))
 			PROC_UNLOCK(p->p_pptr);
+		if ((p->p_reaper = pfind((intptr_t)p->p_reaper)))
+			PROC_UNLOCK(p->p_reaper);
+		if (p->p_reaper)
+			LIST_INSERT_HEAD(&p->p_reaper->p_reaplist, p,
+			    p_reapsibling);
 		if (p->p_pptr)
 			LIST_INSERT_HEAD(&p->p_pptr->p_children, p,
 			    p_sibling);
