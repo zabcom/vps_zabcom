@@ -1549,5 +1549,68 @@ _sx_xlock_hard+0x4ad:   movl    0x408(%r15),%eax
 
 --------------------------------------------------------------------------------
 
+On the one process left in a VPS after stop:
+
+db> show all proc
+  pid  ppid  pgrp   uid  state   wmesg   wchan               cmd
+    0     0     0     0  DLsJ    (threaded)                  [kernel]
+100000                   D       swapin  0xffffffff81f14820  [swapper]
+100007                   D       -       0xfffff80007724400  [softirq_0]
+100008                   D       -       0xfffff80007724200  [if_io_tqg_0]
+100009                   D       -       0xfffff80007724000  [if_config_tqg_0]
+100011                   D       -       0xfffff80007723b00  [kqueue_ctx taskq]
+100014                   D       -       0xfffff80007723500  [thread taskq]
+100015                   D       -       0xfffff80007723300  [aiod_kick taskq]
+100019                   D       -       0xfffff80007722c00  [firmware taskq]
+100023                   D       -       0xfffff80007722400  [acpi_task_0]
+100024                   D       -       0xfffff80007722400  [acpi_task_1]
+100025                   D       -       0xfffff80007722400  [acpi_task_2]
+100048                   D       -       0xfffff80008ccda00  [mca taskq]
+100049                   D       -       0xffffffff81cf6e30  [deadlkres]
+100053                   D       -       0xfffff80007722600  [CAM taskq]
+100078                   D       -       0xfffff80008ccb900  [t5nex0 tq0]
+100079                   D       -       0xfffff80008ccb600  [t5nex0 tq1]
+100080                   D       -       0xfffff80008ccb500  [t5nex0 tq2]
+100081                   D       -       0xfffff80008ccb300  [t5nex0 tq3]
+nprocs = 1, np = -1
+
+db> show all ifnets
+vnet=0xfffff8000771f780
+                 lo0 ifp=0xfffff8000d432800
+                vps0 ifp=0xfffff8000d432000
+
+db> show all lltab
+vnet=0xfffff8000771f780
+llt=0xfffff8000d1d4300 llt_af=28 llt_ifp=0xfffff8000d432000(vps0)
+llt=0xfffff8000df1b400 llt_af=2 llt_ifp=0xfffff8000d432000(vps0)
+llt=0xfffff8000d1d4500 llt_af=28 llt_ifp=0xfffff8000d432800(lo0)
+llt=0xfffff8000d1d4700 llt_af=2 llt_ifp=0xfffff8000d432800(lo0)
+
+--------------------------------------------------------------------------------
+
+On startup:
+
+[a] vps_alloc:277 XXX-BZ _vps_ref vps 0xfffff8000d009000 ucred 0xfffff8022701a400 refcnt 2
+[x] shm_vpsalloc_hook:990 XXX-BZ _vps_ref vps 0xfffff8000d009000 ucred 0 refcnt 3
+[x] sem_vpsalloc_hook:478 XXX-BZ _vps_ref vps 0xfffff8000d009000 ucred 0 refcnt 4
+[x] msg_vpsalloc_hook:276 XXX-BZ _vps_ref vps 0xfffff8000d009000 ucred 0 refcnt 5
+vps_switch_proc:1454 XXX-BZ _vps_ref vps 0xfffff8000d009000 ucred 0xfffff8022701a500 refcnt 6
+[b] crcopy:1939 XXX-BZ _vps_ref vps 0xfffff8000d009000 ucred 0xfffff80227019a00 refcnt 7
+
+On stop:
+
+[b] crfree:1907 XXX-BZ _vps_deref vps 0xfffff8000d009000 ucred 0xfffff80227019a00 last 0 refcnt 6
+[x] shm_vpsfree_hook:1006 XXX-BZ _vps_deref vps 0xfffff8000d009000 ucred 0 last 0 refcnt 5
+[x] sem_vpsfree_hook:498 XXX-BZ _vps_deref vps 0xfffff8000d009000 ucred 0 last 0 refcnt 4
+[x] msg_vpsfree_hook:290 XXX-BZ _vps_deref vps 0xfffff8000d009000 ucred 0 last 0 refcnt 3
+vps_free_locked:688 XXX-BZ _vps_deref vps 0xfffff8000d009000 ucred 0xdeadbeef last 0 refcnt 2
+and after some delay:
+[a] crfree:1907 XXX-BZ _vps_deref vps 0xfffff8000d009000 ucred 0xfffff8022701a400 last 0 refcnt 1
+
+--------------------------------------------------------------------------------
+
+
+
+
 
 # end
