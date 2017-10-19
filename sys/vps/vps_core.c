@@ -254,7 +254,7 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 	vps->vps_parent = vps_parent;
 
 	mtx_init(&vps->vps_refcnt_lock, "vps_refcnt_lock", NULL, MTX_SPIN);
-	refcount_init(&vps->vps_refcnt, 1);
+	refcount_init(&vps->vps_refcnt, 0);
 #ifdef INVARIANTS
 	TAILQ_INIT(&vps->vps_ref_head);
 #endif
