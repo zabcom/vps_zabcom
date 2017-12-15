@@ -63,6 +63,7 @@
 #include <arpa/inet.h>
 #include <termios.h>
 #include <assert.h>
+#include <libutil.h>
 
 #ifndef VIMAGE
 #define VIMAGE	1
@@ -582,6 +583,27 @@ vc_snapshot(int argc, char **argv, int outfd, int verbose)
 	base = (void*)va.database;
 	len = va.datalen;
 	DBGfprintf(stderr, "base = %p, len = %d\n", base, len);
+
+#if 0
+	/* Dump user space pages to investigate correctness of data. */
+	{
+		struct vps_dumpheader *h;
+		void *q;
+		u_int z;
+		char buf[8];
+
+		h = (struct vps_dumpheader *)(void *)base;
+		printf("%s nsyspages 0x%08x nuserpages 0x%08x\n", __func__,
+		    h->nsyspages, h->nuserpages);
+
+		for (z = 0; z < h->nuserpages; z++) {
+			snprintf(buf, sizeof(buf), "%03u > ", z);
+			q = (void*)((uintptr_t)base +
+			    (h->nsyspages << h->pageshift) + (z << h->pageshift));
+			hexdump(q, 1 << h->pageshift, buf, 0);
+		}
+	}
+#endif
 
 	if (verbose) {
 		fprintf(stderr, "done\n");
@@ -1532,6 +1554,7 @@ vc_migrate(int argc, char **argv)
 
 	fprintf(stderr, "done\n");
 
+#if BZ_NO_ABORT_STOP
 	/* remote vps_resume */
 	snprintf(cmd, sizeof(cmd), "vpsctl resume %s remote\n", vps);
 	write(wfd, cmd, strlen(cmd));
@@ -1544,7 +1567,6 @@ vc_migrate(int argc, char **argv)
 		goto resume;
 	}
 
-#if BZ_NO_ABORT_STOP
 	fprintf(stderr, "Aborting local instance ... ");
 
 	/* Migration was successful so abort local instance. */
@@ -1565,7 +1587,7 @@ vc_migrate(int argc, char **argv)
 
 	fprintf(stderr, "done\n");
 #else
-	fprintf(stderr, "XXX-BZ DEBUGGING... leaving VPS hanging around\n");
+	fprintf(stderr, "XXX-BZ DEBUGGING... leaving VPS suspended on both ends\n");
 #endif
 
 	vc_close_ssh_transport(pid);	
@@ -2987,6 +3009,27 @@ vc_showdump(int argc, char **argv)
 		printf("%s: tree is invalid !\n", __func__);
 	else
 		printf("%s: tree is good !\n", __func__);
+
+#if 0
+	/* Dump user space pages to investigate correctness of data. */
+	{
+		struct vps_dumpheader *h;
+		void *q;
+		u_int i;
+		char buf[8];
+
+		h = (struct vps_dumpheader *)ctx->data;
+		printf("%s nsyspages 0x%08x nuserpages 0x%08x\n", __func__,
+		    h->nsyspages, h->nuserpages);
+
+		for (i = 0; i < h->nuserpages; i++) {
+			snprintf(buf, sizeof(buf), "%03u > ", i);
+			q = (void*)((uintptr_t)ctx->data +
+			    (h->nsyspages << h->pageshift) + (i << h->pageshift));
+			hexdump(q, 1 << h->pageshift, buf, 0);
+		}
+	}
+#endif
 
 	free(ctx);
 	munmap(p, size);

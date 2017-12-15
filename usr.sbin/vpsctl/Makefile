@@ -8,6 +8,7 @@ SRCS+=	priv_ston.c priv_ntos.c
 SRCS+=	vps_libdump.c
 MAN=	vpsctl.8 vps.4 vps.9 vps.conf.5
 WARNS?=	6
+LIBADD+=util
 
 CLEANFILES+=	priv_ston.c priv_ntos.c
 
