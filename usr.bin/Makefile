@@ -145,6 +145,10 @@ SUBDIR=	alias \
 	sockstat \
 	soelim \
 	sort \
+	spinit \
+	spinitdyn \
+	spinitsel \
+	spinitzzz \
 	split \
 	stat \
 	stdbuf \
