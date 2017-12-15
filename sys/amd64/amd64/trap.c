@@ -739,8 +739,9 @@ nogo:
 		trap_fatal(frame, eva);
 		return (-1);
 	} else {
-		printf("%s: proc=%p/%d map=%p eva=%016lx prot=%x rv=%d\n",
-			__func__, p, p->p_pid, map, eva, ftype, rv);
+		printf("%s proc=%p/%d map=%p eva=%016lx va=%016lx prot=%x "
+		    "rv=%d tf_rip=%#lx\n", __func__, p, p->p_pid, map,
+		    eva, va, ftype, rv, frame->tf_rip);
 	}
 
 	return ((rv == KERN_PROTECTION_FAILURE) ? SIGBUS : SIGSEGV);
