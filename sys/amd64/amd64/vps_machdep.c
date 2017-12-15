@@ -106,8 +106,11 @@ vps_md_restore_thread(struct vps_dump_thread *vdtd, struct thread *ntd,
 		return (EOPNOTSUPP);
 	}
 
-	ntd->td_pcb->pcb_cr3 =
-	    DMAP_TO_PHYS((vm_offset_t)vmspace_pmap(p->p_vmspace)->pm_pml4);
+	if (ntd->td_sa.code >= p->p_sysent->sv_size)
+		ntd->td_sa.callp = &p->p_sysent->sv_table[0];
+	else
+		ntd->td_sa.callp = &p->p_sysent->sv_table[ntd->td_sa.code];
+
 	ntd->td_pcb->pcb_r12 = (uint64_t)vps_func->vps_restore_return;
 	ntd->td_pcb->pcb_rbp = 0;
 	ntd->td_pcb->pcb_rsp = (uint64_t)ntd->td_frame - sizeof(void *);
@@ -337,17 +340,17 @@ vps_md_syscall_fixup(struct vps *vps, struct thread *td,
 	register_t code;
 	register_t args[8];
 	int narg;
-	int error = 0;
+	int error;
 	int i;
-	int ia32_emul = 0;
-	struct ucred *save_ucred = curthread->td_ucred;
+#ifdef COMPAT_FREEBSD32
+	int ia32_emul;
+#endif
+	struct ucred *save_ucred;
 
 	if (vps_func->vps_access_vmspace == NULL)
 		return (EOPNOTSUPP);
 
-	p = td->td_proc;
 	frame = td->td_frame;
-	sv = p->p_sysent;
 
 	if (frame->tf_trapno != 0x80) {
 		DBGCORE("%s: thread %p was not in syscall: "
@@ -355,10 +358,14 @@ vps_md_syscall_fixup(struct vps *vps, struct thread *td,
 		    frame->tf_trapno, (void*)frame->tf_rip);
 
 		/* nothing to do ? */
-		error = 0;
-		goto out;
+		return (0);
 	}
 
+#ifdef COMPAT_FREEBSD32
+	ia32_emul = 0;
+#endif
+	p = td->td_proc;
+	sv = p->p_sysent;
 	if (sv == &elf64_freebsd_sysvec) {
 		DBGCORE("%s: proc=%p/%u elf64_freebsd_sysvec\n",
 		    __func__, p, p->p_pid);
@@ -376,7 +383,9 @@ vps_md_syscall_fixup(struct vps *vps, struct thread *td,
 	}
 
 	/* Just in case vm objects are split/copied/... */
+	save_ucred = curthread->td_ucred;
 	curthread->td_ucred = td->td_ucred;
+	error = 0;
 
 	/*
 	 * XXX: special handling for
@@ -385,19 +394,20 @@ vps_md_syscall_fixup(struct vps *vps, struct thread *td,
 
 	memset((caddr_t)args, 0, sizeof(args));
 
-	code = frame->tf_rax;
+	code = td->td_sa.code;
 
 	if (sv->sv_mask)
 		code &= sv->sv_mask;
 	if (code >= sv->sv_size)
 		code = 0;
 
-	narg = (&sv->sv_table[code])->sy_narg;
+	narg = td->td_sa.callp->sy_narg;
 
 	KASSERT(narg * sizeof(register_t) <= sizeof(args),
 	    ("%s: argument space on stack too small, narg=%d\n",
 	    __func__, narg));
 
+#ifdef COMPAT_FREEBSD32
 	if (ia32_emul) {
 		uint32_t args32[8];
 
@@ -416,10 +426,11 @@ vps_md_syscall_fixup(struct vps *vps, struct thread *td,
 		for (i = 0; i < narg; i++)
 			args[i] = (uint64_t)args32[i];
 
-	} else {
+	} else
+#endif
+	{
 
 		params = (caddr_t)frame->tf_rsp + sizeof(register_t);
-
 		args[0] = frame->tf_rdi;
 		args[1] = frame->tf_rsi;
 		args[2] = frame->tf_rdx;
@@ -427,9 +438,14 @@ vps_md_syscall_fixup(struct vps *vps, struct thread *td,
 		args[4] = frame->tf_r8;
 		args[5] = frame->tf_r9;
 
+		/* Zero the arguments not expected to not leak information. */
 		for (i = 0; i < 6; i++)
 			if (i >= narg)
 				args[i] = 0;
+
+		if (narg > 6)
+			panic("%s:%d more than 6 arguments (%d) to syscall\n",
+			    __func__, __LINE__, narg);
 
 		/* XXX only need this in case narg > regcnt (6 on amd64)
 		if ((vps_func->vps_access_vmspace(p->p_vmspace,
@@ -458,7 +474,9 @@ vps_md_syscall_fixup(struct vps *vps, struct thread *td,
 	*ret_narg= narg;
 	memcpy(ret_args, &args, narg * sizeof(args[0]));
 
- out:
+#ifdef COMPAT_FREEBSD32
+out:
+#endif
 	curthread->td_ucred = save_ucred;
 
 	return (error);
