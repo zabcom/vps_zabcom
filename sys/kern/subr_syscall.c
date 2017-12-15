@@ -156,10 +156,11 @@ syscallenter(struct thread *td)
 	 * without any syscall error processing.
 	 *
 	 * XXX error/td_errno hack
+	 * XXX-BZ whatever that hack was there for it made no sense.
+	 * should we find a problem with it check the attic.
 	 */
 	if (td->td_flags2 & TDF2_VPSSUSPEND) {
 		DBGCORE("%s: td=%p suspending\n", __func__, td);
-		td->td_errno = error;
 		if (td->td_flags & TDF_NEEDSUSPCHK) {
 			PROC_LOCK(td->td_proc);
 			thread_suspend_check(0);
@@ -170,7 +171,6 @@ syscallenter(struct thread *td)
 			PROC_UNLOCK(td->td_proc);
 		}
 		td->td_flags2 &= ~TDF2_VPSSUSPEND;
-		error = td->td_errno;
 	}
 #endif
  retval:
@@ -311,14 +311,12 @@ again:
 	 * without any syscall error processing.
 	 *
 	 * XXX error/td_errno hack
+	 * XXX-BZ see similar comment above.
 	 */
 	if (td->td_flags2 & TDF2_VPSSUSPEND) {
 		DBGCORE("%s: td=%p suspending\n", __func__, td);
 
 		vps_md_syscallret(td, sa);
-
-		td->td_errno = error = EINTR;
-		td->td_errno = error;
 		if (td->td_flags & TDF_NEEDSUSPCHK) {
 			PROC_LOCK(td->td_proc);
 			thread_suspend_check(0);
@@ -329,7 +327,6 @@ again:
 			PROC_UNLOCK(td->td_proc);
 		}
 		td->td_flags2 &= ~TDF2_VPSSUSPEND;
-		error = td->td_errno;
 	}
 #endif
 }
