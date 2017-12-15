@@ -52,10 +52,16 @@ static void
 vps_md_syscallret(struct thread *td, struct syscall_args *sa)
 {
 
+#if 0
+	/*
+	 * XXX-BZ it is entirely unclear why this needs to be done.
+	 * Nowhere in the code we garuantee that code stays available in rax.
+	 */
 	/* re-setting tf_rax */
 	td->td_frame->tf_rax = sa->code;
 	DBGCORE("%s: td=%p tf_rax=%p\n",
 	    __func__, td, (void*)td->td_frame->tf_rax);
+#endif
 }
 
 #endif /* _VPS_MD_FUNCTIONS */
