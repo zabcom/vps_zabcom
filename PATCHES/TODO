@@ -1609,6 +1609,1010 @@ and after some delay:
 
 --------------------------------------------------------------------------------
 
+XXX-BZ uifind:1290 new_uip 0xfffff8000771de80
+KDB: stack backtrace:
+db_fetch_ksymtab() at db_fetch_ksymtab+0x14b/frame 0xfffffe085f49d530
+uifind() at uifind+0x13c/frame 0xfffffe085f49d580
+vps_switch_proc() at vps_switch_proc+0x73a/frame 0xfffffe085f49d660
+vps_ioc_switch() at vps_ioc_switch+0x5e/frame 0xfffffe085f49d690
+dev2udev() at dev2udev+0x2650/frame 0xfffffe085f49d6e0
+VOP_IOCTL_APV() at VOP_IOCTL_APV+0xe0/frame 0xfffffe085f49d710
+sys_posix_fadvise() at sys_posix_fadvise+0x4e4/frame 0xfffffe085f49d820
+dev2udev() at dev2udev+0x2d2f/frame 0xfffffe085f49d840
+kern_ioctl() at kern_ioctl+0x2cd/frame 0xfffffe085f49d8a0
+sys_ioctl() at sys_ioctl+0x16f/frame 0xfffffe085f49d980
+
+--------------------------------------------------------------------------------
+
+
+root@rabbit3:~ # vpsctl abort testvps
+vps_suspend_relink_delete: get_next_dirent() error=2
+root@rabbit3:~ # VNASSERT failed
+0xfffff8000db473b0: tag nfs, type VREG
+    usecount 0, writecount 1, refcount 0 mountedhere 0
+    flags (VI_FREE)
+    v_object 0xfffff8000db28d20 ref 0 pages 0 cleanbuf 0 dirtybuf 0
+    lock type nfs: UNLOCKED
+        fileid 32158566 fsid 0x3a3a00ff01
+panic: vn_lock: zero hold count
+cpuid = 0
+time = 1509380681
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085f1bb4e0
+vpanic() at vpanic+0x19c/frame 0xfffffe085f1bb560
+kassert_panic() at kassert_panic+0x126/frame 0xfffffe085f1bb5d0
+_vn_lock() at _vn_lock+0x142/frame 0xfffffe085f1bb640
+vn_write() at vn_write+0x196/frame 0xfffffe085f1bb6c0
+vn_io_fault1() at vn_io_fault1+0x1b0/frame 0xfffffe085f1bb810
+vn_io_fault() at vn_io_fault+0x197/frame 0xfffffe085f1bb890
+dofilewrite() at dofilewrite+0xa7/frame 0xfffffe085f1bb8e0
+kern_writev() at kern_writev+0x68/frame 0xfffffe085f1bb930
+sys_write() at sys_write+0x86/frame 0xfffffe085f1bb980
+amd64_syscall() at amd64_syscall+0x859/frame 0xfffffe085f1bbab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085f1bbab0
+--- syscall (4, FreeBSD ELF64, sys_write), rip = 0x800c085fa, rsp = 0x7fffffffd1d8, rbp = 0x7fffffffd210 ---
+KDB: enter: panic
+[ thread pid 24 tid 100104 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+db> show proc 24
+Process 24 (sh) at 0xfffff8003c90b540:
+ state: NORMAL
+ uid: 0  gids: 0, 5
+ parent: pid 16 at 0xfffff8000db13540
+ ABI: FreeBSD ELF64
+ arguments: sh /etc/rc
+ threads: 1
+100104                   Run     CPU 0                       sh
+ repear: 0xfffff8000d081000
+ reapsubtree: 16
+ vmspace: 0xfffff8000dbd6000
+   (map 0xfffff8000dbd6000)
+     (pmap 0xfffff8000dbd60d8)
+   (pmap 0xfffff8000dbd6130)
+
+
+
+--------------------------------------------------------------------------------
+
+on the restored system:
+- do we have a parent process on resume when creating the vps after migration?
+- do we properly restore the reaper in these cases?
+
+panic: exit1: child procs exists but q->p_reaper == NULL, p=0xfffff8000ed35540 q=0xfffff8000ed35a80
+cpuid = 0
+time = 1510594135
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085f418670
+vpanic() at vpanic+0x19c/frame 0xfffffe085f4186f0
+kassert_panic() at kassert_panic+0x126/frame 0xfffffe085f418760
+exit1() at exit1+0xf59/frame 0xfffffe085f4187d0
+sigexit() at sigexit+0xb2c/frame 0xfffffe085f4189a0
+postsig() at postsig+0x2a6/frame 0xfffffe085f418a70
+ast() at ast+0x4c8/frame 0xfffffe085f418ab0
+doreti_ast() at doreti_ast+0x1f/frame 0x7fffffffe0e0
+KDB: enter: panic
+[ thread pid 1 tid 100095 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+db> ps
+  pid  ppid  pgrp   uid  state   wmesg   wchan               cmd
+    0     0     0     0  DLsJ    (threaded)                  [kernel]
+100000                   D       swapin  0xffffffff81f25840  [swapper]
+100007                   D       -       0xfffff80007721400  [softirq_0]
+100008                   D       -       0xfffff80007721200  [if_io_tqg_0]
+100009                   D       -       0xfffff80007721000  [if_config_tqg_0]
+100010                   D       -       0xfffff80007720d00  [kqueue_ctx taskq]
+100013                   D       -       0xfffff80007720700  [thread taskq]
+100014                   D       -       0xfffff80007720500  [aiod_kick taskq]
+100019                   D       -       0xfffff8000771fc00  [firmware taskq]
+100022                   D       -       0xfffff8000771f600  [acpi_task_0]
+100023                   D       -       0xfffff8000771f600  [acpi_task_1]
+100024                   D       -       0xfffff8000771f600  [acpi_task_2]
+100048                   D       -       0xfffff80008cbea00  [mca taskq]
+100049                   D       -       0xffffffff81d07e30  [deadlkres]
+100053                   D       -       0xfffff8000771f200  [CAM taskq]
+100078                   D       -       0xfffff80008cbc800  [t5nex0 tq0]
+100079                   D       -       0xfffff80008cbc700  [t5nex0 tq1]
+100080                   D       -       0xfffff80008cbc500  [t5nex0 tq2]
+100081                   D       -       0xfffff80008cbc300  [t5nex0 tq3]
+    1     1     1     0  RE+     CPU 0                       init
+nprocs = 2, np = -1
+db> show proc 0xfffff8000ed35540
+Process 1 (init) at 0xfffff8000ed35540:
+ state: NORMAL
+ uid: 0  gids: 0, 5
+ ABI: FreeBSD ELF64
+ arguments: /sbin/init
+ threads: 1
+100095                   Run     CPU 0                       init
+ pptr: 0
+ repear: 0
+ reapsubtree: 956
+ sigparent: 20
+ vmspace: 0xffffffff81f26318
+   (map 0xffffffff81f26318)
+     (pmap 0xffffffff81f263f0)
+   (pmap 0xffffffff81f26448)
+db> show proc 0xfffff8000ed35a80
+Process 2 (init) at 0xfffff8000ed35a80:
+ state: ZOMBIE
+ uid: 0  gids: 0, 5
+ parent: pid 1 at 0xfffff8000ed35540
+ ABI: FreeBSD ELF64
+ arguments: /sbin/init
+ threads: 1
+100094                   Inactv                              init
+ pptr: 0xfffff8000ed35540
+ repear: 0
+ reapsubtree: 956
+ sigparent: 20
+ vmspace: 0xffffffff81f26318
+   (map 0xffffffff81f26318)
+     (pmap 0xffffffff81f263f0)
+   (pmap 0xffffffff81f26448)
+
+--------------------------------------------------------------------------------
+
+root@rabbit3:~ # vpsctl stop testvps
+XXX-BZ vps_free_locked:588 vps 0xfffff8000bfff000 vps_name testvps vps_status 4
+XXX-BZ vps_free_locked:659 vps 0xfffff8000bfff000 V_proctree_lock 0xfffffe0002ea92c8 p2 0 p 0xfffff8000e0c6000
+XXX-BZ vps_proc_release:1065 vps1 0xfffff8000bfff000 vps2 0xfffff8000bfff000 V_proctree_lock 0xfffffe0002ea92c8
+panic: _sx_xlock_hard: recursed on non-recursive sx vps instance 0xfffff8000bfff000 lock @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_core.c:908
+
+cpuid = 0
+time = 1510901361
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085ebd63c0
+vpanic() at vpanic+0x19c/frame 0xfffffe085ebd6440
+kassert_panic() at kassert_panic+0x126/frame 0xfffffe085ebd64b0
+_sx_xlock_hard() at _sx_xlock_hard+0x75a/frame 0xfffffe085ebd6580
+_sx_xlock() at _sx_xlock+0xc5/frame 0xfffffe085ebd65c0
+vps_deref() at vps_deref+0x106/frame 0xfffffe085ebd6600
+vps_free_locked() at vps_free_locked+0x68e/frame 0xfffffe085ebd6650
+vps_free() at vps_free+0x2c/frame 0xfffffe085ebd6670
+vps_ioc_destroy() at vps_ioc_destroy+0x53/frame 0xfffffe085ebd6690
+devfs_ioctl() at devfs_ioctl+0xc0/frame 0xfffffe085ebd66e0
+VOP_IOCTL_APV() at VOP_IOCTL_APV+0xe0/frame 0xfffffe085ebd6710
+vn_ioctl() at vn_ioctl+0x124/frame 0xfffffe085ebd6820
+devfs_ioctl_f() at devfs_ioctl_f+0x1f/frame 0xfffffe085ebd6840
+kern_ioctl() at kern_ioctl+0x2cd/frame 0xfffffe085ebd68a0
+sys_ioctl() at sys_ioctl+0x16f/frame 0xfffffe085ebd6980
+amd64_syscall() at amd64_syscall+0x37b/frame 0xfffffe085ebd6ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe085ebd6ab0
+--- syscall (54, FreeBSD ELF64, sys_ioctl), rip = 0x800bcf6da, rsp = 0x7fffffffcfb8, rbp = 0x7fffffffeb40 ---
+KDB: enter: panic
+[ thread pid 17111 tid 100101 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+db>
+
+
+
+After stop, when the timer happens:
+
+panic: Lock vps instance 0xfffff80008df4800 lock not exclusively locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_core.c:912
+
+cpuid = 0
+time = 1511108522
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe085e8fb840
+vpanic() at vpanic+0x19c/frame 0xfffffe085e8fb8c0
+panic() at panic+0x43/frame 0xfffffe085e8fb920
+_sx_assert() at _sx_assert+0xb2/frame 0xfffffe085e8fb930
+vps_deref() at vps_deref+0x106/frame 0xfffffe085e8fb970
+_crfree() at _crfree+0x111/frame 0xfffffe085e8fb9b0
+brelse() at brelse+0x66a/frame 0xfffffe085e8fba00
+buf_recycle() at buf_recycle+0x20d/frame 0xfffffe085e8fba50
+bufspace_daemon() at bufspace_daemon+0x72/frame 0xfffffe085e8fba70
+fork_exit() at fork_exit+0x88/frame 0xfffffe085e8fbab0
+fork_trampoline() at fork_trampoline+0xe/frame 0xfffffe085e8fbab0
+--- trap 0, rip = 0, rsp = 0, rbp = 0 ---
+KDB: enter: panic
+[ thread pid 20 tid 100062 ]
+Stopped at      kdb_enter+0x3b: movq    $0,kdb_why
+db>
+
+
+--------------------------------------------------------------------------------
+
+pid 2   sh?             0xfffff8000473d540
+        pptr            0xfffff8000473da80
+        sibling         next 0x0, prev 0xfffff8000473db78       <<< pid 0, has sinbling prev/next, children 0x1; no threads; bogus
+        children        first 0x0
+        reaper          0xfffff8000473da80
+        reaplist        first 0x0
+        reaplsibling    next 0x0, prev 0x0
+        reapsubtree     0x1
+
+pid 1   init?           0xfffff8000473da80
+        pptr            0xfffff8000473ea80
+        siblings        next 0x0, prev 0xfffff8000473e0f8       <<< pid 0, cred 4, ... looks bogus
+        children        first 0xfffff8000473d540
+        reaper          0xfffff8000473ea80
+        reaplist        0x0                                     <<<
+        reapsibling     next 0x0, prev 0xfffff8000473eb88       <<< loads of 0s, looks bogus
+        reapsubtree     0x2ad
+
+pid 0x2ad   vps1?       0xfffff8000473ea80
+        pptr            0xffffffff81f25940
+        siblings        0xfffff80004407000, 0xfffff8000473e628
+        children        first 0x0                               <<< SHOULD BE FIXED
+        reaper          0xffffffff81f25940
+        reaplist        first 0xfffff8000473da80
+        reapsibling     next 0xfffff80004407000, prev 0xfffff8000473e650
+        reapsubtree     0x2ad
+
+--------------------------------------------------------------------------------
+
+in qemu after sh vps.sh, snapshot, abort, stop, then on list it panics:
+
+Stopped at      strlen+0x1f:    movq    (%rcx),%rax
+db> where
+Tracing pid 793 tid 100076 td 0xfffff80004842580
+strlen() at strlen+0x1f/frame 0xfffffe00f6f01220
+kvprintf() at kvprintf+0x9bc/frame 0xfffffe00f6f01320
+vsnprintf() at vsnprintf+0x31/frame 0xfffffe00f6f01340
+kassert_panic() at kassert_panic+0x5a/frame 0xfffffe00f6f013b0
+__mtx_lock_flags() at __mtx_lock_flags+0x158/frame 0xfffffe00f6f01400
+prison_free() at prison_free+0x27/frame 0xfffffe00f6f01430
+_crfree() at _crfree+0xf2/frame 0xfffffe00f6f01470
+devfs_free() at devfs_free+0x23/frame 0xfffffe00f6f01490
+devfs_populate_loop() at devfs_populate_loop+0x193/frame 0xfffffe00f6f014f0
+devfs_populate() at devfs_populate+0x4a/frame 0xfffffe00f6f01510
+devfs_populate_vp() at devfs_populate_vp+0x7f/frame 0xfffffe00f6f01560
+devfs_lookup() at devfs_lookup+0x2c/frame 0xfffffe00f6f01670
+VOP_LOOKUP_APV() at VOP_LOOKUP_APV+0xda/frame 0xfffffe00f6f016a0
+lookup() at lookup+0x6d2/frame 0xfffffe00f6f01740
+namei() at namei+0x534/frame 0xfffffe00f6f01800
+vn_open_cred() at vn_open_cred+0x1fd/frame 0xfffffe00f6f01950
+kern_openat() at kern_openat+0x1fe/frame 0xfffffe00f6f01ac0
+amd64_syscall() at amd64_syscall+0x37b/frame 0xfffffe00f6f01bf0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe00f6f01bf0
+--- syscall (499, FreeBSD ELF64, sys_openat), rip = 0x800b5f73a, rsp = 0x7ffffff
+fea88, rbp = 0x7fffffffeb70 ---
+
+--------------------------------------------------------------------------------
+
+On reboot after vps stop:
+
+vps_deref: vps=0xfffff800043c7000 is DEAD and last reference gone --> scheduling
+destroy
+panic: negative refcount 0xfffff800043c7168
+cpuid = 0
+time = 1511441536
+KDB: stack backtrace:
+db_trace_self_wrapper() at db_trace_self_wrapper+0x2b/frame 0xfffffe011b1e9440
+vpanic() at vpanic+0x19c/frame 0xfffffe011b1e94c0
+kassert_panic() at kassert_panic+0x126/frame 0xfffffe011b1e9530
+vps_deref() at vps_deref+0x209/frame 0xfffffe011b1e9570
+_crfree() at _crfree+0x113/frame 0xfffffe011b1e95b0
+brelse() at brelse+0x66a/frame 0xfffffe011b1e9600
+flushbuflist() at flushbuflist+0x167/frame 0xfffffe011b1e9680
+bufobj_invalbuf() at bufobj_invalbuf+0x81/frame 0xfffffe011b1e96e0
+vgonel() at vgonel+0x15e/frame 0xfffffe011b1e9750
+vflush() at vflush+0x368/frame 0xfffffe011b1e98a0
+ffs_flushfiles() at ffs_flushfiles+0x161/frame 0xfffffe011b1e9910
+ffs_unmount() at ffs_unmount+0x7e/frame 0xfffffe011b1e9960
+dounmount() at dounmount+0x5eb/frame 0xfffffe011b1e99e0
+vfs_unmountall() at vfs_unmountall+0x7b/frame 0xfffffe011b1e9a10
+bufshutdown() at bufshutdown+0x3ab/frame 0xfffffe011b1e9a60
+kern_reboot() at kern_reboot+0x189/frame 0xfffffe011b1e9aa0
+kern_reboot() at kern_reboot/frame 0xfffffe011b1e9ac0
+
+--------------------------------------------------------------------------------
+
+
+root@:~ # vpsctl resume testvps
+vps_resume: resume vps=0xfffff800043c3800 BEGIN
+vps_md_syscall_fixup: proc=0xfffff80004737540/1 elf64_freebsd_sysvec
+vps_md_syscall_fixup: code=7/0x7 narg=4 args: 00000000ffffffff 00007fffffffe93c
+0000000000000000 0000000000000000 0000000000000000 0000000000000000
+SYSCALL: tid=100073 pid=1 syscall=7 retval[0]=0 retval[1]=0 errno=0
+vps_md_syscall_fixup: proc=0xfffff80004737a80/2 elf64_freebsd_sysvec
+vps_md_syscall_fixup: code=240/0xf0 narg=2 args: 00007fffffffed30 00007fffffffed
+30 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+SYSCALL: tid=100072 pid=2 syscall=240 retval[0]=0 retval[1]=0 errno=0
+vps_access_vmspace: vmspace=0xfffff800047d2000 vaddr=0x7fffffffed30 len=16 buf=0
+xfffffe011b1e4728 prot=1
+vps_access_vmspace: vaddr=0x7fffffffed30 len=16 map=0xfffff800047d2000 entry=0xf
+ffff800047ddb40 object=0xfffff80004707870 pindex=31
+vps_syscall_fixup_need_inthread: SYS_nanosleep: suspended at 0
+vps_syscall_fixup_need_inthread: SYS_nanosleep: ts: sec=0 nsec=0
+p=0xfffff80004737540 pid=1
+p=0xfffff80004737a80 pid=2
+vps_resume: vnet=0xfffff80003caeec0 clearing VPS_VNET_SUSPENDED
+vps_resume: resume vps=0xfffff800043c3800 FINISHED
+root@:~ # XXX-BZ fork_exit:1102 p 0xfffff80004737540 td 0xfffff800047f9000 frame
+0xfffffe011b1fdc00 td_pcb 0xfffffe011b1fdcc0 td_frame 0xfffffe011b1fdc00
+trap_pfault:734 XXX proc=0xfffff80004737540/1 map=0xfffff800047d1000 eva=0000000
+800b985da prot=4 tf_rip=0x800b985da
+
+
+Breakpoint 1, exit1 (td=0xfffff8000450d580, rval=0, signo=11) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_exit.c:197
+197     {
+(kgdb) where
+#0  exit1 (td=0xfffff8000450d580, rval=0, signo=11) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_exit.c:197
+#1  0xffffffff80a6d04c in sigexit (td=0xfffff8000450d580, sig=11) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_sig.c:3126
+#2  0xffffffff80a6d636 in postsig (sig=11) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_sig.c:3032
+#3  0xffffffff80ac1ee8 in ast (framep=<optimized out>) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/subr_trap.c:324
+#4  0xffffffff80f22c49 in doreti_ast () at /tank/users/bz/vps_zambcom/vps_zabcom/sys/amd64/amd64/exception.S:686
+#5  0x00007fffffffed30 in ?? ()
+#6  0x00007fffffffed30 in ?? ()
+#7  0x00007fffffffecb8 in ?? ()
+#8  0xe390e7a64b7e681f in ?? ()
+#9  0x0000000000000004 in ?? ()
+#10 0x0000000000000000 in ?? ()
+
+(kgdb) p/x *(struct thread *)0xfffff8000450d580
+$3 = {td_lock = 0xffffffff81d1f580, td_proc = 0xfffff80004737a80, td_plist = {tqe_next = 0x0, tqe_prev = 0xfffff80004737a90}, td_runq = {tqe_next = 0x0, tqe_prev = 0xffffffff81d1fcc0},
+  td_slpq = {tqe_next = 0x0, tqe_prev = 0x0}, td_lockq = {tqe_next = 0x0, tqe_prev = 0x0}, td_hash = {le_next = 0x0, le_prev = 0xfffffe0000dda740}, td_cpuset = 0xfffff80003cc8000,
+  td_sel = 0x0, td_sleepqueue = 0xfffff800037b7e80, td_turnstile = 0xfffff8000450bd80, td_rlqe = 0x0, td_umtxq = 0xfffff80003f54b80, td_vm_dom_policy = {seq = 0x0, p = {policy = 0x0,
+      domain = 0xffffffff}}, td_tid = 0x186e8, td_sigqueue = {sq_signals = {__bits = {0x0, 0x0, 0x0, 0x0}}, sq_kill = {__bits = {0x0, 0x0, 0x0, 0x0}}, sq_ptrace = {__bits = {0x0, 0x0, 0x0,
+        0x0}}, sq_list = {tqh_first = 0x0, tqh_last = 0xfffff8000450d650}, sq_proc = 0xfffff80004737a80, sq_flags = 0x1}, td_lend_user_pri = 0xff, td_flags = 0x4, td_flags2 = 0x0,
+  td_inhibitors = 0x0, td_pflags = 0x0, td_dupfd = 0x0, td_sqqueue = 0x0, td_wchan = 0x0, td_wmesg = 0x0, td_owepreempt = 0x0, td_tsqueue = 0x0, td_locks = 0x0, td_rw_rlocks = 0x0,
+  td_lk_slocks = 0x0, td_stopsched = 0x0, td_blocked = 0x0, td_lockname = 0x0, td_contested = {lh_first = 0x0}, td_sleeplocks = 0xffffffff81e48028, td_intr_nesting_level = 0x0,
+  td_pinned = 0x0, td_ucred = 0xfffff80003cb4100, td_limit = 0xfffff80003cd7100, td_slptick = 0x0, td_blktick = 0x0, td_swvoltick = 0x0, td_swinvoltick = 0x0, td_cow = 0x0, td_ru = {
+    ru_utime = {tv_sec = 0x0, tv_usec = 0x0}, ru_stime = {tv_sec = 0x0, tv_usec = 0x0}, ru_maxrss = 0x0, ru_ixrss = 0x0, ru_idrss = 0x0, ru_isrss = 0x0, ru_minflt = 0x1, ru_majflt = 0x0,
+    ru_nswap = 0x0, ru_inblock = 0x0, ru_oublock = 0x0, ru_msgsnd = 0x0, ru_msgrcv = 0x0, ru_nsignals = 0x0, ru_nvcsw = 0x0, ru_nivcsw = 0x0}, td_rux = {rux_runtime = 0x0, rux_uticks = 0x0,
+    rux_sticks = 0x0, rux_iticks = 0x0, rux_uu = 0x0, rux_su = 0x0, rux_tu = 0x0}, td_incruntime = 0x0, td_runtime = 0x0, td_pticks = 0x0, td_sticks = 0x0, td_iticks = 0x0, td_uticks = 0x0,
+  td_intrval = 0x0, td_oldsigmask = {__bits = {0x0, 0x0, 0x0, 0x0}}, td_generation = 0x0, td_sigstk = {ss_sp = 0x0, ss_size = 0x0, ss_flags = 0x4}, td_xsig = 0x0, td_profil_addr = 0x0,
+  td_profil_ticks = 0x0, td_name = {0x0 <repeats 20 times>}, td_fpop = 0x0, td_dbgflags = 0x0, td_si = {si_signo = 0xb, si_errno = 0x0, si_code = 0x1, si_pid = 0x0, si_uid = 0x0,
+    si_status = 0x0, si_addr = 0x0, si_value = {sival_int = 0x0, sival_ptr = 0x0, sigval_int = 0x0, sigval_ptr = 0x0}, _reason = {_fault = {_trapno = 0xc}, _timer = {_timerid = 0xc,
+        _overrun = 0x0}, _mesgq = {_mqd = 0xc}, _poll = {_band = 0xc}, __spare__ = {__spare1__ = 0xc, __spare2__ = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}}}}, td_ng_outbound = 0x0, td_osd = {
+    osd_nslots = 0x0, osd_slots = 0x0, osd_next = {le_next = 0x0, le_prev = 0x0}}, td_map_def_user = 0x0, td_dbg_forked = 0x0, td_vp_reserv = 0x0, td_no_sleeping = 0x0, td_dom_rr_idx = 0x0,
+  td_su = 0x0, td_sleeptimo = 0x0, td_rtcgen = 0x0, td_sigmask = {__bits = {0x0, 0x0, 0x0, 0x0}}, td_rqindex = 0x29, td_base_pri = 0xac, td_priority = 0xac, td_pri_class = 0x3,
+  td_user_pri = 0xac, td_base_user_pri = 0xac, td_rb_list = 0x0, td_rbp_list = 0x0, td_rb_inact = 0x0, td_sa = {code = 0xf0, callp = 0xffffffff81a17f50, args = {0x7fffffffed30,
+      0x7fffffffed30, 0x7fffffffecb8, 0xe390e7a64b7e681f, 0x4, 0x0, 0x0, 0x0}, narg = 0x2}, td_pcb = 0xfffffe011b1f8cc0, td_state = 0x4, td_uretoff = {tdu_retval = {0x0, 0x0}, tdu_off = 0x0},
+  td_cowgen = 0x0, td_slpcallout = {c_links = {le = {le_next = 0x0, le_prev = 0x0}, sle = {sle_next = 0x0}, tqe = {tqe_next = 0x0, tqe_prev = 0x0}}, c_time = 0x0, c_precision = 0x0,
+    c_arg = 0x0, c_func = 0x0, c_lock = 0x0, c_flags = 0x0, c_iflags = 0x10, c_cpu = 0x0}, td_frame = 0xfffffe011b1f8c00, td_kstack_obj = 0xfffff800047f3690, td_kstack = 0xfffffe011b1f5000,
+  td_kstack_pages = 0x4, td_critnest = 0x0, td_md = {md_spinlock_count = 0x0, md_saved_flags = 0x246, md_spurflt_addr = 0x0, md_invl_gen = {gen = 0x0, link = {le_next = 0x0, le_prev = 0x0}}},
+  td_ar = 0x0, td_lprof = {{lh_first = 0x0}, {lh_first = 0x0}}, td_dtrace = 0xfffff800047b0d00, td_errno = 0xffffffff, td_vnet = 0x0, td_vnet_lpush = 0x0, td_intr_frame = 0x0,
+  td_rfppwait_p = 0x0, td_ma = 0x0, td_ma_cnt = 0x0, td_emuldata = 0x0, td_lastcpu = 0xffffffff, td_oncpu = 0x0, td_lkpi_task = 0x0, td_vps = 0xfffff800043c3800,
+  td_vps_acc = 0xfffff80003cb7400}
+
+
+(kgdb) p/x *(struct proc *)0xfffff80004737a80
+$4 = {p_list = {le_next = 0x0, le_prev = 0xfffff80004737540}, p_threads = {tqh_first = 0xfffff8000450d580, tqh_last = 0xfffff8000450d590}, p_slock = {lock_object = {
+      lo_name = 0xffffffff814af2b5, lo_flags = 0x20030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, p_ucred = 0xfffff80003cb4100, p_fd = 0xfffff800047348a0, p_fdtol = 0x0,
+  p_stats = 0xfffff80004427600, p_limit = 0xfffff80003cd7100, p_limco = {c_links = {le = {le_next = 0x0, le_prev = 0x0}, sle = {sle_next = 0x0}, tqe = {tqe_next = 0x0, tqe_prev = 0x0}},
+    c_time = 0x0, c_precision = 0x0, c_arg = 0x0, c_func = 0x0, c_lock = 0x0, c_flags = 0x0, c_iflags = 0x0, c_cpu = 0x0}, p_sigacts = 0xfffff800047d7000, p_flag = 0x10004000,
+  p_flag2 = 0x10000000, p_state = 0x1, p_pid = 0x2, p_hash = {le_next = 0x0, le_prev = 0xfffffe00017cc010}, p_pglist = {le_next = 0xfffff80004737540, le_prev = 0xfffff80003ec1290},
+  p_pptr = 0xfffff80004737540, p_sibling = {le_next = 0x0, le_prev = 0xfffff80004737638}, p_children = {lh_first = 0x0}, p_reaper = 0xfffff80004737540, p_reaplist = {lh_first = 0x0},
+  p_reapsibling = {le_next = 0x0, le_prev = 0xfffff80004737648}, p_mtx = {lock_object = {lo_name = 0xffffffff814af2a8, lo_flags = 0x21430000, lo_data = 0x0, lo_witness = 0xfffffe0000c27400},
+    mtx_lock = 0x4}, p_statmtx = {lock_object = {lo_name = 0xffffffff814af2c3, lo_flags = 0x20030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, p_itimmtx = {lock_object = {
+      lo_name = 0xffffffff814af2ca, lo_flags = 0x20030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, p_profmtx = {lock_object = {lo_name = 0xffffffff814af2d1, lo_flags = 0x20030000,
+      lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, p_ksi = 0xfffff800043818c0, p_sigqueue = {sq_signals = {__bits = {0x0, 0x0, 0x0, 0x0}}, sq_kill = {__bits = {0x0, 0x0, 0x0, 0x0}},
+    sq_ptrace = {__bits = {0x0, 0x0, 0x0, 0x0}}, sq_list = {tqh_first = 0x0, tqh_last = 0xfffff80004737c58}, sq_proc = 0xfffff80004737a80, sq_flags = 0x1}, p_oppid = 0x0,
+  p_vmspace = 0xfffff800047d2000, p_swtick = 0x7ff7c36a, p_cowgen = 0x0, p_realtimer = {it_interval = {tv_sec = 0x0, tv_usec = 0x0}, it_value = {tv_sec = 0x0, tv_usec = 0x0}}, p_ru = {
+    ru_utime = {tv_sec = 0x0, tv_usec = 0x0}, ru_stime = {tv_sec = 0x0, tv_usec = 0x0}, ru_maxrss = 0x0, ru_ixrss = 0x0, ru_idrss = 0x0, ru_isrss = 0x0, ru_minflt = 0x0, ru_majflt = 0x0,
+    ru_nswap = 0x0, ru_inblock = 0x0, ru_oublock = 0x0, ru_msgsnd = 0x0, ru_msgrcv = 0x0, ru_nsignals = 0x0, ru_nvcsw = 0x0, ru_nivcsw = 0x0}, p_rux = {rux_runtime = 0x0, rux_uticks = 0x0,
+    rux_sticks = 0x0, rux_iticks = 0x0, rux_uu = 0x0, rux_su = 0x0, rux_tu = 0x0}, p_crux = {rux_runtime = 0x0, rux_uticks = 0x0, rux_sticks = 0x0, rux_iticks = 0x0, rux_uu = 0x0,
+    rux_su = 0x0, rux_tu = 0x0}, p_profthreads = 0x0, p_exitthreads = 0x0, p_traceflag = 0x0, p_tracevp = 0x0, p_tracecred = 0x0, p_textvp = 0xfffff800047eb588, p_lock = 0x0, p_sigiolst = {
+    slh_first = 0x0}, p_sigparent = 0x14, p_sig = 0xb, p_code = 0x1, p_stops = 0x0, p_stype = 0x0, p_step = 0x0, p_pfsflags = 0x0, p_ptevents = 0x0, p_nlminfo = 0x0, p_aioinfo = 0x0,
+  p_singlethread = 0x0, p_suspcount = 0x0, p_xthread = 0x0, p_boundary_count = 0x0, p_pendingcnt = 0x0, p_itimers = 0x0, p_procdesc = 0x0, p_treeflag = 0x0, p_pendingexits = 0x0,
+  p_filemon = 0x0, p_magic = 0xbeefface, p_osrel = 0x0, p_comm = {0x73, 0x6c, 0x65, 0x65, 0x70, 0x0 <repeats 15 times>}, p_sysent = 0xffffffff81a7ffc8, p_args = 0xfffff80003f48a60,
+  p_cpulimit = 0x7fffffffffffffff, p_nice = 0x0, p_fibnum = 0x0, p_reapsubtree = 0x1, p_elf_machine = 0x0, p_elf_flags = 0x0, p_xexit = 0x0, p_xsig = 0x0, p_pgrp = 0xfffff80003ec1280,
+  p_klist = 0xfffff800037c5c00, p_numthreads = 0x1, p_md = {md_ldt = 0x0, md_ldt_sd = {sd_lolimit = 0x0, sd_lobase = 0x0, sd_type = 0x0, sd_dpl = 0x0, sd_p = 0x0, sd_hilimit = 0x0,
+      sd_xx0 = 0x0, sd_gran = 0x0, sd_hibase = 0x0, sd_xx1 = 0x0, sd_mbz = 0x0, sd_xx2 = 0x0}}, p_itcallout = {c_links = {le = {le_next = 0x0, le_prev = 0x0}, sle = {sle_next = 0x0}, tqe = {
+        tqe_next = 0x0, tqe_prev = 0x0}}, c_time = 0x0, c_precision = 0x0, c_arg = 0x0, c_func = 0x0, c_lock = 0x0, c_flags = 0x0, c_iflags = 0x10, c_cpu = 0x0}, p_acflag = 0x10,
+  p_peers = 0x0, p_leader = 0xfffff80004737a80, p_emuldata = 0x0, p_label = 0x0, p_ktr = {stqh_first = 0x0, stqh_last = 0xfffff80004737f48}, p_mqnotifier = {lh_first = 0x0},
+  p_dtrace = 0xfffff800037c5c40, p_pwait = {cv_description = 0xffffffff814b00f0, cv_waiters = 0x0}, p_dbgwait = {cv_description = 0xffffffff814b00f7, cv_waiters = 0x0}, p_prev_runtime = 0x0,
+  p_racct = 0x0, p_throttled = 0x0, p_vm_dom_policy = {seq = 0x0, p = {policy = 0x0, domain = 0x0}}, p_orphan = {le_next = 0x0, le_prev = 0x0}, p_orphans = {lh_first = 0x0}}
+
+
+(kgdb) p/x *(struct proc *)0xfffff80004737540
+$5 = {p_list = {le_next = 0xfffff80004737a80, le_prev = 0xfffffe000160f308}, p_threads = {tqh_first = 0xfffff800047f9000, tqh_last = 0xfffff800047f9010}, p_slock = {lock_object = {
+      lo_name = 0xffffffff814af2b5, lo_flags = 0x20030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, p_ucred = 0xfffff800047b1200, p_fd = 0xfffff80004734450, p_fdtol = 0x0,
+  p_stats = 0xfffff80004427800, p_limit = 0xfffff80003cd7000, p_limco = {c_links = {le = {le_next = 0x0, le_prev = 0x0}, sle = {sle_next = 0x0}, tqe = {tqe_next = 0x0, tqe_prev = 0x0}},
+    c_time = 0x0, c_precision = 0x0, c_arg = 0x0, c_func = 0x0, c_lock = 0x0, c_flags = 0x0, c_iflags = 0x0, c_cpu = 0x0}, p_sigacts = 0xfffff800047f6000, p_flag = 0x10004002,
+  p_flag2 = 0x10000000, p_state = 0x1, p_pid = 0x1, p_hash = {le_next = 0x0, le_prev = 0xfffffe00017cc008}, p_pglist = {le_next = 0x0, le_prev = 0xfffff80004737b50},
+  p_pptr = 0xfffff80004739540, p_sibling = {le_next = 0x0, le_prev = 0xfffff80004739638}, p_children = {lh_first = 0xfffff80004737a80}, p_reaper = 0xfffff80004739540, p_reaplist = {
+    lh_first = 0xfffff80004737a80}, p_reapsibling = {le_next = 0x0, le_prev = 0xfffff80004739648}, p_mtx = {lock_object = {lo_name = 0xffffffff814af2a8, lo_flags = 0x21430000, lo_data = 0x0,
+      lo_witness = 0xfffffe0000c27400}, mtx_lock = 0x4}, p_statmtx = {lock_object = {lo_name = 0xffffffff814af2c3, lo_flags = 0x20030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4},
+  p_itimmtx = {lock_object = {lo_name = 0xffffffff814af2ca, lo_flags = 0x20030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, p_profmtx = {lock_object = {lo_name = 0xffffffff814af2d1,
+      lo_flags = 0x20030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, p_ksi = 0xfffff80004381850, p_sigqueue = {sq_signals = {__bits = {0x0, 0x0, 0x0, 0x0}}, sq_kill = {__bits = {
+        0x0, 0x0, 0x0, 0x0}}, sq_ptrace = {__bits = {0x0, 0x0, 0x0, 0x0}}, sq_list = {tqh_first = 0x0, tqh_last = 0xfffff80004737718}, sq_proc = 0xfffff80004737540, sq_flags = 0x1},
+  p_oppid = 0x0, p_vmspace = 0xfffff800047d1000, p_swtick = 0x7ff7c1a6, p_cowgen = 0x0, p_realtimer = {it_interval = {tv_sec = 0x0, tv_usec = 0x0}, it_value = {tv_sec = 0x0, tv_usec = 0x0}},
+  p_ru = {ru_utime = {tv_sec = 0x0, tv_usec = 0x0}, ru_stime = {tv_sec = 0x0, tv_usec = 0x0}, ru_maxrss = 0x0, ru_ixrss = 0x0, ru_idrss = 0x0, ru_isrss = 0x0, ru_minflt = 0x0,
+    ru_majflt = 0x0, ru_nswap = 0x0, ru_inblock = 0x0, ru_oublock = 0x0, ru_msgsnd = 0x0, ru_msgrcv = 0x0, ru_nsignals = 0x0, ru_nvcsw = 0x0, ru_nivcsw = 0x0}, p_rux = {rux_runtime = 0x0,
+    rux_uticks = 0x0, rux_sticks = 0x0, rux_iticks = 0x0, rux_uu = 0x0, rux_su = 0x0, rux_tu = 0x0}, p_crux = {rux_runtime = 0x0, rux_uticks = 0x0, rux_sticks = 0x0, rux_iticks = 0x0,
+    rux_uu = 0x0, rux_su = 0x0, rux_tu = 0x0}, p_profthreads = 0x0, p_exitthreads = 0x0, p_traceflag = 0x0, p_tracevp = 0x0, p_tracecred = 0x0, p_textvp = 0xfffff800047eab10, p_lock = 0x0,
+  p_sigiolst = {slh_first = 0x0}, p_sigparent = 0x14, p_sig = 0xb, p_code = 0x1, p_stops = 0x0, p_stype = 0x0, p_step = 0x0, p_pfsflags = 0x0, p_ptevents = 0x0, p_nlminfo = 0x0,
+  p_aioinfo = 0x0, p_singlethread = 0x0, p_suspcount = 0x0, p_xthread = 0x0, p_boundary_count = 0x0, p_pendingcnt = 0x1, p_itimers = 0x0, p_procdesc = 0x0, p_treeflag = 0x0,
+  p_pendingexits = 0x0, p_filemon = 0x0, p_magic = 0xbeefface, p_osrel = 0x0, p_comm = {0x73, 0x68, 0x0 <repeats 18 times>}, p_sysent = 0xffffffff81a7ffc8, p_args = 0xfffff800037c5b00,
+  p_cpulimit = 0x7fffffffffffffff, p_nice = 0x0, p_fibnum = 0x0, p_reapsubtree = 0x2b5, p_elf_machine = 0x0, p_elf_flags = 0x0, p_xexit = 0x0, p_xsig = 0x0, p_pgrp = 0xfffff80003ec1280,
+  p_klist = 0xfffff800037c5b40, p_numthreads = 0x1, p_md = {md_ldt = 0x0, md_ldt_sd = {sd_lolimit = 0x0, sd_lobase = 0x0, sd_type = 0x0, sd_dpl = 0x0, sd_p = 0x0, sd_hilimit = 0x0,
+      sd_xx0 = 0x0, sd_gran = 0x0, sd_hibase = 0x0, sd_xx1 = 0x0, sd_mbz = 0x0, sd_xx2 = 0x0}}, p_itcallout = {c_links = {le = {le_next = 0x0, le_prev = 0x0}, sle = {sle_next = 0x0}, tqe = {
+        tqe_next = 0x0, tqe_prev = 0x0}}, c_time = 0x0, c_precision = 0x0, c_arg = 0x0, c_func = 0x0, c_lock = 0x0, c_flags = 0x0, c_iflags = 0x10, c_cpu = 0x0}, p_acflag = 0x0,
+  p_peers = 0x0, p_leader = 0xfffff80004737540, p_emuldata = 0x0, p_label = 0x0, p_ktr = {stqh_first = 0x0, stqh_last = 0xfffff80004737a08}, p_mqnotifier = {lh_first = 0x0},
+  p_dtrace = 0xfffff800037c5b80, p_pwait = {cv_description = 0xffffffff814b00f0, cv_waiters = 0x0}, p_dbgwait = {cv_description = 0xffffffff814b00f7, cv_waiters = 0x0}, p_prev_runtime = 0x0,
+  p_racct = 0x0, p_throttled = 0x0, p_vm_dom_policy = {seq = 0x0, p = {policy = 0x0, domain = 0x0}}, p_orphan = {le_next = 0x0, le_prev = 0x0}, p_orphans = {lh_first = 0x0}}
+
+
+(kgdb) p/x *(struct vps *)0xfffff800043c3800
+$8 = {vnet = 0xfffff80003caeec0, vps_all = {le_next = 0xfffff80003ae9800, le_prev = 0xffffffff81f589f0}, vps_sibling = {le_next = 0x0, le_prev = 0xfffff80003ae9828}, vps_child_head = {
+    lh_first = 0x0}, vps_parent = 0xfffff80003ae9800, vps_lock = {lock_object = {lo_name = 0xfffff80003cb4800, lo_flags = 0x2330000, lo_data = 0x0, lo_witness = 0xfffffe0000c34100},
+    sx_lock = 0x1}, vps_lock_name = 0xfffff80003cb4800, vps_id = 0x1, vps_name = {0x74, 0x65, 0x73, 0x74, 0x76, 0x70, 0x73, 0x0 <repeats 249 times>}, vps_status = 0x4, vps_refcnt = 0x6,
+  vps_refcnt_lock = {lock_object = {lo_name = 0xffffffff815187a5, lo_flags = 0x30000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, vps_ref_head = {tqh_first = 0xfffff80003f48ba0,
+    tqh_last = 0xfffff80003f48b00}, vps_task = {q = 0x0, t = {ta_link = {stqe_next = 0x0}, ta_pending = 0x0, ta_priority = 0x0, ta_func = 0x0, ta_context = 0x0}, c = {c_links = {le = {
+          le_next = 0x0, le_prev = 0x0}, sle = {sle_next = 0x0}, tqe = {tqe_next = 0x0, tqe_prev = 0x0}}, c_time = 0x0, c_precision = 0x0, c_arg = 0x0, c_func = 0x0, c_lock = 0x0,
+      c_flags = 0x0, c_iflags = 0x0, c_cpu = 0x0}, f = 0x0}, priv_allow_set = {0x20, 0x1, 0x0, 0x0, 0x0, 0x0, 0xfc, 0x1f, 0x0, 0x0, 0x7, 0x0, 0x0, 0xc0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x7,
+    0x3c, 0x10, 0x0, 0x0, 0x41, 0x0, 0x0, 0xc0, 0x0, 0x6, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xc0, 0xff, 0x44, 0x23, 0xbc, 0x1, 0x0, 0x0, 0x0, 0x0, 0xc0, 0xfc, 0xff, 0xff, 0x0, 0x0, 0x0, 0x0,
+    0x0, 0x0, 0x0, 0x0, 0x0, 0x4, 0xe, 0x3, 0x0 <repeats 22 times>}, priv_impl_set = {0xff, 0xff, 0xff, 0xff, 0xff, 0xe0, 0xff <repeats 80 times>}, vps_ip4 = 0xfffff80003f49f30,
+  vps_ip6 = 0xfffff80003f48a80, vps_ip4_cnt = 0x1, vps_ip6_cnt = 0x1, vps_flags = 0x0, restore_count = 0x1, suspend_time = 0x0, swappertd = 0xfffff80004739540, vps_acc = 0xfffff80003cb7400,
+  consolelog = 0x0, console_tty = 0xfffff800043f1000, console_fp_ma = 0xfffff8000446d870, consolelog_refcnt = 0x0, console_flags = 0x0, vps_ucred = 0xfffff80003cb4400,
+  devfs_ruleset = 0xfffffe0001627000, _rootvnode = 0xfffff8000469db10, _rootpath = {0x2f, 0x76, 0x70, 0x73, 0x72, 0x6f, 0x6f, 0x74, 0x0 <repeats 1016 times>}}
+
+
+(kgdb) p/x *(struct proc *)0xfffff80004739540
+$9 = {p_list = {le_next = 0xfffff80004405a80, le_prev = 0xfffff80004738a80}, p_threads = {tqh_first = 0xfffff800045e9000, tqh_last = 0xfffff800045e9010}, p_slock = {lock_object = {
+      lo_name = 0xffffffff814af2b5, lo_flags = 0x20030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, p_ucred = 0xfffff80003cb3d00, p_fd = 0xfffff800044028a0, p_fdtol = 0x0,
+  p_stats = 0xfffff80004426a00, p_limit = 0xfffff80003cda000, p_limco = {c_links = {le = {le_next = 0x0, le_prev = 0x0}, sle = {sle_next = 0x0}, tqe = {tqe_next = 0x0, tqe_prev = 0x0}},
+    c_time = 0x0, c_precision = 0x0, c_arg = 0x0, c_func = 0x0, c_lock = 0xfffff80004739660, c_flags = 0x0, c_iflags = 0x0, c_cpu = 0x0}, p_sigacts = 0xfffff800045bd000, p_flag = 0x10000204,
+  p_flag2 = 0x0, p_state = 0x1, p_pid = 0x2b5, p_hash = {le_next = 0x0, le_prev = 0xfffffe0000dd05a8}, p_pglist = {le_next = 0xfffff80004407000, le_prev = 0xfffff80004738b50},
+  p_pptr = 0xffffffff81f258c0, p_sibling = {le_next = 0xfffff80004407000, le_prev = 0xfffff80004738b68}, p_children = {lh_first = 0xfffff80004737540}, p_reaper = 0xffffffff81f258c0,
+  p_reaplist = {lh_first = 0xfffff80004737540}, p_reapsibling = {le_next = 0xfffff80004407000, le_prev = 0xfffff80004738b90}, p_mtx = {lock_object = {lo_name = 0xffffffff814af2a8,
+      lo_flags = 0x21430000, lo_data = 0x0, lo_witness = 0xfffffe0000c27400}, mtx_lock = 0x4}, p_statmtx = {lock_object = {lo_name = 0xffffffff814af2c3, lo_flags = 0x20030000, lo_data = 0x0,
+      lo_witness = 0x0}, mtx_lock = 0x4}, p_itimmtx = {lock_object = {lo_name = 0xffffffff814af2ca, lo_flags = 0x20030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, p_profmtx = {
+    lock_object = {lo_name = 0xffffffff814af2d1, lo_flags = 0x20030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, p_ksi = 0xfffff80004381af0, p_sigqueue = {sq_signals = {__bits = {
+        0x0, 0x0, 0x0, 0x0}}, sq_kill = {__bits = {0x0, 0x0, 0x0, 0x0}}, sq_ptrace = {__bits = {0x0, 0x0, 0x0, 0x0}}, sq_list = {tqh_first = 0x0, tqh_last = 0xfffff80004739718},
+    sq_proc = 0xfffff80004739540, sq_flags = 0x1}, p_oppid = 0x0, p_vmspace = 0xffffffff81f26398, p_swtick = 0x80010d34, p_cowgen = 0x0, p_realtimer = {it_interval = {tv_sec = 0x0,
+      tv_usec = 0x0}, it_value = {tv_sec = 0x0, tv_usec = 0x0}}, p_ru = {ru_utime = {tv_sec = 0x0, tv_usec = 0x0}, ru_stime = {tv_sec = 0x0, tv_usec = 0x0}, ru_maxrss = 0x0, ru_ixrss = 0x0,
+    ru_idrss = 0x0, ru_isrss = 0x0, ru_minflt = 0x0, ru_majflt = 0x0, ru_nswap = 0x0, ru_inblock = 0x0, ru_oublock = 0x0, ru_msgsnd = 0x0, ru_msgrcv = 0x0, ru_nsignals = 0x0, ru_nvcsw = 0x0,
+    ru_nivcsw = 0x0}, p_rux = {rux_runtime = 0x0, rux_uticks = 0x0, rux_sticks = 0x0, rux_iticks = 0x0, rux_uu = 0x0, rux_su = 0x0, rux_tu = 0x0}, p_crux = {rux_runtime = 0x0,
+    rux_uticks = 0x0, rux_sticks = 0x0, rux_iticks = 0x0, rux_uu = 0x0, rux_su = 0x0, rux_tu = 0x0}, p_profthreads = 0x0, p_exitthreads = 0x0, p_traceflag = 0x0, p_tracevp = 0x0,
+  p_tracecred = 0x0, p_textvp = 0x0, p_lock = 0x0, p_sigiolst = {slh_first = 0x0}, p_sigparent = 0x14, p_sig = 0x0, p_code = 0x0, p_stops = 0x0, p_stype = 0x0, p_step = 0x0, p_pfsflags = 0x0,
+  p_ptevents = 0x0, p_nlminfo = 0x0, p_aioinfo = 0x0, p_singlethread = 0x0, p_suspcount = 0x0, p_xthread = 0x0, p_boundary_count = 0x0, p_pendingcnt = 0x0, p_itimers = 0x0, p_procdesc = 0x0,
+  p_treeflag = 0x4, p_pendingexits = 0x0, p_filemon = 0x0, p_magic = 0xbeefface, p_osrel = 0x124fa4, p_comm = {0x76, 0x70, 0x73, 0x31, 0x0, 0x6c, 0x0 <repeats 14 times>},
+  p_sysent = 0xffffffff81a14b58, p_args = 0x0, p_cpulimit = 0x7fffffffffffffff, p_nice = 0x0, p_fibnum = 0x0, p_reapsubtree = 0x2b5, p_elf_machine = 0x0, p_elf_flags = 0x0, p_xexit = 0x0,
+  p_xsig = 0x0, p_pgrp = 0xffffffff81d05630, p_klist = 0xfffff800037c6340, p_numthreads = 0x1, p_md = {md_ldt = 0x0, md_ldt_sd = {sd_lolimit = 0x0, sd_lobase = 0x0, sd_type = 0x0,
+      sd_dpl = 0x0, sd_p = 0x0, sd_hilimit = 0x0, sd_xx0 = 0x0, sd_gran = 0x0, sd_hibase = 0x0, sd_xx1 = 0x0, sd_mbz = 0x0, sd_xx2 = 0x0}}, p_itcallout = {c_links = {le = {le_next = 0x0,
+        le_prev = 0x0}, sle = {sle_next = 0x0}, tqe = {tqe_next = 0x0, tqe_prev = 0x0}}, c_time = 0x0, c_precision = 0x0, c_arg = 0x0, c_func = 0x0, c_lock = 0xfffff80004739660,
+    c_flags = 0x0, c_iflags = 0x0, c_cpu = 0x0}, p_acflag = 0x1, p_peers = 0x0, p_leader = 0xfffff80004739540, p_emuldata = 0x0, p_label = 0x0, p_ktr = {stqh_first = 0x0,
+    stqh_last = 0xfffff80004739a08}, p_mqnotifier = {lh_first = 0x0}, p_dtrace = 0xfffff800037c6240, p_pwait = {cv_description = 0xffffffff814b00f0, cv_waiters = 0x0}, p_dbgwait = {
+    cv_description = 0xffffffff814b00f7, cv_waiters = 0x0}, p_prev_runtime = 0x0, p_racct = 0x0, p_throttled = 0x0, p_vm_dom_policy = {seq = 0x2, p = {policy = 0x0, domain = 0xffffffff}},
+  p_orphan = {le_next = 0x0, le_prev = 0x0}, p_orphans = {lh_first = 0x0}}
+
+
+
+(kgdb) p/x $10->td_pcb
+$11 = 0xfffffe011b1f8cc0
+(kgdb) p/x *$10->td_pcb
+$12 = {pcb_r15 = 0xffffffff81d1f580, pcb_r14 = 0x0, pcb_r13 = 0xfffff8000481c580, pcb_r12 = 0xffffffff80dc9a10, pcb_rbp = 0x0, pcb_rsp = 0xfffffe011b1f8bf8, pcb_rbx = 0xfffff8000450d580,
+  pcb_rip = 0xffffffff80f21d20, pcb_fsbase = 0x80063e898, pcb_gsbase = 0x0, pcb_kgsbase = 0x0, pcb_cr0 = 0x0, pcb_cr2 = 0x0, pcb_cr3 = 0x0, pcb_cr4 = 0x0, pcb_dr0 = 0x0, pcb_dr1 = 0x0,
+  pcb_dr2 = 0x0, pcb_dr3 = 0x0, pcb_dr6 = 0x0, pcb_dr7 = 0x0, pcb_gdt = {rd_limit = 0x0, rd_base = 0x0}, pcb_idt = {rd_limit = 0x0, rd_base = 0x0}, pcb_ldt = {rd_limit = 0x0, rd_base = 0x0},
+  pcb_tr = 0x0, pcb_flags = 0x18, pcb_initial_fpucw = 0x37f, pcb_onfault = 0x0, pcb_pad0 = 0x0, pcb_tssp = 0x0, pcb_efer = 0x0, pcb_star = 0x0, pcb_lstar = 0x0, pcb_cstar = 0x0,
+  pcb_sfmask = 0x0, pcb_save = 0xfffffe011b1f8e00, pcb_pad = {0x0, 0x0, 0x0, 0x0, 0x0}}
+
+(kgdb) p/x $13->p_pendingcnt
+$14 = 0x0
+(kgdb) p/x $13->p_siglist
+There is no member named p_siglist.
+(kgdb) p/x $13->p_sigqueue.sq_signals
+$15 = {__bits = {0x0, 0x0, 0x0, 0x0}}
+(kgdb) p/x $16->td_flags
+$17 = 0x4
+
+../sys/proc.h:#define   TDF_NEEDSIGCHK  0x00020000 /* Thread may need signal delivery. */
+
+(kgdb) p/x $16->td_sigstk.ss_sp
+$18 = 0x0
+
+--------------------------------------------------------------------------------
+
+
+FOCUS ON THIS ONE I GUESS as it has "vps_restore" specifics imho,
+also related the thread_exit();
+syscallret
+        ->
+        vps_md_syscallret
+                /* restore rax from code */
+
+
+This should just work with suspend/resume so that can't be the cause for
+vps_restore/resume killing processes:
+vps_resume
+        ->
+        vps_syscall_fixup
+                ->
+                vps_md_syscall_fixup
+                        if 0x80 return
+                        else do stuff /* XXX that stuff is probably wrong somewhere */
+                                /* stuff == restore syscall "args" regs to some part, not sure why and what for yet */
+                ->
+                vps_syscall_fixup_need_inthread
+                |> vps_md_syscall_fixup_setup_inthread
+
+
+
+--------------------------------------------------------------------------------
+
+This happened on snapshot with spinitsel (select call inside vps) and a few
+other modifications.  The select has an open socket() nothing else.
+
+Fatal trap 12: page fault while in kernel mode
+cpuid = 0; apic id = 00
+fault virtual address   = 0x100000408
+fault code              = supervisor read data, page not present
+instruction pointer     = 0x20:0xffffffff80a71c0d
+stack pointer           = 0x28:0xfffffe00f6f06410
+frame pointer           = 0x28:0xfffffe00f6f064d0
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, IOPL = 0
+current process         = 783 (vpsctl)
+[ thread pid 783 tid 100077 ]
+Stopped at      _sx_xlock_hard+0x50d:   movl    0x408(%r15),%eax
+db>
+
+
+db> where
+Tracing pid 783 tid 100077 td 0xfffff80004809000
+_sx_xlock_hard() at _sx_xlock_hard+0x50d/frame 0xfffffe00f6f064d0
+_sx_xlock() at _sx_xlock+0xc5/frame 0xfffffe00f6f06510
+sblock() at sblock+0x9d/frame 0xfffffe00f6f06530
+vps_snapshot_socket() at vps_snapshot_socket+0x192/frame 0xfffffe00f6f065a0
+vps_snapshot_socket() at vps_snapshot_socket+0xee/frame 0xfffffe00f6f06610
+vps_snapshot_fdset() at vps_snapshot_fdset+0x3af/frame 0xfffffe00f6f06670
+vps_snapshot_proc_one() at vps_snapshot_proc_one+0x7c4/frame 0xfffffe00f6f066b0
+vps_snapshot_proc() at vps_snapshot_proc+0x2fa/frame 0xfffffe00f6f06700
+vps_snapshot() at vps_snapshot+0x55e/frame 0xfffffe00f6f067a0
+vps_ioc_snapshot() at vps_ioc_snapshot+0x9f/frame 0xfffffe00f6f067d0
+devfs_ioctl() at devfs_ioctl+0xc0/frame 0xfffffe00f6f06820
+VOP_IOCTL_APV() at VOP_IOCTL_APV+0xe0/frame 0xfffffe00f6f06850
+vn_ioctl() at vn_ioctl+0x124/frame 0xfffffe00f6f06960
+devfs_ioctl_f() at devfs_ioctl_f+0x1f/frame 0xfffffe00f6f06980
+kern_ioctl() at kern_ioctl+0x2cd/frame 0xfffffe00f6f069e0
+sys_ioctl() at sys_ioctl+0x16f/frame 0xfffffe00f6f06ac0
+amd64_syscall() at amd64_syscall+0x36d/frame 0xfffffe00f6f06bf0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe00f6f06bf0
+-- syscall (54, FreeBSD ELF64, sys_ioctl), rip = 0x800bcf6da, rsp = 0x7fffffffe
+898, rbp = 0x7fffffffeb40 ---
+
+
+db> show alllocks
+Process 783 (vpsctl) thread 0xfffff80004809000 (100077)
+exclusive sx filedesc structure (filedesc structure) r = 0 (0xfffff8000473b040)
+locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:2699
+shared sx allproc_0xfffff800043c7000 (allproc_0xfffff800043c7000) r = 0 (0xfffff
+e000160f2a8) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c
+:1940
+exclusive sx vps instance 0xfffff800043c7000 lock (vps instance 0xfffff800043c70
+00 lock) r = 0 (0xfffff800043c7038) locked @ /tank/users/bz/vps_zambcom/vps_zabc
+om/sys/vps/vps_user.c:431
+shared sx lock of all vps instances (lock of all vps instances) r = 0 (0xfffffff
+f81f58ce0) locked @ /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_user.c:425
+
+db> show reg
+cs                        0x20
+ds                        0x3b
+es                        0x3b
+fs                        0x13
+gs                        0x1b
+ss                        0x28
+rax                          0
+rcx         0xfffff80004809000
+rdx                          0
+rbx         0xfffffe0000c27a58
+rsp         0xfffffe00f6f06410
+rbp         0xfffffe00f6f064d0
+rsi                0x100000000
+rdi         0xfffffe0000c27a58
+r8          0xffffffff814c39d8  ttystates+0x2128
+r9                       0x118
+r10                        0x1
+r11                       0x19
+r12                          0
+r13                0x100000000
+r14         0xfffff80004809000
+r15                0x100000000
+rip         0xffffffff80a71c0d  _sx_xlock_hard+0x50d
+rflags                   0x212
+_sx_xlock_hard+0x50d:   movl    0x408(%r15),%eax
+
+Good test case to reproduce the socket locking problem....
+
+
+(kgdb) break *__bz_dss
+Breakpoint 1 at 0xffffffff80dc7560: file /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c, line 2465.
+(kgdb) cont
+Continuing.
+
+Breakpoint 1, __bz_dss (so=0xfffff8000482f358, ctx=0xfffff80003ef3600, vps=0xfffff800043c7000) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:2465
+2465    {
+(kgdb) where
+#0  __bz_dss (so=0xfffff8000482f358, ctx=0xfffff80003ef3600, vps=0xfffff800043c7000) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:2465
+#1  0xffffffff80dc6d74 in vps_snapshot_socket (ctx=0xfffff80003ef3600, vps=0xfffff800043c7000, so=0xfffff8000482f358) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:2494
+#2  0xffffffff80dc56ef in vps_snapshot_fdset (ctx=<optimized out>, vps=<optimized out>, p=<optimized out>) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:2819
+#3  0xffffffff80dc4a84 in vps_snapshot_proc_one (ctx=0xfffff80003ef3600, vps=<optimized out>, p=0xfffff8000471a000) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:3697
+#4  0xffffffff80dc28fa in vps_snapshot_proc (ctx=0xfffff80003ef3600, vps=0xfffff800043c7000) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:1943
+#5  0xffffffff80dc11ee in vps_snapshot (dev_ctx=0xfffff80003b3fc00, vps=0xfffff800043c7000, va=<optimized out>) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:565
+#6  0xffffffff80dbf1ff in vps_ioc_snapshot (vps=<optimized out>, ctx=0xfffff80003b3fc00, cmd=<optimized out>, data=0xfffff8000442f000 "testvps", flags=<optimized out>, td=<optimized out>)
+    at /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_user.c:432
+#7  0xffffffff8092fbb0 in devfs_ioctl (ap=0xfffffe011b1e5868) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/fs/devfs/devfs_vnops.c:808
+#8  0xffffffff810b7540 in VOP_IOCTL_APV (vop=<optimized out>, a=0xfffffe011b1e5868) at vnode_if.c:1067
+#9  0xffffffff80b4b5b4 in vn_ioctl (fp=0xfffff8000446daa0, com=<optimized out>, data=0xfffff8000442f000, active_cred=0xfffff80003cb4700, td=0x4)
+    at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_vnops.c:1494
+#10 0xffffffff8093028f in devfs_ioctl_f (fp=0xfffff8000482f358, com=18446735277682537984, data=0xfffff800043c7000, cred=0x2, td=0xfffff800045e7580)
+    at /tank/users/bz/vps_zambcom/vps_zabcom/sys/fs/devfs/devfs_vnops.c:766
+#11 0xffffffff80ad296d in fo_ioctl (fp=<optimized out>, com=3244324626, active_cred=<optimized out>, td=<optimized out>, data=<optimized out>)
+    at /tank/users/bz/vps_zambcom/vps_zabcom/sys/sys/file.h:323
+#12 kern_ioctl (td=<optimized out>, fd=<optimized out>, com=<optimized out>, data=0xfffff800043c7000 "\200\356\312\003") at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/sys_generic.c:848
+#13 0xffffffff80ad262f in sys_ioctl (td=<optimized out>, uap=0xfffff800045e7938) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/sys_generic.c:757
+#14 0xffffffff80f4014d in syscallenter (td=0xfffff800045e7580) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/amd64/amd64/../../kern/subr_syscall.c:137
+#15 amd64_syscall (td=0xfffff800045e7580, traced=<optimized out>) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/amd64/amd64/trap.c:948
+#16 0xffffffff80f21b54 in Xfast_syscall () at /tank/users/bz/vps_zambcom/vps_zabcom/sys/amd64/amd64/exception.S:399
+#17 0x0000000000000003 in ?? ()
+#18 0x00000000c1607712 in ?? ()
+#19 0x00007fffffffe9b0 in ?? ()
+#20 0x0000000000000000 in ?? ()
+
+(kgdb) p/x *so
+$2 = {so_lock = {lock_object = {lo_name = 0xffffffff814fd1d0, lo_flags = 0x1430000, lo_data = 0x0, lo_witness = 0xfffffe0000c33e00}, mtx_lock = 0x4}, so_count = 0x1, so_rdsel = {si_tdlist = {
+      tqh_first = 0x0, tqh_last = 0xfffff8000482f380}, si_note = {kl_list = {slh_first = 0x0}, kl_lock = 0xffffffff80b00850, kl_unlock = 0xffffffff80b00890,
+      kl_assert_locked = 0xffffffff80b008d0, kl_assert_unlocked = 0xffffffff80b00920, kl_lockarg = 0xfffff8000482f358, kl_autodestroy = 0x0}, si_mtx = 0xfffffe000160b270}, so_wrsel = {
+    si_tdlist = {tqh_first = 0x0, tqh_last = 0x0}, si_note = {kl_list = {slh_first = 0x0}, kl_lock = 0xffffffff80b00960, kl_unlock = 0xffffffff80b009a0, kl_assert_locked = 0xffffffff80b009e0,
+      kl_assert_unlocked = 0xffffffff80b00a30, kl_lockarg = 0xfffff8000482f358, kl_autodestroy = 0x0}, si_mtx = 0x0}, so_type = 0x2, so_options = 0x0, so_linger = 0x0, so_state = 0x0,
+  so_pcb = 0xfffff8000479d1a8, so_vnet = 0xfffff80003caee80, so_proto = 0xffffffff81a56e50, so_timeo = 0x0, so_error = 0x0, so_sigio = 0x0, so_cred = 0xfffff8000481e100, so_label = 0x0,
+  so_gencnt = 0x806, so_emuldata = 0x0, osd = {osd_nslots = 0x0, osd_slots = 0x0, osd_next = {le_next = 0x0, le_prev = 0x0}}, so_fibnum = 0x0, so_user_cookie = 0x0, so_ts_clock = 0x0,
+  so_max_pacing_rate = 0x0, {{so_rcv = {sb_mtx = {lock_object = {lo_name = 0xffffffff814be3c6, lo_flags = 0x1030000, lo_data = 0x0, lo_witness = 0xfffffe0000c27800}, mtx_lock = 0x4}, sb_sx = {
+          lock_object = {lo_name = 0xffffffff814a3e0b, lo_flags = 0x2330000, lo_data = 0x0, lo_witness = 0xfffffe0000c33f00}, sx_lock = 0x1}, sb_sel = 0xfffff8000482f380, sb_state = 0x0,
+        sb_mb = 0x0, sb_mbtail = 0x0, sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0, sb_sndptroff = 0x0, sb_acc = 0x0, sb_ccc = 0x0, sb_hiwat = 0xa460, sb_mbcnt = 0x0, sb_mcnt = 0x0,
+        sb_ccnt = 0x0, sb_mbmax = 0x52300, sb_ctl = 0x0, sb_lowat = 0x1, sb_timeo = 0x0, sb_flags = 0x8, sb_upcall = 0x0, sb_upcallarg = 0x0, sb_aiojobq = {tqh_first = 0x0,
+          tqh_last = 0xfffff8000482f560}, sb_aiotask = {ta_link = {stqe_next = 0x0}, ta_pending = 0x0, ta_priority = 0x0, ta_func = 0xffffffff80adbfb0, ta_context = 0xfffff8000482f358}},
+      so_snd = {sb_mtx = {lock_object = {lo_name = 0xffffffff814be3bf, lo_flags = 0x1030000, lo_data = 0x0, lo_witness = 0xfffffe0000c27780}, mtx_lock = 0x4}, sb_sx = {lock_object = {
+            lo_name = 0xffffffff814a3e01, lo_flags = 0x2330000, lo_data = 0x0, lo_witness = 0xfffffe0000c33e80}, sx_lock = 0x1}, sb_sel = 0xfffff8000482f3d0, sb_state = 0x0, sb_mb = 0x0,
+        sb_mbtail = 0x0, sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0, sb_sndptroff = 0x0, sb_acc = 0x0, sb_ccc = 0x0, sb_hiwat = 0x2400, sb_mbcnt = 0x0, sb_mcnt = 0x0, sb_ccnt = 0x0,
+        sb_mbmax = 0x12000, sb_ctl = 0x0, sb_lowat = 0x800, sb_timeo = 0x0, sb_flags = 0x0, sb_upcall = 0x0, sb_upcallarg = 0x0, sb_aiojobq = {tqh_first = 0x0, tqh_last = 0xfffff8000482f650},
+        sb_aiotask = {ta_link = {stqe_next = 0x0}, ta_pending = 0x0, ta_priority = 0x0, ta_func = 0xffffffff80adc720, ta_context = 0xfffff8000482f358}}, so_list = {tqe_next = 0x0,
+        tqe_prev = 0x0}, so_listen = 0x0, so_qstate = 0x0, so_peerlabel = 0x0, so_oobmark = 0x0}, {sol_incomp = {tqh_first = 0xffffffff814be3c6, tqh_last = 0x1030000}, sol_comp = {
+        tqh_first = 0xfffffe0000c27800, tqh_last = 0x4}, sol_qlen = 0x814a3e0b, sol_incqlen = 0xffffffff, sol_qlimit = 0x2330000, sol_accept_filter = 0xfffffe0000c33f00,
+      sol_accept_filter_arg = 0x1, sol_accept_filter_str = 0xfffff8000482f380, sol_upcall = 0x0, sol_upcallarg = 0x0, sol_sbrcv_lowat = 0x0, sol_sbsnd_lowat = 0x0, sol_sbrcv_hiwat = 0x0,
+      sol_sbsnd_hiwat = 0x0, sol_sbrcv_flags = 0x0, sol_sbsnd_flags = 0x0, sol_sbrcv_timeo = 0x0, sol_sbsnd_timeo = 0x0}}}
+
+
+(kgdb) s
+2467            printf("XXX-BZ %s:%d so %p ctx %p vps %p\n", __func__, __LINE__, so, ctx, vps);
+(kgdb) s
+printf (fmt=0xffffffff8151bceb "XXX-BZ %s:%d so %p ctx %p vps %p\n") at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/subr_prf.c:398
+398     {
+(kgdb) s
+402             va_start(ap, fmt);
+(kgdb) n
+403             retval = vprintf(fmt, ap);
+(kgdb) n
+406             return (retval);
+(kgdb) n
+vps_snapshot_socket (ctx=0xfffff80003ef3600, vps=0xfffff800043c7000, so=0xfffff8000482f358) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:2495
+2495            sblock(&so->so_snd, SBL_WAIT | SBL_NOINTR);
+
+
+(kgdb) s
+sblock (sb=0xfffff8000482f590, flags=3) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/uipc_sockbuf.c:274
+274             KASSERT((flags & SBL_VALID) == flags,
+(kgdb) s
+277             if (flags & SBL_WAIT) {
+(kgdb) s
+278                     if ((sb->sb_flags & SB_NOINTR) ||
+(kgdb) s
+280                             sx_xlock(&sb->sb_sx);
+(kgdb) s
+_sx_xlock (sx=0xfffff8000482f5b0, opts=0, file=0xffffffff814c39f8 "/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/uipc_sockbuf.c", line=280)
+    at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_sx.c:298
+298             KASSERT(kdb_active != 0 || SCHEDULER_STOPPED() ||
+(kgdb) s
+__curthread () at ./machine/pcpu.h:232
+232             __asm("movq %%gs:%1,%0" : "=r" (td)
+(kgdb) s
+_sx_xlock (sx=0xfffff8000482f5b0, opts=0, file=0xffffffff814c39f8 "/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/uipc_sockbuf.c", line=280)
+    at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_sx.c:298
+298             KASSERT(kdb_active != 0 || SCHEDULER_STOPPED() ||
+(kgdb) s
+302             KASSERT(sx->sx_lock != SX_LOCK_DESTROYED,
+(kgdb) s
+304             WITNESS_CHECKORDER(&sx->lock_object, LOP_NEWORDER | LOP_EXCLUSIVE, file,
+(kgdb) s
+witness_checkorder (lock=0xffffffff81d1f700 <tdq_cpu>, flags=11, file=0xffffffff814a3c85 "/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_clock.c", line=803, interlock=0x0)
+    at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/subr_witness.c:1083
+1083            if (witness_cold || witness_watch < 1 || lock->lo_witness == NULL ||
+(kgdb) s
+1417    }
+(kgdb) s
+thread_lock_flags_ (td=0xfffff800045e7580, opts=<optimized out>, file=0xffffffff814a3c85 "/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_clock.c", line=803)
+    at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/kern_mutex.c:830
+830                             if (_mtx_obtain_lock_fetch(m, &v, tid))
+
+
+...
+
+(kgdb) n
+witness_checkorder (lock=0xfffff8000482f5b0, flags=9, file=0xffffffff814c39f8 "/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/uipc_sockbuf.c", line=280, interlock=0x0)
+    at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/subr_witness.c:1075
+1075    {
+(kgdb) s
+1083            if (witness_cold || witness_watch < 1 || lock->lo_witness == NULL ||
+(kgdb) s
+1084                panicstr != NULL)
+(kgdb) s
+1088            class = LOCK_CLASS(lock);
+(kgdb) s
+1089            td = curthread;
+(kgdb) s
+__curthread () at ./machine/pcpu.h:232
+232             __asm("movq %%gs:%1,%0" : "=r" (td)
+(kgdb) s
+witness_checkorder (lock=0xfffff8000482f5b0, flags=9, file=0xffffffff814c39f8 "/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/uipc_sockbuf.c", line=280, interlock=0x0)
+    at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/subr_witness.c:1091
+1091            if (class->lc_flags & LC_SLEEPLOCK) {
+(kgdb) s
+1098                    if (td->td_critnest != 0 && !kdb_active)
+(kgdb) s
+1108                    lock_list = td->td_sleeplocks;
+(kgdb) s
+1109                    if (lock_list == NULL || lock_list->ll_count == 0)
+(kgdb) s
+1135            lock1 = find_instance(lock_list, lock);
+(kgdb) s
+find_instance (lock=<optimized out>, list=<optimized out>) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/subr_witness.c:2163
+2163                    for (i = lle->ll_count - 1; i >= 0; i--) {
+(kgdb) s
+2164                            instance = &lle->ll_children[i];
+(kgdb) s
+2165                            if (instance->li_lock == lock)
+(kgdb) s
+2164                            instance = &lle->ll_children[i];
+(kgdb) s
+2165                            if (instance->li_lock == lock)
+2164                            instance = &lle->ll_children[i];
+(kgdb) s
+2165                            if (instance->li_lock == lock)
+(kgdb) s
+2164                            instance = &lle->ll_children[i];
+(kgdb) s
+2165                            if (instance->li_lock == lock)
+(kgdb) s
+2164                            instance = &lle->ll_children[i];
+(kgdb) s
+2165                            if (instance->li_lock == lock)
+(kgdb) s
+2162            for (lle = list; lle != NULL; lle = lle->ll_next)
+(kgdb) s
+witness_checkorder (lock=0xfffff8000482f5b0, flags=<optimized out>, file=0xffffffff814c39f8 "/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/uipc_sockbuf.c", line=<optimized out>,
+    interlock=<optimized out>) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/subr_witness.c:1159
+1159            if (interlock != NULL) {
+(kgdb) s
+1175            plock = &lock_list->ll_children[lock_list->ll_count - 1];
+(kgdb) s
+1198            w1 = plock->li_lock->lo_witness;
+(kgdb) s
+1199            if (witness_lock_order_check(w1, w))
+(kgdb) s
+witness_lock_order_check (parent=0xfffffe0000c2e380, child=<optimized out>) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/subr_witness.c:2941
+2941            if (parent != child &&
+(kgdb) s
+2942                w_rmatrix[parent->w_index][child->w_index]
+(kgdb) s
+2943                & WITNESS_LOCK_ORDER_KNOWN &&
+(kgdb) s
+witness_checkorder (lock=0xfffff8000482f5b0, flags=<optimized out>, file=0xffffffff814c39f8 "/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/uipc_sockbuf.c", line=<optimized out>,
+    interlock=<optimized out>) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/subr_witness.c:1202
+1202            mtx_lock_spin(&w_mtx);
+
+
+...
+
+(kgdb) p/x *(struct socket *)0xfffffe0000c27800
+$3 = {so_lock = {lock_object = {lo_name = 0x7663725f6f73, lo_flags = 0x0, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x0}, so_count = 0x0, so_rdsel = {si_tdlist = {tqh_first = 0x0,
+      tqh_last = 0x0}, si_note = {kl_list = {slh_first = 0x0}, kl_lock = 0x10, kl_unlock = 0xffffffff81a25e88, kl_assert_locked = 0xfffffe0000c27780, kl_assert_unlocked = 0xfffffe0000c27780,
+      kl_lockarg = 0x0, kl_autodestroy = 0x814c3e90}, si_mtx = 0xb00000ccc}, so_wrsel = {si_tdlist = {tqh_first = 0x200000008001d, tqh_last = 0x6b636c6c6573}, si_note = {kl_list = {
+        slh_first = 0x0}, kl_lock = 0x0, kl_unlock = 0x0, kl_assert_locked = 0x0, kl_assert_unlocked = 0x0, kl_lockarg = 0x0, kl_autodestroy = 0x0}, si_mtx = 0x11}, so_type = 0x5e88,
+  so_options = 0x81a2, so_linger = 0xffff, so_state = 0xffff, so_pcb = 0xfffffe0000c27800, so_vnet = 0xfffffe0000c27800, so_proto = 0x0, so_timeo = 0xf50f, so_error = 0x814b,
+  so_sigio = 0x700000757, so_cred = 0x2a, so_label = 0x6f6e207869646172, so_gencnt = 0x64616568206564, so_emuldata = 0x0, osd = {osd_nslots = 0x0, osd_slots = 0x0, osd_next = {le_next = 0x0,
+      le_prev = 0x0}}, so_fibnum = 0x0, so_user_cookie = 0x0, so_ts_clock = 0x12, so_max_pacing_rate = 0x0, {{so_rcv = {sb_mtx = {lock_object = {lo_name = 0xffffffff81a29ef8,
+            lo_flags = 0xc27880, lo_data = 0xfffffe00, lo_witness = 0xfffffe0000c27880}, mtx_lock = 0x0}, sb_sx = {lock_object = {lo_name = 0xffffffff814be364, lo_flags = 0x0, lo_data = 0x3,
+            lo_witness = 0x5001e}, sx_lock = 0x7972746e657472}, sb_sel = 0x0, sb_state = 0x0, sb_mb = 0x0, sb_mbtail = 0x0, sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0,
+        sb_sndptroff = 0x13, sb_acc = 0x0, sb_ccc = 0x81a25e88, sb_hiwat = 0xffffffff, sb_mbcnt = 0xc27900, sb_mcnt = 0xfffffe00, sb_ccnt = 0xc27900, sb_mbmax = 0xfffffe00, sb_ctl = 0x0,
+        sb_lowat = 0x0, sb_timeo = 0xffffffff814d5708, sb_flags = 0x2b1, sb_upcall = 0x40022, sb_upcallarg = 0x726464616669, sb_aiojobq = {tqh_first = 0x0, tqh_last = 0x0}, sb_aiotask = {
+          ta_link = {stqe_next = 0x0}, ta_pending = 0x0, ta_priority = 0x0, ta_func = 0x0, ta_context = 0x0}}, so_snd = {sb_mtx = {lock_object = {lo_name = 0x0, lo_flags = 0x14,
+            lo_data = 0x0, lo_witness = 0xffffffff81a25e88}, mtx_lock = 0xfffffe0000c27980}, sb_sx = {lock_object = {lo_name = 0xfffffe0000c27980, lo_flags = 0x0, lo_data = 0x0,
+            lo_witness = 0xffffffff814be364}, sx_lock = 0x100000000}, sb_sel = 0x23, sb_state = 0x6475, sb_mb = 0x0, sb_mbtail = 0x0, sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0,
+        sb_sndptroff = 0x0, sb_acc = 0x0, sb_ccc = 0x0, sb_hiwat = 0x0, sb_mbcnt = 0x15, sb_mcnt = 0x0, sb_ccnt = 0x81a29ef8, sb_mbmax = 0xffffffff, sb_ctl = 0xc27a00, sb_lowat = 0xfffffe00,
+        sb_timeo = 0xfffffe0000c27a00, sb_flags = 0x0, sb_upcall = 0xffffffff8151af73, sb_upcallarg = 0x4b00000954, sb_aiojobq = {tqh_first = 0x140003, tqh_last = 0x69746c756d5f6e69},
+        sb_aiotask = {ta_link = {stqe_next = 0x78746d5f}, ta_pending = 0x0, ta_priority = 0x0, ta_func = 0x0, ta_context = 0x0}}, so_list = {tqe_next = 0x0, tqe_prev = 0x0}, so_listen = 0x0,
+      so_qstate = 0x16, so_peerlabel = 0xffffffff81a25e88, so_oobmark = 0xfffffe0000c27a80}, {sol_incomp = {tqh_first = 0xffffffff81a29ef8, tqh_last = 0xfffffe0000c27880}, sol_comp = {
+        tqh_first = 0xfffffe0000c27880, tqh_last = 0x0}, sol_qlen = 0x814be364, sol_incqlen = 0xffffffff, sol_qlimit = 0x0, sol_accept_filter = 0x5001e,
+      sol_accept_filter_arg = 0x7972746e657472, sol_accept_filter_str = 0x0, sol_upcall = 0x0, sol_upcallarg = 0x0, sol_sbrcv_lowat = 0x0, sol_sbsnd_lowat = 0x0, sol_sbrcv_hiwat = 0x0,
+      sol_sbsnd_hiwat = 0x0, sol_sbrcv_flags = 0x0, sol_sbsnd_flags = 0x0, sol_sbrcv_timeo = 0x0, sol_sbsnd_timeo = 0x13}}}
+
+(kgdb) p/x $3->so_snd
+$4 = {sb_mtx = {lock_object = {lo_name = 0x0, lo_flags = 0x14, lo_data = 0x0, lo_witness = 0xffffffff81a25e88}, mtx_lock = 0xfffffe0000c27980}, sb_sx = {lock_object = {
+      lo_name = 0xfffffe0000c27980, lo_flags = 0x0, lo_data = 0x0, lo_witness = 0xffffffff814be364}, sx_lock = 0x100000000}, sb_sel = 0x23, sb_state = 0x6475, sb_mb = 0x0, sb_mbtail = 0x0,
+  sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0, sb_sndptroff = 0x0, sb_acc = 0x0, sb_ccc = 0x0, sb_hiwat = 0x0, sb_mbcnt = 0x15, sb_mcnt = 0x0, sb_ccnt = 0x81a29ef8,
+  sb_mbmax = 0xffffffff, sb_ctl = 0xc27a00, sb_lowat = 0xfffffe00, sb_timeo = 0xfffffe0000c27a00, sb_flags = 0x0, sb_upcall = 0xffffffff8151af73, sb_upcallarg = 0x4b00000954, sb_aiojobq = {
+    tqh_first = 0x140003, tqh_last = 0x69746c756d5f6e69}, sb_aiotask = {ta_link = {stqe_next = 0x78746d5f}, ta_pending = 0x0, ta_priority = 0x0, ta_func = 0x0, ta_context = 0x0}}
+
+
+(kgdb) p/x $3->so_rcv
+$5 = {sb_mtx = {lock_object = {lo_name = 0xffffffff81a29ef8, lo_flags = 0xc27880, lo_data = 0xfffffe00, lo_witness = 0xfffffe0000c27880}, mtx_lock = 0x0}, sb_sx = {lock_object = {
+      lo_name = 0xffffffff814be364, lo_flags = 0x0, lo_data = 0x3, lo_witness = 0x5001e}, sx_lock = 0x7972746e657472}, sb_sel = 0x0, sb_state = 0x0, sb_mb = 0x0, sb_mbtail = 0x0,
+  sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0, sb_sndptroff = 0x13, sb_acc = 0x0, sb_ccc = 0x81a25e88, sb_hiwat = 0xffffffff, sb_mbcnt = 0xc27900, sb_mcnt = 0xfffffe00,
+  sb_ccnt = 0xc27900, sb_mbmax = 0xfffffe00, sb_ctl = 0x0, sb_lowat = 0x0, sb_timeo = 0xffffffff814d5708, sb_flags = 0x2b1, sb_upcall = 0x40022, sb_upcallarg = 0x726464616669, sb_aiojobq = {
+    tqh_first = 0x0, tqh_last = 0x0}, sb_aiotask = {ta_link = {stqe_next = 0x0}, ta_pending = 0x0, ta_priority = 0x0, ta_func = 0x0, ta_context = 0x0}}
+
+
+The socket clearly does not look healthy.   So the point is that we are coming from
+here:
+
+(kgdb) l *vps_snapshot_fdset+0x3af
+0xffffffff80dc56ef is in vps_snapshot_fdset (/tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:2819).
+2814                            break;
+2815
+2816                    case DTYPE_SOCKET:
+2817                            if (fp->f_data == NULL)
+2818                                    break;
+2819                            if ((error = vps_snapshot_socket(ctx, vps,
+2820                                fp->f_data)))
+2821                                    goto out;
+2822                            break;
+2823
+
+
+
+XXX-BZ vps_snapshot_fdset:2754 fdp 0xfffff800044508a0 fd_nfiles 20 fd_lastfile 0
+XXX-BZ vps_snapshot_fdset:2844 so 0xfffff8000450c358 fp 0xfffff80004189960 i 0
+XXX-BZ __bz_dss:2467 so 0xfffff8000450c358 ctx 0xfffff80003bdf600 vps 0xfffff800040e2800
+XXX-BZ vps_snapshot_socket:2589 so 0xfffff8000450c358
+
+Coming from the sol_qlen / sol_incqlen ...  case; but our original socket as in the
+fdset is corrupted...
+
+XXX-BZ __bz_dss:2467 so 0xffffffff814bac7d ctx 0xfffff80003bdf600 vps 0xfffff800040e2800
+
+(kgdb) p/x *(struct socket *)0xfffff8000450c358
+$1 = {so_lock = {lock_object = {lo_name = 0xffffffff814f5400, lo_flags = 0x1430000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, so_count = 0x1, so_rdsel = {si_tdlist = {
+      tqh_first = 0x0, tqh_last = 0xfffff8000450c380}, si_note = {kl_list = {slh_first = 0x0}, kl_lock = 0xffffffff80afa400, kl_unlock = 0xffffffff80afa440,
+      kl_assert_locked = 0xffffffff80afa480, kl_assert_unlocked = 0xffffffff80afa4d0, kl_lockarg = 0xfffff8000450c358, kl_autodestroy = 0x0}, si_mtx = 0xfffffe00015d2f90}, so_wrsel = {
+    si_tdlist = {tqh_first = 0x0, tqh_last = 0x0}, si_note = {kl_list = {slh_first = 0x0}, kl_lock = 0xffffffff80afa510, kl_unlock = 0xffffffff80afa550, kl_assert_locked = 0xffffffff80afa590,
+      kl_assert_unlocked = 0xffffffff80afa5e0, kl_lockarg = 0xfffff8000450c358, kl_autodestroy = 0x0}, si_mtx = 0x0}, so_type = 0x2, so_options = 0x0, so_linger = 0x0, so_state = 0x0,
+  so_pcb = 0xfffff8000452c1a8, so_vnet = 0xfffff80003997e80, so_proto = 0xffffffff81a4e7a0, so_timeo = 0x0, so_error = 0x0, so_sigio = 0x0, so_cred = 0xfffff800044b7200, so_label = 0x0,
+  so_gencnt = 0x7fa, so_emuldata = 0x0, osd = {osd_nslots = 0x0, osd_slots = 0x0, osd_next = {le_next = 0x0, le_prev = 0x0}}, so_fibnum = 0x0, so_user_cookie = 0x0, so_ts_clock = 0x0,
+  so_max_pacing_rate = 0x0, {{so_rcv = {sb_mtx = {lock_object = {lo_name = 0xffffffff814bac7d, lo_flags = 0x1030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, sb_sx = {lock_object = {
+            lo_name = 0xffffffff8149dc2b, lo_flags = 0x2330000, lo_data = 0x0, lo_witness = 0x0}, sx_lock = 0x1}, sb_sel = 0xfffff8000450c380, sb_state = 0x0, sb_mb = 0x0, sb_mbtail = 0x0,
+        sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0, sb_sndptroff = 0x0, sb_acc = 0x0, sb_ccc = 0x0, sb_hiwat = 0xa460, sb_mbcnt = 0x0, sb_mcnt = 0x0, sb_ccnt = 0x0,
+        sb_mbmax = 0x52300, sb_ctl = 0x0, sb_lowat = 0x1, sb_timeo = 0x0, sb_flags = 0x8, sb_upcall = 0x0, sb_upcallarg = 0x0, sb_aiojobq = {tqh_first = 0x0, tqh_last = 0xfffff8000450c560},
+        sb_aiotask = {ta_link = {stqe_next = 0x0}, ta_pending = 0x0, ta_priority = 0x0, ta_func = 0xffffffff80ad5d30, ta_context = 0xfffff8000450c358}}, so_snd = {sb_mtx = {lock_object = {
+            lo_name = 0xffffffff814bac84, lo_flags = 0x1030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, sb_sx = {lock_object = {lo_name = 0xffffffff8149dc21, lo_flags = 0x2330000,
+            lo_data = 0x0, lo_witness = 0x0}, sx_lock = 0x1}, sb_sel = 0xfffff8000450c3d0, sb_state = 0x0, sb_mb = 0x0, sb_mbtail = 0x0, sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0,
+        sb_sndptroff = 0x0, sb_acc = 0x0, sb_ccc = 0x0, sb_hiwat = 0x2400, sb_mbcnt = 0x0, sb_mcnt = 0x0, sb_ccnt = 0x0, sb_mbmax = 0x12000, sb_ctl = 0x0, sb_lowat = 0x800, sb_timeo = 0x0,
+        sb_flags = 0x0, sb_upcall = 0x0, sb_upcallarg = 0x0, sb_aiojobq = {tqh_first = 0x0, tqh_last = 0xfffff8000450c650}, sb_aiotask = {ta_link = {stqe_next = 0x0}, ta_pending = 0x0,
+          ta_priority = 0x0, ta_func = 0xffffffff80ad64a0, ta_context = 0xfffff8000450c358}}, so_list = {tqe_next = 0x0, tqe_prev = 0x0}, so_listen = 0x0, so_qstate = 0x0, so_peerlabel = 0x0,
+      so_oobmark = 0x0}, {sol_incomp = {tqh_first = 0xffffffff814bac7d, tqh_last = 0x1030000}, sol_comp = {tqh_first = 0x0, tqh_last = 0x4}, sol_qlen = 0x8149dc2b, sol_incqlen = 0xffffffff,
+      sol_qlimit = 0x2330000, sol_accept_filter = 0x0, sol_accept_filter_arg = 0x1, sol_accept_filter_str = 0xfffff8000450c380, sol_upcall = 0x0, sol_upcallarg = 0x0, sol_sbrcv_lowat = 0x0,
+      sol_sbsnd_lowat = 0x0, sol_sbrcv_hiwat = 0x0, sol_sbsnd_hiwat = 0x0, sol_sbrcv_flags = 0x0, sol_sbsnd_flags = 0x0, sol_sbrcv_timeo = 0x0, sol_sbsnd_timeo = 0x0}}}
+(kgdb) p/x $1->sol_qlen
+$2 = 0x8149dc2b
+(kgdb) p/x $1->sol_incqlen
+$3 = 0xffffffff
+
+
+
+Problem remains that the socket coming from the fd_data is corrupted:
+
+(kgdb) break *__bz_dss
+Breakpoint 1 at 0xffffffff80dc0e90: file /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c, line 2465.
+(kgdb) cont
+Continuing.
+
+Breakpoint 1, __bz_dss (so=0xfffff80004518358, ctx=0xfffff80003bdf600, vps=0xfffff80003c40000) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/vps/vps_snapst.c:2465
+warning: Source file is more recent than executable.
+2465    {
+(kgdb) p/x *(struct socket *)0xfffff80004518358
+$4 = {so_lock = {lock_object = {lo_name = 0xffffffff814f5400, lo_flags = 0x1430000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, so_count = 0x1, so_rdsel = {si_tdlist = {
+      tqh_first = 0x0, tqh_last = 0xfffff80004518380}, si_note = {kl_list = {slh_first = 0x0}, kl_lock = 0xffffffff80afa400, kl_unlock = 0xffffffff80afa440,
+      kl_assert_locked = 0xffffffff80afa480, kl_assert_unlocked = 0xffffffff80afa4d0, kl_lockarg = 0xfffff80004518358, kl_autodestroy = 0x0}, si_mtx = 0xfffffe00015d2950}, so_wrsel = {
+    si_tdlist = {tqh_first = 0x0, tqh_last = 0x0}, si_note = {kl_list = {slh_first = 0x0}, kl_lock = 0xffffffff80afa510, kl_unlock = 0xffffffff80afa550, kl_assert_locked = 0xffffffff80afa590,
+      kl_assert_unlocked = 0xffffffff80afa5e0, kl_lockarg = 0xfffff80004518358, kl_autodestroy = 0x0}, si_mtx = 0x0}, so_type = 0x2, so_options = 0x0, so_linger = 0x0, so_state = 0x0,
+  so_pcb = 0xfffff8000454e1a8, so_vnet = 0xfffff80003997e80, so_proto = 0xffffffff81a4e7a0, so_timeo = 0x0, so_error = 0x0, so_sigio = 0x0, so_cred = 0xfffff8000451ce00, so_label = 0x0,
+  so_gencnt = 0xb52, so_emuldata = 0x0, osd = {osd_nslots = 0x0, osd_slots = 0x0, osd_next = {le_next = 0x0, le_prev = 0x0}}, so_fibnum = 0x0, so_user_cookie = 0x0, so_ts_clock = 0x0,
+  so_max_pacing_rate = 0x0, {{so_rcv = {sb_mtx = {lock_object = {lo_name = 0xffffffff814bac7d, lo_flags = 0x1030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, sb_sx = {lock_object = {
+            lo_name = 0xffffffff8149dc2b, lo_flags = 0x2330000, lo_data = 0x0, lo_witness = 0x0}, sx_lock = 0x1}, sb_sel = 0xfffff80004518380, sb_state = 0x0, sb_mb = 0x0, sb_mbtail = 0x0,
+        sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0, sb_sndptroff = 0x0, sb_acc = 0x0, sb_ccc = 0x0, sb_hiwat = 0xa460, sb_mbcnt = 0x0, sb_mcnt = 0x0, sb_ccnt = 0x0,
+        sb_mbmax = 0x52300, sb_ctl = 0x0, sb_lowat = 0x1, sb_timeo = 0x0, sb_flags = 0x8, sb_upcall = 0x0, sb_upcallarg = 0x0, sb_aiojobq = {tqh_first = 0x0, tqh_last = 0xfffff80004518560},
+        sb_aiotask = {ta_link = {stqe_next = 0x0}, ta_pending = 0x0, ta_priority = 0x0, ta_func = 0xffffffff80ad5d30, ta_context = 0xfffff80004518358}}, so_snd = {sb_mtx = {lock_object = {
+            lo_name = 0xffffffff814bac84, lo_flags = 0x1030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, sb_sx = {lock_object = {lo_name = 0xffffffff8149dc21, lo_flags = 0x2330000,
+            lo_data = 0x0, lo_witness = 0x0}, sx_lock = 0x1}, sb_sel = 0xfffff800045183d0, sb_state = 0x0, sb_mb = 0x0, sb_mbtail = 0x0, sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0,
+        sb_sndptroff = 0x0, sb_acc = 0x0, sb_ccc = 0x0, sb_hiwat = 0x2400, sb_mbcnt = 0x0, sb_mcnt = 0x0, sb_ccnt = 0x0, sb_mbmax = 0x12000, sb_ctl = 0x0, sb_lowat = 0x800, sb_timeo = 0x0,
+        sb_flags = 0x0, sb_upcall = 0x0, sb_upcallarg = 0x0, sb_aiojobq = {tqh_first = 0x0, tqh_last = 0xfffff80004518650}, sb_aiotask = {ta_link = {stqe_next = 0x0}, ta_pending = 0x0,
+          ta_priority = 0x0, ta_func = 0xffffffff80ad64a0, ta_context = 0xfffff80004518358}}, so_list = {tqe_next = 0x0, tqe_prev = 0x0}, so_listen = 0x0, so_qstate = 0x0, so_peerlabel = 0x0,
+      so_oobmark = 0x0}, {sol_incomp = {tqh_first = 0xffffffff814bac7d, tqh_last = 0x1030000}, sol_comp = {tqh_first = 0x0, tqh_last = 0x4}, sol_qlen = 0x8149dc2b, sol_incqlen = 0xffffffff,
+      sol_qlimit = 0x2330000, sol_accept_filter = 0x0, sol_accept_filter_arg = 0x1, sol_accept_filter_str = 0xfffff80004518380, sol_upcall = 0x0, sol_upcallarg = 0x0, sol_sbrcv_lowat = 0x0,
+      sol_sbsnd_lowat = 0x0, sol_sbrcv_hiwat = 0x0, sol_sbsnd_hiwat = 0x0, sol_sbrcv_flags = 0x0, sol_sbsnd_flags = 0x0, sol_sbrcv_timeo = 0x0, sol_sbsnd_timeo = 0x0}}}
+(kgdb) p/x $4->sol_incqlen
+$5 = 0xffffffff
+
+--------------------------------------------------------------------------------
+
+XXX-BZ vps2 0xfffff8000399b800 initproc = 0xfffff80004453540 swapper 0xfffff8000
+4454540 reaper 0xfffff80004454540 pptr 0xfffff80004454540
+XXX-BZ soalloc:451 NEW so 0xfffff8000451d358
+XXX-BZ socreate:572 CREATE so 0xfffff8000451d358
+XXX-BZ kern_socket:169 so 0xfffff8000451d358
+Expensive timeout(9) function: 0xffffffff80af0a90(0) 0.005202369 s
+Active VPS instances: 1
+Name                 State    VFS Root                     %CPU   Virtual Size
+testvps              suspended /vpsroot                        6        8732672
+Name:          testvps
+Status:        suspended
+VFS root:      /vpsroot
+Processes:            1
+Sockets:              1
+Interfaces:           2
+Restore count:        0
+root@:~ #
+
+
+(kgdb) p/x *(struct socket *)0xfffff8000451d358
+$1 = {so_lock = {lock_object = {lo_name = 0xffffffff814f5410, lo_flags = 0x1430000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, so_count = 0x1, so_rdsel = {si_tdlist = {
+      tqh_first = 0x0, tqh_last = 0xfffff8000451d380}, si_note = {kl_list = {slh_first = 0x0}, kl_lock = 0xffffffff80afa460, kl_unlock = 0xffffffff80afa4a0,
+      kl_assert_locked = 0xffffffff80afa4e0, kl_assert_unlocked = 0xffffffff80afa530, kl_lockarg = 0xfffff8000451d358, kl_autodestroy = 0x0}, si_mtx = 0xfffffe00015d2eb0}, so_wrsel = {
+    si_tdlist = {tqh_first = 0x0, tqh_last = 0x0}, si_note = {kl_list = {slh_first = 0x0}, kl_lock = 0xffffffff80afa570, kl_unlock = 0xffffffff80afa5b0, kl_assert_locked = 0xffffffff80afa5f0,
+      kl_assert_unlocked = 0xffffffff80afa640, kl_lockarg = 0xfffff8000451d358, kl_autodestroy = 0x0}, si_mtx = 0x0}, so_type = 0x2, so_options = 0x0, so_linger = 0x0, so_state = 0x0,
+  so_pcb = 0xfffff8000455d1a8, so_vnet = 0xfffff80003997e80, so_proto = 0xffffffff81a4e7a0, so_timeo = 0x0, so_error = 0x0, so_sigio = 0x0, so_cred = 0xfffff80004514100, so_label = 0x0,
+  so_gencnt = 0x7f6, so_emuldata = 0x0, osd = {osd_nslots = 0x0, osd_slots = 0x0, osd_next = {le_next = 0x0, le_prev = 0x0}}, so_fibnum = 0x0, so_user_cookie = 0x0, so_ts_clock = 0x0,
+  so_max_pacing_rate = 0x0, {{so_rcv = {sb_mtx = {lock_object = {lo_name = 0xffffffff814bac7d, lo_flags = 0x1030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, sb_sx = {lock_object = {
+            lo_name = 0xffffffff8149dc2b, lo_flags = 0x2330000, lo_data = 0x0, lo_witness = 0x0}, sx_lock = 0x1}, sb_sel = 0xfffff8000451d380, sb_state = 0x0, sb_mb = 0x0, sb_mbtail = 0x0,
+        sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0, sb_sndptroff = 0x0, sb_acc = 0x0, sb_ccc = 0x0, sb_hiwat = 0xa460, sb_mbcnt = 0x0, sb_mcnt = 0x0, sb_ccnt = 0x0,
+        sb_mbmax = 0x52300, sb_ctl = 0x0, sb_lowat = 0x1, sb_timeo = 0x0, sb_flags = 0x8, sb_upcall = 0x0, sb_upcallarg = 0x0, sb_aiojobq = {tqh_first = 0x0, tqh_last = 0xfffff8000451d560},
+        sb_aiotask = {ta_link = {stqe_next = 0x0}, ta_pending = 0x0, ta_priority = 0x0, ta_func = 0xffffffff80ad5d30, ta_context = 0xfffff8000451d358}}, so_snd = {sb_mtx = {lock_object = {
+            lo_name = 0xffffffff814bac84, lo_flags = 0x1030000, lo_data = 0x0, lo_witness = 0x0}, mtx_lock = 0x4}, sb_sx = {lock_object = {lo_name = 0xffffffff8149dc21, lo_flags = 0x2330000,
+            lo_data = 0x0, lo_witness = 0x0}, sx_lock = 0x1}, sb_sel = 0xfffff8000451d3d0, sb_state = 0x0, sb_mb = 0x0, sb_mbtail = 0x0, sb_lastrecord = 0x0, sb_sndptr = 0x0, sb_fnrdy = 0x0,
+        sb_sndptroff = 0x0, sb_acc = 0x0, sb_ccc = 0x0, sb_hiwat = 0x2400, sb_mbcnt = 0x0, sb_mcnt = 0x0, sb_ccnt = 0x0, sb_mbmax = 0x12000, sb_ctl = 0x0, sb_lowat = 0x800, sb_timeo = 0x0,
+        sb_flags = 0x0, sb_upcall = 0x0, sb_upcallarg = 0x0, sb_aiojobq = {tqh_first = 0x0, tqh_last = 0xfffff8000451d650}, sb_aiotask = {ta_link = {stqe_next = 0x0}, ta_pending = 0x0,
+          ta_priority = 0x0, ta_func = 0xffffffff80ad64a0, ta_context = 0xfffff8000451d358}}, so_list = {tqe_next = 0x0, tqe_prev = 0x0}, so_listen = 0x0, so_qstate = 0x0, so_peerlabel = 0x0,
+      so_oobmark = 0x0}, {sol_incomp = {tqh_first = 0xffffffff814bac7d, tqh_last = 0x1030000}, sol_comp = {tqh_first = 0x0, tqh_last = 0x4}, sol_qlen = 0x8149dc2b, sol_incqlen = 0xffffffff,
+      sol_qlimit = 0x2330000, sol_accept_filter = 0x0, sol_accept_filter_arg = 0x1, sol_accept_filter_str = 0xfffff8000451d380, sol_upcall = 0x0, sol_upcallarg = 0x0, sol_sbrcv_lowat = 0x0,
+      sol_sbsnd_lowat = 0x0, sol_sbrcv_hiwat = 0x0, sol_sbsnd_hiwat = 0x0, sol_sbrcv_flags = 0x0, sol_sbsnd_flags = 0x0, sol_sbrcv_timeo = 0x0, sol_sbsnd_timeo = 0x0}}}
+
+
+(kgdb) p/x $1->sol_qlen
+$2 = 0x8149dc2b
+(kgdb) p/x $1->sol_incqlen
+$3 = 0xffffffff
+
+NOT GOOD.
+
+--------------------------------------------------------------------------------
+
+(kgdb) break *__bz_sigsegv
+Breakpoint 1 at 0xffffffff80f39ca0: file /tank/users/bz/vps_zambcom/vps_zabcom/sys/amd64/amd64/trap.c, line 166.
+(kgdb) cont
+Continuing.
+
+Breakpoint 1, __bz_sigsegv (f=0xffffffff81529098 "trap_pfault", l=830, td=0xfffff80004233000, frame=0xfffffe00f7125c00) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/amd64/amd64/trap.c:166
+166     {
+(kgdb) p/x bz_log
+$1 = {p = 0xfffff80004129540, td = 0xfffff80004233000, frame = 0xfffffe00f7125c00, stack = 0xfffffe00f7122000, frame_copy = {tf_rdi = 0x1, tf_rsi = 0x7fffffffecd0, tf_rdx = 0x0, tf_rcx = 0x0,
+    tf_r8 = 0x0, tf_r9 = 0x0, tf_rax = 0x5d, tf_rbx = 0x1, tf_rbp = 0x7fffffffed70, tf_r10 = 0x6530, tf_r11 = 0x800896570, tf_r12 = 0x0, tf_r13 = 0x7fffffffedd0, tf_r14 = 0x7fffffffecd0,
+    tf_r15 = 0x0, tf_trapno = 0xc, tf_fs = 0x13, tf_gs = 0x1b, tf_addr = 0x7fffffffecc8, tf_flags = 0x1, tf_es = 0x3b, tf_ds = 0x3b, tf_err = 0x4, tf_rip = 0x41b7f0, tf_cs = 0x43,
+    tf_rflags = 0x246, tf_rsp = 0x7fffffffecc8, tf_ss = 0x3b}, map = 0xfffff800044a8000, eva = 0x7fffffffecc8, va = 0x7fffffffe000, ftype = 0x1, rv = 0x0}
+(kgdb) i/x 0x41b7f0
+Undefined info command: "/x 0x41b7f0".  Try "help info".
+(kgdb) x/i 0x41b7f0
+   0x41b7f0:    retq
+(kgdb) where
+#0  __bz_sigsegv (f=0xffffffff81529098 "trap_pfault", l=830, td=0xfffff80004233000, frame=0xfffffe00f7125c00) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/amd64/amd64/trap.c:166
+#1  0xffffffff80f39a5d in trap_pfault (frame=<optimized out>, usermode=<optimized out>) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/amd64/amd64/trap.c:830
+#2  0xffffffff80f39067 in trap (frame=0xfffffe00f7125c00) at /tank/users/bz/vps_zambcom/vps_zabcom/sys/amd64/amd64/trap.c:342
+#3  0xffffffff80f1b101 in calltrap () at /tank/users/bz/vps_zambcom/vps_zabcom/sys/amd64/amd64/exception.S:236
+#4  0x0000000000000001 in ?? ()
+#5  0x00007fffffffecd0 in ?? ()
+#6  0x0000000000000000 in ?? ()
+(kgdb) p/x 0x41b7f0
+$2 = 0x41b7f0
+(kgdb) p/x *0x41b7f0
+$3 = 0xccccccc3
+(kgdb) p/x *(struct trapframe *)0xfffffe00f7125c00
+$4 = {tf_rdi = 0x1, tf_rsi = 0x7fffffffecd0, tf_rdx = 0x0, tf_rcx = 0x0, tf_r8 = 0x0, tf_r9 = 0x0, tf_rax = 0x5d, tf_rbx = 0x1, tf_rbp = 0x7fffffffed70, tf_r10 = 0x6530, tf_r11 = 0x800896570,
+  tf_r12 = 0x0, tf_r13 = 0x7fffffffedd0, tf_r14 = 0x7fffffffecd0, tf_r15 = 0x0, tf_trapno = 0xc, tf_fs = 0x13, tf_gs = 0x1b, tf_addr = 0x0, tf_flags = 0x1, tf_es = 0x3b, tf_ds = 0x3b,
+  tf_err = 0x14, tf_rip = 0x0, tf_cs = 0x43, tf_rflags = 0x246, tf_rsp = 0x7fffffffecd0, tf_ss = 0x3b}
 
 
 
