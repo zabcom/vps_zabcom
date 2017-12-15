@@ -1126,7 +1126,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 				PROC_LOCK(p->p_pptr);
 				sigqueue_take(p->p_ksi);
 				PROC_UNLOCK(p->p_pptr);
-
+				/* XXX-BZ, anything else? */
 				LIST_REMOVE(p, p_sibling);
 				p->p_pptr = NULL;
 			} else 
