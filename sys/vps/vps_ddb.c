@@ -45,6 +45,7 @@
 #include <sys/module.h>
 #include <sys/refcount.h>
 #include <sys/queue.h>
+#include <sys/resourcevar.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/sysctl.h>
@@ -239,12 +240,36 @@ DB_SHOW_COMMAND(ucred, db_show_ucred)
 
 	ucred = (struct ucred *)addr;
 
-	db_printf("ucred:       %p\n", ucred);
-	db_printf("cr_ref:      %d\n", ucred->cr_ref);
-	db_printf("cr_vps:      %p\n", ucred->cr_vps);
-	db_printf("cr_prison:   %p\n", ucred->cr_prison);
-	db_printf("cr_uid:	%d\n", ucred->cr_uid);
-	db_printf("cr_gid:	%d\n", ucred->cr_gid);
+	db_printf("ucred:	%p\n", ucred);
+	db_printf(" cr_ref:	%d\n", ucred->cr_ref);
+	db_printf(" cr_vps:	%p\n", ucred->cr_vps);
+	db_printf(" cr_prison:	%p\n", ucred->cr_prison);
+	db_printf(" cr_uid:	%d\n", ucred->cr_uid);
+	db_printf(" cr_gid:	%d\n", ucred->cr_gid);
+	db_printf(" cr_uidinfo:	%p\n", ucred->cr_uidinfo);
+	db_printf(" cr_ruidinfo:%p\n", ucred->cr_ruidinfo);
+}
+
+DB_SHOW_COMMAND(uidinfo, db_show_uidinfo)
+{
+	struct uidinfo *uip;
+
+	if (!have_addr) {
+		db_printf("show uuidinfo <addr>\n");
+		return;
+	}
+
+	uip = (struct uidinfo *)addr;
+
+	db_printf("uip:	%p\n", uip);
+	db_printf(" vmsize:	%ld\n", uip->ui_vmsize);
+	db_printf(" sbsize:	%ld\n", uip->ui_sbsize);
+	db_printf(" proccnt:	%ld\n", uip->ui_proccnt);
+	db_printf(" ptscnt:	%ld\n", uip->ui_ptscnt);
+	db_printf(" kqcnt:	%ld\n", uip->ui_kqcnt);
+	db_printf(" umtxcnt:	%ld\n", uip->ui_umtxcnt);
+	db_printf(" uid:	%u\n", uip->ui_uid);
+	db_printf(" ref:	%u\n", uip->ui_ref);
 }
 #endif /* DDB */
 
