@@ -614,6 +614,7 @@ sysctl_kern_pid_max(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_kern, OID_AUTO, pid_max, CTLTYPE_INT |
     CTLFLAG_RWTUN | CTLFLAG_NOFETCH | CTLFLAG_MPSAFE,
     0, 0, sysctl_kern_pid_max, "I", "Maximum allowed pid");
+/* XXX-BZ virtualize */
 
 #include <sys/bio.h>
 #include <sys/buf.h>
