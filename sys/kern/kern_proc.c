@@ -222,6 +222,10 @@ procinit(void)
  * Reverse of procinit().
  */
 
+#define V_uihashtbl             VPSV(uihashtbl)
+#define V_uihash                VPSV(uihash)
+
+
 void
 procuninit(void)
 {
@@ -229,8 +233,11 @@ procuninit(void)
 	//LIST_HEAD(generic, generic) *hashtbl, *hp;
 	struct pidhashhead *pidhashtbl, *hp;
 	struct pgrphashhead *pghashtbl, *hpg;
+	struct uihashhead *uihashtbl, *uipp;
 	struct pgrp *pg;
 	struct proc *p;
+	struct uidinfo *uip;
+	int c;
 
 	pghashtbl = (void *)V_pgrphashtbl;
 	for (hpg = pghashtbl; hpg <= &pghashtbl[V_pgrphash]; hpg++)
@@ -245,9 +252,20 @@ procuninit(void)
 			printf("%s: pidhash p=%p p->p_pid=%d\n",
 				__func__, p, p->p_pid);
 		}
+
+	uihashtbl = V_uihashtbl;
+	c = 0;
+	for (uipp = uihashtbl; uipp <= &uihashtbl[V_uihash]; uipp++)
+		LIST_FOREACH(uip, uipp, ui_hash) {
+			printf("%s: uihash uip %p\n", __func__, uip);
+			c++;
+		}
 #endif
 
-	uihashdestroy();
+	if (c == 0)
+		uihashdestroy();
+	else
+		printf("LEAKING uidhash memory: %d elements remaining\n", c);
 
 	hashdestroy(V_pgrphashtbl, M_PROC, V_pgrphash);
 	hashdestroy(V_pidhashtbl, M_PROC, V_pidhash);

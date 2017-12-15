@@ -79,7 +79,7 @@ static u_long uihash;		/* size of hash table - 1 */
 #endif
 
 VPS_DEFINE(struct rwlock, uihashtbl_lock);
-VPS_DEFINE(LIST_HEAD(uihashhead, uidinfo) *, uihashtbl);
+VPS_DEFINE(struct uihashhead *, uihashtbl);
 VPS_DEFINE(u_long, uihash);
 #define	V_uihashtbl_lock	VPSV(uihashtbl_lock)
 #define	V_uihashtbl		VPSV(uihashtbl)

@@ -974,6 +974,10 @@ LIST_HEAD(pgrphashhead, pgrp);
 VPS_DECLARE(struct pgrphashhead *, pgrphashtbl);
 VPS_DECLARE(u_long, pgrphash);
 
+LIST_HEAD(uihashhead, uidinfo);
+VPS_DECLARE(struct uihashhead *, uihashtbl);
+VPS_DECLARE(u_long, uihash);
+
 VPS_DECLARE(struct sx, allproc_lock);
 VPS_DECLARE(struct sx, proctree_lock);
 VPS_DECLARE(struct mtx, ppeers_lock);
