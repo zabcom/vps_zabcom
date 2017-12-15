@@ -137,7 +137,10 @@ reaper_abandon_children(struct proc *p, bool exiting)
 	struct proc *p1, *p2, *ptmp;
 
 	sx_assert(&V_proctree_lock, SX_LOCKED);
+#ifndef VPS
+	/* XXX-BZ revisit this ifndef. */
 	KASSERT(p != V_initproc, ("reaper_abandon_children for initproc"));
+#endif
 	if ((p->p_treeflag & P_TREE_REAPER) == 0)
 		return;
 	p1 = p->p_reaper;
@@ -612,15 +615,6 @@ exit1(struct thread *td, int rval, int signo)
 		 * notify process 1 instead (and hope it will handle this
 		 * situation).
 		 */
-#ifdef VPS
-		/*
-		 * If we don't have a parent proc at all we must be the init proc.
-		 * Otherwise something went wrong !
-		 */
-		KASSERT( ! (p->p_pptr==NULL && p != V_initproc),
-			("%s: p->p_pptr==NULL && p != V_initproc, p=%p", __func__, p));
-		if (p->p_pptr) {
-#endif
 		PROC_LOCK(p->p_pptr);
 		mtx_lock(&p->p_pptr->p_sigacts->ps_mtx);
 		if (p->p_pptr->p_sigacts->ps_flag &
@@ -651,9 +645,6 @@ exit1(struct thread *td, int rval, int signo)
 			else	/* LINUX thread */
 				kern_psignal(p->p_pptr, p->p_sigparent);
 		}
-#ifdef VPS
-		}
-#endif
 	} else
 		PROC_LOCK(p->p_pptr);
 	sx_xunlock(&V_proctree_lock);
@@ -679,12 +670,12 @@ exit1(struct thread *td, int rval, int signo)
 #ifdef VPS
 	if (p->p_pptr) {
 #endif
-	wakeup(p->p_pptr);
-	cv_broadcast(&p->p_pwait);
-	sched_exit(p->p_pptr, td);
-	PROC_SLOCK(p);
-	p->p_state = PRS_ZOMBIE;
-	PROC_UNLOCK(p->p_pptr);
+		wakeup(p->p_pptr);
+		cv_broadcast(&p->p_pwait);
+		sched_exit(p->p_pptr, td);
+		PROC_SLOCK(p);
+		p->p_state = PRS_ZOMBIE;
+		PROC_UNLOCK(p->p_pptr);
 #ifdef VPS
 	} else {
 		cv_broadcast(&p->p_pwait);
