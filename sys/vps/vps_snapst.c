@@ -435,16 +435,18 @@ vps_snapshot_dump_userpages(struct vps_snapst_ctx *ctx, int cidx,
 		/* Requeue to maintain LRU ordering. */
 		vm_page_requeue(cm);
 	vm_page_unlock(cm);
-	VM_OBJECT_WUNLOCK(dev_ctx->obj);
-	VM_OBJECT_WUNLOCK(ctx->page_ref[cidx].obj);
 
 	pmap_copy_page(cm, dm);
+	dm->valid = cm->valid;
+	dm->dirty = cm->dirty;
+
+	VM_OBJECT_WUNLOCK(dev_ctx->obj);
+	VM_OBJECT_WUNLOCK(ctx->page_ref[cidx].obj);
 
 #if 0
 	vm_page_xunbusy(dm);
 	vm_page_xunbusy(cm);
 
-	vm_page_dirty(dm);
 	vm_pager_page_unswapped(dm);
 #endif
 
