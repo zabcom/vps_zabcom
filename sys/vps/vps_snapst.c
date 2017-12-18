@@ -2476,17 +2476,13 @@ vps_snapshot_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 			DBGS("%s: socket=%p already dumped\n",
 			    __func__, so);
 			return (0);
-	}
+		}
 
 	/* If we couldn't allocate memory we try again. */
-  again:
+again:
 
 	KASSERT(so != NULL, ("%s: so is NULL ctx %p vps %p\n",
 	    __func__, ctx, vps));
-	sblock(&so->so_snd, SBL_WAIT | SBL_NOINTR);
-	sblock(&so->so_rcv, SBL_WAIT | SBL_NOINTR);
-	SOCKBUF_LOCK(&so->so_snd);
-	SOCKBUF_LOCK(&so->so_rcv);
 
 	if ((o1 = vdo_create(ctx, VPS_DUMPOBJT_SOCKET, M_NOWAIT)) == NULL) {
 		error = ENOMEM;
@@ -2498,18 +2494,49 @@ vps_snapshot_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		goto drop;
 	}
 
+	SOCK_LOCK(so);
+	vds->so_orig_ptr = so;
+
+	vds->so_type = so->so_type;
+	vds->so_options = so->so_options;
+	/* so_linger */
+	vds->so_state = so->so_state;
+	/* so_pcb */
+	/* so_vnet */
+	/* so_proto */
 	vds->so_family = so->so_proto->pr_domain->dom_family;
 	vds->so_protocol = so->so_proto->pr_protocol;
-	vds->so_type = so->so_proto->pr_type;
-
-	vds->so_options = so->so_options;
-	vds->so_state = so->so_state;
-	vds->so_qlimit = so->sol_qlimit;
-	vds->so_qstate = so->so_qstate;
-	vds->sol_qlen = so->sol_qlen;
-	vds->sol_incqlen = so->sol_incqlen;
+	/* (so_timeo) */
+	/* so_error */
+	/* so_sigio */
 	vds->so_cred = so->so_cred;
-	vds->so_orig_ptr = so;
+	/* so_label */
+	/* so_gencnt */
+	/* so_emuldata */
+	/* osd */
+	/* so_fibnum */
+	/* so_user_cookie */
+	/* so_ts_clock */
+	/* so_max_pacing_rate */
+
+	SOCK_UNLOCK(so);
+
+	if (!SOLISTENING(so)) {
+		vds->so_qstate = so->so_qstate;
+		/* XXX-BZ TODO see restore code for full list of fields. */
+	} else {
+		SOLISTEN_LOCK(so);
+		/* sol_incomp */
+		/* sol_comp */
+		vds->sol_qlen = so->sol_qlen;
+		vds->sol_incqlen = so->sol_incqlen;
+
+		vds->so_qlimit = so->sol_qlimit;
+
+		/* XXX-BZ TODO see restore code for full list of fields. */
+
+		SOLISTEN_UNLOCK(so);
+	}
 
 	DBGS("%s: socket protocol family=%d protocol=%d type=%d\n",
 	    __func__, vds->so_family, vds->so_protocol, vds->so_type);
@@ -2537,21 +2564,28 @@ vps_snapshot_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	if ((error = vps_snapshot_ucred(ctx, vps, so->so_cred, M_NOWAIT)))
 		goto drop;
-	if ((error = vps_snapshot_sockbuf(ctx, vps, &so->so_rcv)))
-		goto drop;
-	if ((error = vps_snapshot_sockbuf(ctx, vps, &so->so_snd)))
-		goto drop;
+	if (!SOLISTENING(so)) {
+		sblock(&so->so_rcv, SBL_WAIT | SBL_NOINTR);
+		SOCKBUF_LOCK(&so->so_rcv);
+		error = vps_snapshot_sockbuf(ctx, vps, &so->so_rcv);
+		SOCKBUF_UNLOCK(&so->so_rcv);
+		sbunlock(&so->so_rcv);
+		if (error != 0)
+			goto drop;
 
-
-	SOCKBUF_UNLOCK(&so->so_rcv);
-	SOCKBUF_UNLOCK(&so->so_snd);
-	sbunlock(&so->so_rcv);
-	sbunlock(&so->so_snd);
+		sblock(&so->so_snd, SBL_WAIT | SBL_NOINTR);
+		SOCKBUF_LOCK(&so->so_snd);
+		error = vps_snapshot_sockbuf(ctx, vps, &so->so_snd);
+		SOCKBUF_UNLOCK(&so->so_snd);
+		sbunlock(&so->so_snd);
+		if (error != 0)
+			goto drop;
+	}
 
 	vdo_close(ctx);
 
 	/* Sockets that are on the accept queue of this socket. */
-	if (so->sol_qlen > 0 || so->sol_incqlen > 0) {
+	if (SOLISTENING(so) && (so->sol_qlen > 0 || so->sol_incqlen > 0)) {
 		DBGS("%s: so=%p sol_qlen=%d sol_incqlen=%d\n",
 			__func__, so, so->sol_qlen, so->sol_incqlen);
 		TAILQ_FOREACH(so2, &so->sol_comp, so_list) {
@@ -2578,11 +2612,6 @@ vps_snapshot_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 	return (0);
 
   drop:
-	SOCKBUF_UNLOCK(&so->so_rcv);
-	SOCKBUF_UNLOCK(&so->so_snd);
-	sbunlock(&so->so_rcv);
-	sbunlock(&so->so_snd);
-	/* SOCK_UNLOCK(so); */
 
 	DBGS("%s: error = %d\n", __func__, error);
 	if (o1 != NULL)

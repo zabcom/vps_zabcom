@@ -1645,10 +1645,16 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 	sockargs.type = vds->so_type;
 	sockargs.protocol = vds->so_protocol;
 
+#if 0
+	/* XXX-BZ check what we derive this from and then make sure it is set
+	 * correctly during alloc. */
+	nso->so_vnet = curvnet;
+#endif
 	if ((error = sys_socket(curthread, &sockargs))) {
 		ERRMSG(ctx, "%s: sys_socket() error: %d\n",
 			__func__, error);
-		goto out;
+		/* XXX-BZ restore vnet/cred/.. whatever needed. */
+		return (error);
 	}
 	fdidx = curthread->td_retval[0];
 	cap_rights_init(&rights, CAP_GETSOCKNAME);	/* XXX-BZ CAP_???? */
@@ -1659,30 +1665,91 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		goto out;
 	}
 	nso = fp->f_data;
-	sblock(&nso->so_rcv, SBL_WAIT | SBL_NOINTR);
-	sblock(&nso->so_snd, SBL_WAIT | SBL_NOINTR);
-	SOCKBUF_LOCK(&nso->so_rcv);
-	SOCKBUF_LOCK(&nso->so_snd);
-	nso->so_vnet = curvnet;
+	SOCK_LOCK(nso);
 	nso->so_state = vds->so_state;
-	if (vds->so_options & SO_ACCEPTCONN)
-		nso->so_options |= SO_ACCEPTCONN;
-	nso->sol_qlimit = vds->so_qlimit;
-	nso->so_qstate = vds->so_qstate;
+	nso->so_options = vds->so_options;
+	/* XXX-BZ so_emuldata; */
+	SOCK_UNLOCK(nso);
 
-	/* XXX restore all socket options at all levels ! */
-
-	DBGR("%s: nso=%p dso->so_state = %08x\n",
-	    __func__, nso, vds->so_state);
+	DBGR("%s: nso=%p nso->so_state = %08x\n",
+	    __func__, nso, nso->so_state);
 	DBGR("%s: nso->so_cred=%p nso->so_cred->cr_vps=%p "
 	    "nso->so_vnet=%p\n", __func__, nso->so_cred,
 	    nso->so_cred->cr_vps, nso->so_vnet);
 
+	/* XXX-BZ OSD */
+	/* XXX-BZ so_fibnum */
+	/* XXX-BZ so_user_cookie */
+	/* XXX-BZ so_ts_clock */
+	/* XXX-BZ so_max_pacing_rate */
+
+	if (!SOLISTENING(nso)) {
+		sblock(&nso->so_rcv, SBL_WAIT | SBL_NOINTR);
+		SOCKBUF_LOCK(&nso->so_rcv);
+		if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_SOCKBUF)
+			if ((error = vps_restore_sockbuf(ctx, vps, &nso->so_rcv))) {
+				SOCKBUF_UNLOCK(&nso->so_rcv);
+				sbunlock(&nso->so_rcv);
+				goto out;
+			}
+		SOCKBUF_UNLOCK(&nso->so_rcv);
+		sbunlock(&nso->so_rcv);
+
+		sblock(&nso->so_snd, SBL_WAIT | SBL_NOINTR);
+		SOCKBUF_LOCK(&nso->so_snd);
+		if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_SOCKBUF)
+			if ((error = vps_restore_sockbuf(ctx, vps, &nso->so_snd))) {
+				SOCKBUF_UNLOCK(&nso->so_snd);
+				sbunlock(&nso->so_snd);
+				goto out;
+			}
+		SOCKBUF_UNLOCK(&nso->so_snd);
+		sbunlock(&nso->so_snd);
+
+		/*
+		SOLISTEN_LOCK(othersock);
+		so_list
+		SOLISTEN_UNLOCK(othersock);
+		*/
+
+		SOCK_LOCK(nso);
+		/* so_listen */
+		nso->so_qstate = vds->so_qstate;
+		/* so_peerlabel */
+		/* so_oobmark */
+		SOCK_UNLOCK(nso);
+	} else {
+		SOLISTEN_LOCK(nso);
+		/* sol_incomp */
+		/* sol_comp */
+		nso->sol_qlen = vds->sol_qlen;
+		nso->sol_incqlen = vds->sol_incqlen;
+
+		nso->sol_qlimit = vds->so_qlimit;
+
+		/* XXX-BZ locking on these three unclear? */
+		/* sol_accept_filter */
+		/* sol_accept_filter_arg */
+		/* sol_accept_filter_str */
+
+		/* sol_upcall */
+		/* sol_upcallarg */
+
+		/* XXX-BZ locking unclear on these? */
+		/* sol_sbrcv_lowat */
+		/* sol_sbsnd_lowat */
+		/* sol_sbrcv_hiwat */
+		/* sol_sbsnd_hiwat */
+		/* sol_sbrcv_flags */
+		/* sol_sbsnd_flags */
+		/* sol_sbrcv_timeo */
+		/* sol_sbsnd_timeo */
+
+		SOLISTEN_UNLOCK(nso);
+	}
+
 	switch (vds->so_family) {
 	case PF_UNIX:
-
-		SOCKBUF_UNLOCK(&nso->so_snd);
-		SOCKBUF_UNLOCK(&nso->so_rcv);
 
 		vdunpcb = (struct vps_dump_unixpcb *)cpos;
 		cpos += sizeof(*vdunpcb);
@@ -1724,11 +1791,10 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 				    saddr_un->sun_path);
 				free(statp, M_TEMP);
 				free(saddr_un, M_TEMP);
-				SOCKBUF_LOCK(&nso->so_rcv);
-				SOCKBUF_LOCK(&nso->so_snd);
-				goto out_unlock;
+				goto out;
 			}
-			kern_unlinkat(curthread, AT_FDCWD, saddr_un->sun_path, UIO_USERSPACE, 0);
+			kern_unlinkat(curthread, AT_FDCWD, saddr_un->sun_path,
+			    UIO_USERSPACE, 0);
 
 			error = sobind(nso, (struct sockaddr *)saddr_un,
 			    curthread);
@@ -1737,9 +1803,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 				    __func__, error, saddr_un->sun_path);
 				free(statp, M_TEMP);
 				free(saddr_un, M_TEMP);
-				SOCKBUF_LOCK(&nso->so_rcv);
-				SOCKBUF_LOCK(&nso->so_snd);
-				goto out_unlock;
+				goto out;
 			}
 
 			/* Restore permissions. */
@@ -1752,9 +1816,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 				    saddr_un->sun_path);
 				free(statp, M_TEMP);
 				free(saddr_un, M_TEMP);
-				SOCKBUF_LOCK(&nso->so_rcv);
-				SOCKBUF_LOCK(&nso->so_snd);
-				goto out_unlock;
+				goto out;
 			}
 			error = kern_fchmodat(curthread, AT_FDCWD, saddr_un->sun_path,
 			    UIO_SYSSPACE, statp->st_mode, 0);
@@ -1764,9 +1826,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 				    saddr_un->sun_path);
 				free(statp, M_TEMP);
 				free(saddr_un, M_TEMP);
-				SOCKBUF_LOCK(&nso->so_rcv);
-				SOCKBUF_LOCK(&nso->so_snd);
-				goto out_unlock;
+				goto out;
 			}
 			free(statp, M_TEMP);
 
@@ -1781,9 +1841,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 					    "%d [%s]\n", __func__, error,
 					    saddr_un->sun_path);
 					free(saddr_un, M_TEMP);
-					SOCKBUF_LOCK(&nso->so_rcv);
-					SOCKBUF_LOCK(&nso->so_snd);
-					goto out_unlock;
+					goto out;
 				}
 			}
 
@@ -1866,8 +1924,6 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 			__func__, nso, nso->so_state, nunpcb->unp_conn);
 
 		free(saddr_un, M_TEMP);
-		SOCKBUF_LOCK(&nso->so_rcv);
-		SOCKBUF_LOCK(&nso->so_snd);
 		break;
 
 	case PF_INET:
@@ -1954,7 +2010,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 				ERRMSG(ctx, "%s: ninpcb->inp_ppcb == "
 				    "NULL\n", __func__);
 				error = EINVAL;
-				goto out_unlock;
+				goto out;
 			}
 
 			/* inpcb->inp_ip_p seems to be 0 and only used for
@@ -1997,7 +2053,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 					    "!= NULL, unsupported\n",
 					    __func__);
 					error = EINVAL;
-					goto out_unlock;
+					goto out;
 				}
 				nudpcb->u_flags = vdudpcb->u_flags;
 				nudpcb->u_tun_func = NULL;
@@ -2014,7 +2070,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 				    "%d / %d\n", __func__,
 				    vds->so_protocol, vdinpcb->inp_ip_p);
 				error = EINVAL;
-				goto out_unlock;
+				goto out;
 				break;
 			}
 		}
@@ -2029,32 +2085,17 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		ERRMSG(ctx, "%s: unhandled protocol family %d\n",
 		    __func__, vds->so_family);
 		error = EINVAL;
-		goto out_unlock;
+		goto out;
 		break;
 	}
-
-	if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_SOCKBUF)
-		if ((error = vps_restore_sockbuf(ctx, vps, &nso->so_rcv)))
-			goto out_unlock;
-	if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_SOCKBUF)
-		if ((error = vps_restore_sockbuf(ctx, vps, &nso->so_snd)))
-			goto out_unlock;
 
 	/*
 	 * On success, the only thing to return is the new fd index
 	 * in curthread->td_retval[0].
 	 */
 
-  out_unlock:
-
-	SOCKBUF_UNLOCK(&nso->so_snd);
-	SOCKBUF_UNLOCK(&nso->so_rcv);
-	sbunlock(&nso->so_snd);
-	sbunlock(&nso->so_rcv);
-
-	fdrop(fp, curthread);
-
   out:
+	fdrop(fp, curthread);
 
 	if (error) {
 		/* XXX destroy socket. */
@@ -2067,8 +2108,9 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		crfree(ncr);
 	CURVNET_RESTORE();
 
+	/* XXX-BZ not locked yet & possibly needs to move elesewhere earlier. */
 	/* Sockets that were on the accept queue of this socket. */
-	if (vds->sol_qlen > 0 || vds->sol_incqlen > 0) {
+	if (SOLISTENING(nso) && (vds->sol_qlen > 0 || vds->sol_incqlen > 0)) {
 		DBGR("%s: sol_qlen=%d sol_incqlen=%d\n",
 			__func__, vds->sol_qlen, vds->sol_incqlen);
 
