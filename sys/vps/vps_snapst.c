@@ -2929,7 +2929,7 @@ vps_snapshot_pargs(struct vps_snapst_ctx *ctx, struct vps *vps,
 VPSFUNC
 static int
 vps_snapshot_vmpages(struct vps_snapst_ctx *ctx, struct vps *vps,
-    vm_object_t vmo)
+    vm_object_t vmo, int _debug)
 {
 	struct vps_dumpobj *o1;
 	struct vps_dump_vmpages *vdvmp;
@@ -3001,6 +3001,7 @@ vps_snapshot_vmpages(struct vps_snapst_ctx *ctx, struct vps *vps,
 		}
 		ctx->page_ref[ctx->nuserpages].obj = vmo;
 		ctx->page_ref[ctx->nuserpages].pidx = pidx;
+		ctx->page_ref[ctx->nuserpages]._debug = _debug;
 		++npages;
 		++ctx->nuserpages;
 
@@ -3014,6 +3015,7 @@ vps_snapshot_vmpages(struct vps_snapst_ctx *ctx, struct vps *vps,
 		}
 		vdvmpr->pr_vmobject = vmo;
 		vdvmpr->pr_pindex = pidx;
+		vdvmpr->_debug = _debug;
 
 	}
 
@@ -3084,7 +3086,7 @@ vps_snapshot_vpsfs_getuppervn(struct vps_snapst_ctx *ctx, struct vps *vps,
 VPSFUNC
 static int
 vps_snapshot_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
-    struct vm_object *vmo)
+    struct vm_object *vmo, int _debug)
 {
 	struct vps_dump_vmobject *vdvmo;
 	struct vm_object *dumped_backing_obj;
@@ -3139,7 +3141,7 @@ vps_snapshot_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 			    __func__, vmo, vmo->backing_object);
 			VM_OBJECT_RUNLOCK(vmo);
 			if ((error = vps_snapshot_vmobject(ctx, vps,
-			    dumped_backing_obj)))
+			    dumped_backing_obj, _debug)))
 				return (error);
 			VM_OBJECT_RLOCK(vmo);
 		}
@@ -3290,7 +3292,7 @@ vps_snapshot_vmobject(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	/* Dump pages. */
 	if (dump_pages) {
-		error = vps_snapshot_vmpages(ctx, vps, vmo);
+		error = vps_snapshot_vmpages(ctx, vps, vmo, _debug);
 		if (error != 0) {
 			VM_OBJECT_WUNLOCK(vmo);
 			vdo_discard(ctx, o1);
@@ -3391,7 +3393,7 @@ vps_snapshot_vmspace(struct vps_snapst_ctx *ctx, struct vps *vps,
 			    __func__);
 		} else
 			if ((error = vps_snapshot_vmobject(ctx, vps,
-			    e->object.vm_object)))
+			    e->object.vm_object, 0)))
 				goto out;
 
 		vdo_close(ctx);
