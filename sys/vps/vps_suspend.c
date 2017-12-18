@@ -471,6 +471,19 @@ vps_resume(struct vps *vps, int flags)
 	}
 #endif
 
+	/* vnets of jails, if any */
+	sx_slock(&allprison_lock);
+	ppr = VPS_VPS(vps, prison0);
+	FOREACH_PRISON_DESCENDANT_LOCKED(ppr, cpr, descend) {
+		if ((cpr->pr_flags & PR_VNET)==0)
+			continue;
+		vnet = cpr->pr_vnet;
+		DBGCORE("%s: vnet=%p clearing VPS_VNET_SUSPENDED\n",
+		    __func__, vnet);
+		vnet->vnet_vps_flags &= ~VPS_VNET_SUSPENDED;
+	}
+	sx_sunlock(&allprison_lock);
+
 	/*
 	 * XXX
 	 * cannot lock here because of vps_syscall_fixup().
@@ -551,19 +564,6 @@ vps_resume(struct vps *vps, int flags)
 	sx_xunlock(&VPS_VPS(vps, allproc_lock));
 
 	vps->suspend_time = 0;
-
-	/* vnets of jails, if any */
-	sx_slock(&allprison_lock);
-	ppr = VPS_VPS(vps, prison0);
-	FOREACH_PRISON_DESCENDANT_LOCKED(ppr, cpr, descend) {
-		if ((cpr->pr_flags & PR_VNET)==0)
-			continue;
-		vnet = cpr->pr_vnet;
-		DBGCORE("%s: vnet=%p clearing VPS_VNET_SUSPENDED\n",
-		    __func__, vnet);
-		vnet->vnet_vps_flags &= ~VPS_VNET_SUSPENDED;
-	}
-	sx_sunlock(&allprison_lock);
 
 	/* ''main'' vnet of vps */
 	vnet = vps->vnet;
@@ -857,8 +857,11 @@ vps_syscall_fixup_inthread(register_t code, struct trapframe *frame)
                 error = td->td_errno;
         }
 
+#if 0
 	cpu_set_syscall_retval(td, td->td_errno);
 
+	/* XXX-BZ the only place in the call path to call userret? */
+#endif
         userret(td, frame);
 
 #ifdef KTRACE
