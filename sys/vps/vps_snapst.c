@@ -3481,6 +3481,13 @@ vps_snapshot_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vdtd->tdu_retval[0] = td->td_retval[0];
 	vdtd->tdu_retval[1] = td->td_retval[1];
 
+	vdtd->td_sa.code = td->td_sa.code;
+	vdtd->td_sa.callp = td->td_sa.callp;	// XXX-BZ I think we can properly
+						// restore this again;  MD
+	for (i = 0; i < 8; i++)
+		vdtd->td_sa.args[i] = td->td_sa.args[i];
+	vdtd->td_sa.narg = td->td_sa.narg;
+
 	vdtd->td_kstack_pages = td->td_kstack_pages;
 
 	/* The kstack includes the PCB. */

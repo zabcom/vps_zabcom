@@ -586,6 +586,13 @@ struct vps_dump_thread {
 
 	uint64 td_spare[4];
 
+	struct {
+		uint32 code;
+		sint32 narg;
+		PTR(callp);
+		uint64 args[8];
+	} td_sa;
+
 	sint32 td_tid;
 	uint32 td_kstack_pages;
 	char td_kstack[0];	/* always padded to 64 bit alignment */

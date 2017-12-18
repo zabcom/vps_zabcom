@@ -3524,6 +3524,11 @@ vps_restore_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 	ntd->td_pcb->pcb_save = pcb_save;
 #endif
 
+	ntd->td_sa.code = vdtd->td_sa.code;
+	for (i = 0; i< 8; i++)
+		ntd->td_sa.args[i] = vdtd->td_sa.args[i];
+	ntd->td_sa.narg = vdtd->td_sa.narg;
+
 	/*
 	 * XXX
 	 * There are some registers/values restored along with the PCB
