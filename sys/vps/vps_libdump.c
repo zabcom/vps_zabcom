@@ -191,9 +191,12 @@ void vps_libdump_printheader(struct vps_dumpheader *h);
 #include <stdlib.h>
 #include <fcntl.h>
 #include <sys/resource.h>
+#include <sys/stddef.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <err.h>
+#include <libutil.h>
+#include <sys/sbuf.h>
 
 #define panic	printf
 
@@ -332,6 +335,26 @@ checkfile(const char *path)
 		printf("%s: tree is invalid !\n", __func__);
 	else
 		printf("%s: tree is good !\n", __func__);
+
+#if 0
+	{
+		struct vps_dumpheader *h;
+		void *p;
+		int i;
+		char buf[8];
+
+		h = (struct vps_dumpheader *)ctx->data;
+		printf("%s nsyspages 0x%08x nuserpages 0x%08x\n", __func__,
+		    h->nsyspages, h->nuserpages);
+
+		for (i = 0; i < h->nuserpages; i++) {
+			sprintf(buf, sizeof(buf), "%03u > ", i);
+			p = (void*)((uintptr_t)ctx->data +
+			    (h->nsyspages << h->pageshift) + (i << h->pageshift));
+			hexdump(p, 1 << h->pageshift, buf, 0);
+		}
+	}
+#endif
 
 	free(ctx);
 	munmap(p, size);
@@ -1032,10 +1055,146 @@ vps_dumpobj_makerelative(struct vps_snapst_ctx *ctx)
 }
 
 static void
-__vps_dumpobj_printtree(__unused struct vps_snapst_ctx *ctx,
+_vps_dumpobj_print_thread(struct vps_dumpobj *o, char *ident)
+{
+	void *data;
+	struct vps_dump_thread *vdtd;
+
+	data = o->data;
+	vdtd = (struct vps_dump_thread *)data;
+
+	printf("%s td_tid %d\n", ident, vdtd->td_tid);
+	printf("%s td_kstack_pages %#jx\n", ident,
+	    (uintmax_t)vdtd->td_kstack_pages);
+}
+
+static
+void _vps_dumpobj_print_vmspace(struct vps_dumpobj *o, char *ident)
+{
+	void *data;
+	struct vps_dump_vmspace *vdv;
+	size_t len;
+
+	data = o->data;
+	len = o->size - offsetof(struct vps_dumpobj, data);
+	vdv = (struct vps_dump_vmspace *)data;
+
+	printf("%s vm_orig_ptr %p\n", ident, vdv->vm_orig_ptr);
+	printf("%s vm_map.minoffset %#jx\n", ident,
+	    (uintmax_t)vdv->vm_map.minoffset);
+	printf("%s vm_map.maxoffset %#jx\n", ident,
+	    (uintmax_t)vdv->vm_map.maxoffset);
+	printf("%s vm_tsize %#jx\n", ident, (uintmax_t)vdv->vm_tsize);
+	printf("%s vm_dsize %#jx\n", ident, (uintmax_t)vdv->vm_dsize);
+	printf("%s vm_ssize %#jx\n", ident, (uintmax_t)vdv->vm_ssize);
+}
+
+static
+void _vps_dumpobj_print_vmmapentry(struct vps_dumpobj *o, char *ident)
+{
+	void *data;
+	struct vps_dump_vmmapentry *vdv;
+	size_t len;
+
+	data = o->data;
+	len = o->size - offsetof(struct vps_dumpobj, data);
+	vdv = (struct vps_dump_vmmapentry *)data;
+
+	printf("%s map_object %p\n", ident, vdv->map_object);
+	printf("%s cred %p\n", ident, vdv->cred);
+
+	printf("%s eflags %#jx\n", ident, (uintmax_t)vdv->eflags);
+	printf("%s protection %#jx\n", ident, (uintmax_t)vdv->protection);
+	printf("%s max_protection %#jx\n", ident,
+	    (uintmax_t)vdv->max_protection);
+	printf("%s inheritance %#jx\n", ident, (uintmax_t)vdv->inheritance);
+	printf("%s _pad0 %#jx\n", ident, (uintmax_t)vdv->_pad0);
+
+	printf("%s offset %#jx\n", ident, (uintmax_t)vdv->offset);
+	printf("%s start %#jx\n", ident, (uintmax_t)vdv->start);
+	printf("%s end %#jx\n", ident, (uintmax_t)vdv->end);
+}
+
+static
+void _vps_dumpobj_print_vmobject(struct vps_dumpobj *o, char *ident)
+{
+	void *data;
+	struct vps_dump_vmobject *vdv;
+	size_t len;
+
+	data = o->data;
+	len = o->size - offsetof(struct vps_dumpobj, data);
+	vdv = (struct vps_dump_vmobject *)data;
+
+	printf("%s orig_ptr %p\n", ident, vdv->orig_ptr);
+	printf("%s cred %p\n", ident, vdv->cred);
+	printf("%s backing_object %p\n", ident, vdv->backing_object);
+
+	printf("%s flags %#jx\n", ident, (uintmax_t)vdv->flags);
+	printf("%s type %#jx\n", ident, (uintmax_t)vdv->type);
+	printf("%s have_vnode %#jx\n", ident, (uintmax_t)vdv->have_vnode);
+	printf("%s is_sharedpageobj %#jx\n", ident,
+	    (uintmax_t)vdv->is_sharedpageobj);
+	printf("%s _pad0[0] %#jx\n", ident, (uintmax_t)vdv->_pad0[0]);
+	printf("%s _pad0[1] %#jx\n", ident, (uintmax_t)vdv->_pad0[1]);
+	printf("%s _pad0[2] %#jx\n", ident, (uintmax_t)vdv->_pad0[2]);
+
+	printf("%s size %jx\n", ident, (uintmax_t)vdv->size);
+	printf("%s charge %jx\n", ident, (uintmax_t)vdv->charge);
+	printf("%s backing_object_offset %jx\n", ident,
+	    (uintmax_t)vdv->backing_object_offset);
+}
+
+static uint64_t
+_vps_dumpobj_print_vmpage(struct vps_dumpobj *o, char *ident, uint64_t uidx,
+    struct vps_snapst_ctx *ctx __unused)
+{
+	void *data;
+	struct vps_dump_vmpages *vdvmp;
+	struct vps_dump_vmpageref *vdvmpr;
+	uint64_t i;
+
+	data = o->data;
+	vdvmp = (struct vps_dump_vmpages *)data;
+	vdvmpr = (struct vps_dump_vmpageref *)(vdvmp + 1);
+
+	printf("%s vdvmp count %ju\n", ident, (uintmax_t)vdvmp->count);
+
+	for (i = 0; i < vdvmp->count; i++) {
+		printf("%s vdvmpr[%ju] pr_vmobject %p\n", ident, i,
+		    vdvmpr->pr_vmobject);
+		printf("%s vdvmpr[%ju] pr_pindex %ju\n", ident, i,
+		    (uintmax_t)vdvmpr->pr_pindex);
+		printf("%s vdvmpr[%ju] _debug %ju\n", ident, i,
+		    (uintmax_t)vdvmpr->_debug);
+		printf("%s uidx %ju\n", ident, (uintmax_t)uidx);
+#if 0
+		/* Page content debugging to ensure data consistency. */
+		if (vdvmpr->_debug) {
+			struct vps_dumpheader *h;
+			void *p;
+
+			h = (struct vps_dumpheader *)ctx->data;
+			printf("%s nsyspages 0x%08x nuserpages 0x%08x\n",
+			    ident, h->nsyspages, h->nuserpages);
+			p = (void*)((uintptr_t)ctx->data +
+			    (h->nsyspages << h->pageshift) +
+			    (uidx << h->pageshift));
+			hexdump(p, 1 << h->pageshift, "P  >> ", 0);
+		}
+#endif
+		uidx++;
+	}
+
+	return vdvmp->count;
+}
+
+static void
+__vps_dumpobj_printtree(struct vps_snapst_ctx *ctx,
    struct vps_dumpobj *o)
 {
 	char ident[0x100];
+	static uint64_t uidx = 0;	/* Nasty but it's for debugging only. */
 
 	memset(ident, ' ', o->level * 4);
 	ident[o->level * 4] = 0;
@@ -1048,6 +1207,22 @@ __vps_dumpobj_printtree(__unused struct vps_snapst_ctx *ctx,
 	printf("%ssize=%d\n", ident, o->size);
 	printf("%sparent=%p\n", ident, o->parent);
 	printf("%snext=%p\n", ident, o->next);
+
+	/* BZ likes readable printfs. */
+	if (o->level > 1)
+		ident[o->level * 4 - 1] = '\0';
+	if (o->type == VPS_DUMPOBJT_THREAD)
+		_vps_dumpobj_print_thread(o, ident);
+	else if (o->type == VPS_DUMPOBJT_VMSPACE)
+		_vps_dumpobj_print_vmspace(o, ident);
+	else if (o->type == VPS_DUMPOBJT_VMMAPENTRY)
+		_vps_dumpobj_print_vmmapentry(o, ident);
+	else if (o->type == VPS_DUMPOBJT_VMOBJECT)
+		_vps_dumpobj_print_vmobject(o, ident);
+	else if (o->type == VPS_DUMPOBJT_VMPAGE)
+		uidx += _vps_dumpobj_print_vmpage(o, ident, uidx, ctx);
+	if (o->level > 1)
+		ident[o->level * 4 - 1] = ' ';
 }
 
 int

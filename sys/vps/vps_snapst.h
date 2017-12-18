@@ -135,6 +135,7 @@ struct vps_dumpobj;
 struct vps_page_ref {
 	struct vm_object *obj;
 	vm_pindex_t pidx;
+	int _debug;
 	enum { UNKNOWN = 0, RESIDENT, PAGER } origin;
 };
 

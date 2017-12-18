@@ -835,6 +835,7 @@ struct vps_dump_mbuf {
 struct vps_dump_vmpageref {
         PTR(pr_vmobject);
         uint64 pr_pindex;
+	uint64 _debug;
 };
 
 struct vps_dump_route {
