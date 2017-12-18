@@ -5439,8 +5439,6 @@ void
 vps_restore_return(struct thread *td, struct trapframe *frame)
 {
 
-	cpu_set_syscall_retval(td, td->td_errno);
-
 	userret(td, frame);
 
 #ifdef KTRACE
