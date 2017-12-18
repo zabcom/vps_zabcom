@@ -1904,7 +1904,7 @@ crfree(struct ucred *cr)
 #ifdef VPS
 		/* Drop reference to vps. */
 		if (cr->cr_vps != NULL)
-			vps_deref(cr->cr_vps, cr);
+			vps_deref(cr->cr_vps, cr, 0);
 #endif
 #ifdef AUDIT
 		audit_cred_destroy(cr);

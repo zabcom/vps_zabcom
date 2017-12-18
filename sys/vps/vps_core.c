@@ -275,7 +275,7 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 	   	vps->vps_ucred = crget();
 		crcopy(vps->vps_ucred, td->td_ucred);
 		vps_ref(vps, vps->vps_ucred);
-		vps_deref(vps->vps_ucred->cr_vps, vps->vps_ucred);
+		vps_deref(vps->vps_ucred->cr_vps, vps->vps_ucred, 1);
 		vps->vps_ucred->cr_vps = vps;
 
 		/* XXX-BZ set the proper vps! */
@@ -678,7 +678,7 @@ vps_free_locked(struct vps *vps)
 
 	/* This is the reference acquired by refcount_init() in
 	   vps_alloc(). */
-	vps_deref(vps, (void*)0xdeadbeef);
+	vps_deref(vps, (void*)0xdeadbeef, 1);
 
   out:
 	curthread->td_vps = vps_save;
@@ -833,7 +833,7 @@ vps_destroy_task(void *context, int pending)
 }
 
 void
-vps_deref(struct vps *vps, struct ucred *ucred)
+vps_deref(struct vps *vps, struct ucred *ucred, int is_locked)
 {
 	int last;
 #ifdef INVARIANTS
@@ -863,7 +863,10 @@ vps_deref(struct vps *vps, struct ucred *ucred)
 #endif
 
 	if (last) {
-		sx_xlock(&vps->vps_lock);
+		if (is_locked)
+			sx_assert(&vps->vps_lock, SA_XLOCKED);
+		else
+			sx_xlock(&vps->vps_lock);
 		KASSERT(vps->vps_status == VPS_ST_DEAD,
 		    ("%s: vps=%p; released last reference but "
 		    "vps_status = %d\n", __func__, vps, vps->vps_status));
@@ -891,7 +894,8 @@ vps_deref(struct vps *vps, struct ucred *ucred)
 		    vps_destroy_task, vps);
 		taskqueue_enqueue_timeout(taskqueue_thread, &vps->vps_task,
 		    1 * hz /* ticks */);
-		sx_xunlock(&vps->vps_lock);
+		if (!is_locked)
+			sx_xunlock(&vps->vps_lock);
 	}
 }
 
@@ -989,7 +993,7 @@ vps_proc_release_taskq(void *arg, int pending)
 
 	/* Make sure zombie wasn't reaped by vps_free() already. */
 	if (VPS_VPS(vps, nprocs) == 0) {
-		vps_deref(vps, (void *)0x3478242);
+		vps_deref(vps, (void *)0x3478242, 0);
 		return;
 	}
 
@@ -998,7 +1002,7 @@ vps_proc_release_taskq(void *arg, int pending)
 	sx_xunlock(&VPS_VPS(vps, allproc_lock));
 	sx_xunlock(&VPS_VPS(vps, proctree_lock));
 
-	vps_deref(vps, (void *)0x3478242);
+	vps_deref(vps, (void *)0x3478242, 0);
 }
 #endif /* 0 */
 
@@ -1428,7 +1432,7 @@ vps_switch_proc(struct thread *td, struct vps *vps2, int flag)
 	PROC_UNLOCK(p);
 
 	crcopy(ucr2, ucr1);
-	vps_deref(ucr2->cr_vps, ucr2);
+	vps_deref(ucr2->cr_vps, ucr2, 1);
 	/* crcopy() did prison_hold() */
 	prison_free(ucr2->cr_prison);
 	prison_proc_free(ucr2->cr_prison);

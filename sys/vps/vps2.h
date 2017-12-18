@@ -165,7 +165,7 @@ int vps_free(struct vps *);
 int vps_free_locked(struct vps *);
 int vps_destroy(struct vps *);
 void vps_ref(struct vps *, struct ucred *);
-void vps_deref(struct vps *, struct ucred *);
+void vps_deref(struct vps *, struct ucred *, int);
 
 int vps_devfs_ruleset_create(struct vps *vps);
 int vps_devfs_ruleset_destroy(struct vps *vps);

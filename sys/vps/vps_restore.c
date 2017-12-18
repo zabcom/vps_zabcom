@@ -4740,7 +4740,7 @@ vps_restore_vps(struct vps_snapst_ctx *ctx, const char *vps_name,
 	 * Get a generic ucred we can use for various vps system things.
 	 */
 	ctx->vps_ucred = crdup(curthread->td_ucred);
-	vps_deref(ctx->vps_ucred->cr_vps, ctx->vps_ucred);
+	vps_deref(ctx->vps_ucred->cr_vps, ctx->vps_ucred, 0);
 	ctx->vps_ucred->cr_vps = vps;
 	vps_ref(ctx->vps_ucred->cr_vps, ctx->vps_ucred);
 	prison_free(ctx->vps_ucred->cr_prison);

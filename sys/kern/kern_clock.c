@@ -237,7 +237,7 @@ deadlkres(void)
 			tryl++;
 			pause("allproc", sleepfreq * hz);
 #ifdef VPS
-			vps_deref(vps, (struct ucred *)&deadlkres);
+			vps_deref(vps, (struct ucred *)&deadlkres, 0);
 			sx_slock(&vps_all_lock);
 #endif /* VPS */
 			continue;
@@ -329,7 +329,7 @@ deadlkres(void)
 		}
 		sx_sunlock(&V_allproc_lock);
 #ifdef VPS
-		vps_deref(vps, (struct ucred *)&deadlkres);
+		vps_deref(vps, (struct ucred *)&deadlkres, 0);
 		sx_slock(&vps_all_lock);
 		}
 		sx_sunlock(&vps_all_lock);

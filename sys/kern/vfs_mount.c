@@ -1435,7 +1435,7 @@ dounmount(struct mount *mp, int flags, struct thread *td)
 	mp->mnt_kern_flag &= ~MNTK_ASYNC;
 #ifdef VPS
 	if (mp->mnt_vps) {
-		vps_deref(mp->mnt_vps, (void*)0xdead0010);
+		vps_deref(mp->mnt_vps, (void*)0xdead0010, 0);
 		mp->mnt_vps = NULL;
 	}
 #endif

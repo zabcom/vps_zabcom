@@ -287,7 +287,7 @@ msg_vpsfree_hook(void *arg, struct vps *vps)
 	if (msgunload())
 		printf("%s: msgunload() error\n", __func__);
 
-	vps_deref(vps, NULL);
+	vps_deref(vps, NULL, 0);
 }
 
 static int

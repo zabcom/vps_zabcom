@@ -763,7 +763,7 @@ vps_snapshot_vnodepath(struct vps_snapst_ctx *ctx, struct vps *vps,
 	save_ucred = td->td_ucred;
 	save_vps = td->td_vps;
 	td->td_ucred = crdup(save_ucred);
-	vps_deref(td->td_ucred->cr_vps, td->td_ucred);
+	vps_deref(td->td_ucred->cr_vps, td->td_ucred, 0);
 	td->td_ucred->cr_vps = vps;
 	vps_ref(td->td_ucred->cr_vps, td->td_ucred);
 	td->td_vps = vps;

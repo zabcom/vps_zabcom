@@ -314,7 +314,7 @@ vps_devfs_ruleset_apply(struct vps *vps, struct devfs_mount *dm,
 	tmp_ucred = crget();
 	crcopy(tmp_ucred, save_ucred);
 
-	vps_deref(tmp_ucred->cr_vps, tmp_ucred);
+	vps_deref(tmp_ucred->cr_vps, tmp_ucred, 0);
 	tmp_ucred->cr_vps = vps->vps_parent;
 	vps_ref(tmp_ucred->cr_vps, tmp_ucred);
 
@@ -399,7 +399,7 @@ vps_devfs_ruleset_free(struct vps *vps, struct devfs_mount *dm)
 	tmp_ucred = crget();
 	crcopy(tmp_ucred, save_ucred);
 
-	vps_deref(tmp_ucred->cr_vps, tmp_ucred);
+	vps_deref(tmp_ucred->cr_vps, tmp_ucred, 0);
 	tmp_ucred->cr_vps = vps->vps_parent;
 	vps_ref(tmp_ucred->cr_vps, tmp_ucred);
 
@@ -477,7 +477,7 @@ vps_devfs_unmount_cb(struct devfs_mount *dm)
 	struct vps *vps;
 
 	vps = dm->dm_vps;
-	vps_deref(vps, (void*)0xbeefc0de);
+	vps_deref(vps, (void*)0xbeefc0de, 0);
 	dm->dm_vps = NULL;
 
 	if (vps == vps0)

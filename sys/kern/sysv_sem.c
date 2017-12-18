@@ -495,7 +495,7 @@ sem_vpsfree_hook(void *arg, struct vps *vps)
         if (semunload())
                 printf("%s: semunload() error\n", __func__);
 
-        vps_deref(vps, NULL);
+        vps_deref(vps, NULL, 0);
 }
 
 static int
