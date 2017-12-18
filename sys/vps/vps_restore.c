@@ -1606,6 +1606,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 	struct filedesc *cfd;
 	struct stat *statp;
 	struct file *fp;
+	cap_rights_t rights;
 	caddr_t cpos;
 	int fdidx, fdidx_save;
 	int error;
@@ -1650,8 +1651,10 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		goto out;
 	}
 	fdidx = curthread->td_retval[0];
-	if ((error = getsock(curthread, curthread->td_proc->p_fd, fdidx, &fp, NULL))) {
-		ERRMSG(ctx, "%s: getsock() error: %d\n",
+	cap_rights_init(&rights, CAP_GETSOCKNAME);	/* XXX-BZ CAP_???? */
+	error = getsock_cap(curthread, fdidx, &rights, &fp, NULL, NULL);
+	if (error) {
+		ERRMSG(ctx, "%s: getsock_cap() error: %d\n",
 			__func__, error);
 		goto out;
 	}
