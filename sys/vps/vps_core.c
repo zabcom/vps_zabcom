@@ -39,6 +39,7 @@ __IDSTRING(vpsid, "$Id: vps_core.c 207 2013-12-17 12:23:41Z klaus $");
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/conf.h>
+#include <sys/kthread.h>
 #include <sys/libkern.h>
 #include <sys/module.h>
 #include <sys/sysctl.h>
@@ -205,6 +206,18 @@ vps_shutdown_all(struct thread *td)
         return (0);
 }
 
+static void
+vps_swapper_thread(void *arg)
+{
+	struct vps *vps;
+
+	vps = (struct vps *)arg;
+	while (vps && vps->vps_status != VPS_ST_DYING && vps->vps_status != VPS_ST_DEAD)
+		pause("vpssw", hz);
+
+	kproc_exit(0);
+}
+
 /*
  * We are called with allvps lock held exclusively.
  */
@@ -270,6 +283,21 @@ vps_alloc(struct vps *vps_parent, struct vps_param *vps_pr,
 
 	if (vps_parent) {
 		struct vps *vps_save;
+
+		/*
+		 * Start a kproc for this VPS acting as "swapper"
+		 * which we can use to attach the process tree to and reap init.
+		 * This is not great for for now should work.
+		 * XXX-BZ can we just have one of those with lots of siblings in the
+		 * future (despite overlapping pid spaces?).
+		 */
+		error = kproc_create(vps_swapper_thread, vps, &vps->swappertd, 0, 0,
+		    "vps%u", vps->vps_id);
+		if (error)
+			goto fail;
+		PROC_LOCK(vps->swappertd);
+		vps->swappertd->p_treeflag |= P_TREE_REAPER;
+		PROC_UNLOCK(vps->swappertd);
 
 		/* Alloc vnet. Apparently always succeeds. */
 		vps->vnet = vnet_alloc();
@@ -619,8 +647,11 @@ vps_free_locked(struct vps *vps)
 	 * At this point there MUST NOT be any non-zombie processes,
 	 * as we could release a parent of a still alive child !
 	 */
-	LIST_FOREACH_SAFE(p, &V_zombproc, p_list, p2)
+	sx_xunlock(&V_allproc_lock);
+	LIST_FOREACH_SAFE(p, &V_zombproc, p_list, p2) {
 		vps_proc_release(vps, p);
+	}
+	sx_xlock(&V_allproc_lock);
 
 	i = 0;
 	do {
@@ -883,14 +914,9 @@ vps_deref(struct vps *vps, struct ucred *ucred, int is_locked)
 		/*
 		 * Not calling vps_destroy() directly because there
 		 * might be locks held we need to hold exclusively.
-		 */
-		/*
-		TASK_INIT(&vps->vps_task, 0, vps_destroy_task, vps);
-		taskqueue_enqueue(taskqueue_thread, &vps->vps_task);
-		*/
-		/*
 		 * Defer actual destroy routine by 10 seconds in case
 		 * e.g. network packets are still queued in netisr stuff.
+		 * XXX-BZ different tear-down strategies should be considered.
 		 */
 		TIMEOUT_TASK_INIT(taskqueue_thread, &vps->vps_task, 0,
 		    vps_destroy_task, vps);
@@ -998,10 +1024,10 @@ vps_proc_release_taskq(void *arg, int pending)
 		vps_deref(vps, (void *)0x3478242, 0);
 		return;
 	}
+	sx_xunlock(&VPS_VPS(vps, allproc_lock));
 
 	(void)vps_proc_release(vps, p);
 
-	sx_xunlock(&VPS_VPS(vps, allproc_lock));
 	sx_xunlock(&VPS_VPS(vps, proctree_lock));
 
 	vps_deref(vps, (void *)0x3478242, 0);
@@ -1018,52 +1044,22 @@ vps_proc_release_taskq(void *arg, int pending)
 int
 vps_proc_release(struct vps *vps2, struct proc *p)
 {
-	struct vps *vps1;
+	struct vps *save_vps;
 	int error;
 
-	vps1 = curthread->td_vps;
+	save_vps = curthread->td_vps;
 	curthread->td_vps = vps2;
 
+	sx_assert(&V_allproc_lock, SA_UNLOCKED);
+	sx_assert(&V_proctree_lock, SA_XLOCKED);
 	PROC_LOCK(p);
-	if (p->p_state != PRS_ZOMBIE) {
-		PROC_UNLOCK(p);
-		error = EBUSY;
-		goto fail;
-	}
-	sigqueue_take(p->p_ksi);
-	LIST_REMOVE(p, p_list);
-	if (p->p_pptr)
-		LIST_REMOVE(p, p_sibling);
-	PROC_UNLOCK(p);
-	leavepgrp(p);
-
-	/* XXX process/accounting stats */
-
-	vps_account(p->p_ucred->cr_vps, VPS_ACC_PROCS, VPS_ACC_FREE, 1);
-
-	chgproccnt(p->p_ucred->cr_uidinfo, -1, 0);
-	crfree(p->p_ucred);
-	p->p_ucred = NULL;
-	pargs_drop(p->p_args);
-	sigacts_free(p->p_sigacts);
-	p->p_sigacts = NULL;
-	thread_wait(p);
-	vm_waitproc(p);
-#ifdef MAC
-	mac_proc_destroy(p);
-#endif
-
-	KASSERT(FIRST_THREAD_IN_PROC(p),
-	   ("%s: p=%p no residual thread!", __func__, p));
-
-	uma_zfree(proc_zone, p);
-	V_nprocs--;
-	V_nprocs_zomb--;
-
+	PROC_SLOCK(p);
+	//proc_reap(TAILQ_FIRST(&p->p_threads), p, NULL, 0);
+	proc_reap(curthread, p, NULL, 0);
+	sx_xlock(&V_proctree_lock);
 	error = 0;
 
-  fail:
-	curthread->td_vps = vps1;
+	curthread->td_vps = save_vps;
 
 	return (error);
 }
@@ -1422,11 +1418,26 @@ vps_switch_proc(struct thread *td, struct vps *vps2, int flag)
 	PROC_LOCK(p->p_pptr);
 	sigqueue_take(p->p_ksi);
 	LIST_REMOVE(p, p_sibling);
+	LIST_REMOVE(p, p_reapsibling);
 	PROC_UNLOCK(p->p_pptr);
-	p->p_pptr = NULL;
 
-	LIST_REMOVE(p, p_hash);
 	LIST_REMOVE(p, p_list);
+	LIST_REMOVE(p, p_hash);
+
+	/* Clean up properly to avoid later confusion. */
+	bzero(&p->p_sibling, sizeof(p->p_sibling));
+	bzero(&p->p_reapsibling, sizeof(p->p_reapsibling));
+	bzero(&p->p_list, sizeof(p->p_list));
+
+	p->p_pptr = NULL;
+	KASSERT((LIST_EMPTY(&p->p_children)), ("%s:%d proc %p has children",
+	    __func__, __LINE__, p));
+	KASSERT((LIST_EMPTY(&p->p_reaplist)), ("%s:%d proc %p has non-empty reaplist",
+	    __func__, __LINE__, p));
+	KASSERT((p->p_sibling.le_next == NULL), ("%s:%d proc %p has sibling le_next %p",
+	    __func__, __LINE__, p, p->p_sibling.le_next));
+	KASSERT((p->p_sibling.le_prev == NULL), ("%s:%d proc %p has sibling le_prev %p",
+	    __func__, __LINE__, p, p->p_sibling.le_prev));
 
 	ucr1 = p->p_ucred;
 	setsugid(p); /* ? */
@@ -1510,13 +1521,26 @@ vps_switch_proc(struct thread *td, struct vps *vps2, int flag)
 		bcopy(save_s_login, sess->s_login, sizeof(sess->s_login));
 		SESS_UNLOCK(sess);
 
+		p->p_reaper = vps2->swappertd;
+		p->p_reapsubtree = p->p_pid;
+		p->p_treeflag |= P_TREE_REAPER;
+		LIST_INIT(&p->p_reaplist);
+		LIST_INSERT_HEAD(&vps2->swappertd->p_reaplist, p, p_reapsibling);
+		p->p_pptr = vps2->swappertd;
+		PROC_LOCK(p->p_pptr);
+		LIST_INSERT_HEAD(&p->p_pptr->p_children, p, p_sibling);
+		PROC_UNLOCK(p->p_pptr);
+
 		/* First proc in vps, so it becomes initproc. */
 		VPS_VPS(vps2, initproc) = p;
 
 	} else {
 		p->p_pptr = VPS_VPS(vps2, initproc);
+		p->p_reaper = p->p_pptr;
+		p->p_reapsubtree = p->p_pptr->p_pid;
 		PROC_LOCK(p->p_pptr);
 		LIST_INSERT_HEAD(&p->p_pptr->p_children, p, p_sibling);
+		LIST_INSERT_HEAD(&p->p_reaper->p_reaplist, p, p_reapsibling);
 		PROC_UNLOCK(p->p_pptr);
 	}
 

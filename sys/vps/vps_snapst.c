@@ -3657,10 +3657,12 @@ vps_snapshot_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 	}
 
 	/* proc */
-	vdp->p_pptr_id = (p->p_pptr) ? p->p_pptr->p_pid : 0;
+	vdp->p_pptr_id = (p->p_pptr && p->p_pptr != vps->swappertd) ?
+	    p->p_pptr->p_pid : 0;
 	vdp->p_peers_id = (p->p_peers) ? p->p_peers->p_pid : 0;
 	vdp->p_leader_id = (p->p_leader) ? p->p_leader->p_pid : 0;
-	vdp->p_reaper_pid = (p->p_reaper) ? p->p_reaper->p_pid : 0;
+	vdp->p_reaper_pid = (p->p_reaper && p->p_reaper != vps->swappertd) ?
+	    p->p_reaper->p_pid : 0;
 	vdp->p_pgrp_id = (p->p_pgrp) ? p->p_pgrp->pg_id : 0;
 	vdp->p_xthread_id = (p->p_xthread) ? p->p_xthread->td_tid : 0;
 

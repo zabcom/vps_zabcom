@@ -3543,6 +3543,7 @@ vps_restore_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 	ntd->td_user_pri = vdtd->td_user_pri;
 	ntd->td_base_user_pri = vdtd->td_base_user_pri;
 
+	/* XXX-BZ ... What about these?  especially ss_sp? */
 	ntd->td_sigstk.ss_sp = PTRFROM64(vdtd->td_sigstk.ss_sp);
 	ntd->td_sigstk.ss_size = vdtd->td_sigstk.ss_size;
 	ntd->td_sigstk.ss_flags = vdtd->td_sigstk.ss_flags;
@@ -3594,8 +3595,8 @@ vps_restore_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 	ntd->td_vps_acc = vps->vps_acc;
 	PROC_LOCK(p);
 	thread_cow_get_proc(ntd, p);
-	PROC_UNLOCK(p);
 	thread_link(ntd, p);
+	PROC_UNLOCK(p);
 
 	/* not yet */
 	if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_UMTX)
@@ -3749,7 +3750,8 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	/* --> from proc_linkup() */
 	sigqueue_init(&np->p_sigqueue, np);
 	np->p_ksi = ksiginfo_alloc(1);
-	np->p_ksi->ksi_flags = KSI_EXT | KSI_INS;
+	if (np->p_ksi != NULL)
+		np->p_ksi->ksi_flags = KSI_EXT | KSI_INS;
 	LIST_INIT(&np->p_mqnotifier);
 	np->p_numthreads = 0;
 
@@ -3888,7 +3890,6 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	np->p_leader = (struct proc *)((size_t)vdp->p_leader_id);
 	np->p_reaper = (struct proc *)((size_t)vdp->p_reaper_pid);
 	np->p_pgrp = (struct pgrp *)((size_t)vdp->p_pgrp_id);
-
 	np->p_reapsubtree = vdp->p_reapsubtree;	/* pid_t */
 	LIST_INIT(&np->p_reaplist);	/* XXX-BZ proper save/restore. */
 
@@ -3900,12 +3901,12 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 		error = 0;
 		goto out;
 	}
+	PROC_LOCK(np);
 	np->p_state = vdp->p_state;
 
 	/* Add the extra lock that was set in vps_suspend(). */
 	np->p_lock++;
 
-	PROC_LOCK(np);
 	FOREACH_THREAD_IN_PROC(np, ntd) {
 
 		/* Sets scheduler lock and cpuset, besides some
@@ -4234,9 +4235,39 @@ vps_restore_proc(struct vps_snapst_ctx *ctx, struct vps *vps)
 	    initpgrp))))
 		PGRP_UNLOCK(VPS_VPS(vps, initpgrp));
 	/* XXX pfind() locks allproc_lock again ! */
-	if ((VPS_VPS(vps, initproc) = pfind((intptr_t)VPS_VPS(vps,
-	    initproc))))
+	if ((p = pfind((intptr_t)VPS_VPS(vps, initproc)))) {
+		VPS_VPS(vps, initproc) = p;
+		p->p_pptr = vps->swappertd;
+		p->p_reaper = vps->swappertd;
+		p->p_reapsubtree = vps->swappertd->p_pid;
+		LIST_INSERT_HEAD(&vps->swappertd->p_reaplist, p, p_reapsibling);
+		LIST_INSERT_HEAD(&p->p_pptr->p_children, p, p_sibling);
 		PROC_UNLOCK(VPS_VPS(vps, initproc));
+	} else {
+		DBGR("%s: could not find V_initproc=%p\n",
+		    __func__, VPS_VPS(vps, initproc));
+	}
+
+	LIST_FOREACH(p, &VPS_VPS(vps, allproc), p_list) {
+		PROC_LOCK(p);
+		DBGR("%s: iterating allproc p=%p\n", __func__, p);
+		if (p != VPS_VPS(vps, initproc)) {
+			/*
+			 * Reset to something sensible as the restored pid_t
+			 * makes no sense.
+			 * XXX-BZ should this be our swappertd('s pid)?
+			 */
+			p->p_reapsubtree = VPS_VPS(vps, initproc)->p_pid;
+			if (p->p_reaper == NULL)
+				p->p_reaper = VPS_VPS(vps, initproc);
+		}
+		KASSERT((p->p_pptr != NULL), ("%s:%d restored proc %p "
+		    "has no pptr\n", __func__, __LINE__, p));
+		KASSERT((p->p_reaper != NULL), ("%s:%d restored proc %p "
+		     "has no reaper\n", __func__, __LINE__, p));
+		faultin(p);
+		PROC_UNLOCK(p);
+	}
 
 	DBGR("%s: V_initpgrp=%p V_initproc=%p\n",
 	    __func__, VPS_VPS(vps, initpgrp), VPS_VPS(vps, initproc));

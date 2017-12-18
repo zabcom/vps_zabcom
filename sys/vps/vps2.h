@@ -123,6 +123,7 @@ struct vps {
 
 	int64_t			suspend_time;
 
+	struct proc		*swappertd;
 	struct vps_acc		*vps_acc;	/* XXX do inline */
 
 	struct vnode		*consolelog;
