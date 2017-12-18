@@ -144,6 +144,8 @@ void vps_pager_lowmem(void *arg);
 void vnet_route_init(const void *);
 void vnet_route_uninit(const void *);
 
+static int vps_free_locked(struct vps *);
+
 static void
 vps_init(void *unused)
 {
@@ -533,7 +535,7 @@ vps_free(struct vps *vps)
 /*
  * We are called with vps locked exclusively.
  */
-int
+static int
 vps_free_locked(struct vps *vps)
 {
 	struct ifnet *ifp, *ifp2;

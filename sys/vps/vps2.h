@@ -162,7 +162,6 @@ struct vps *vps_by_name(struct vps *, char *);
 struct vps *vps_alloc(struct vps *, struct vps_param *, char *,
     int *errorval);
 int vps_free(struct vps *);
-int vps_free_locked(struct vps *);
 int vps_destroy(struct vps *);
 void vps_ref(struct vps *, struct ucred *);
 void vps_deref(struct vps *, struct ucred *, int);
