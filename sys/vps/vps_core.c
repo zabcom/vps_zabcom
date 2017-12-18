@@ -935,7 +935,7 @@ vps_proc_signal(struct vps *vps, pid_t pid, int sig)
 }
 
 int
-vps_proc_exit(struct thread *td, struct proc *p)
+vps_proc_exit(struct thread *td __unused, struct proc *p __unused)
 {
 
 	return (0);
