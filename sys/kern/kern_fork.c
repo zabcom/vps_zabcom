@@ -199,8 +199,8 @@ VPS_DEFINE(struct timeval, lastfail) = { 0, 0 };
 
 VPS_DEFINE(int, nprocs_zomb) = 0;
 
-SYSCTL_INT(_kern, OID_AUTO, lastpid, CTLFLAG_RD|CTLFLAG_VPS, &VPS_NAME(lastpid),
-      0, "Last used PID");
+_SYSCTL_INT(_kern, OID_AUTO, lastpid, CTLFLAG_RD|CTLFLAG_VPS, &VPS_NAME(lastpid),
+      0, "Last used PID", VPS_PUBLIC);
 
 
 /*

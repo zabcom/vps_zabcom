@@ -385,7 +385,7 @@ VM_STATS_UINT(v_wire_count, "Wired pages", VPS_PUBLIC);
 VM_STATS_UINT(v_active_count, "Active pages", VPS_PUBLIC);
 VM_STATS_UINT(v_inactive_target, "Desired inactive pages", VPS_0);
 VM_STATS_UINT(v_inactive_count, "Inactive pages", VPS_PUBLIC);
-VM_STATS_UINT(v_laundry_count, "Pages eligible for laundering", VPS_0);
+VM_STATS_UINT(v_laundry_count, "Pages eligible for laundering", VPS_PUBLIC);
 VM_STATS_UINT(v_pageout_free_min, "Min pages reserved for kernel", VPS_0);
 VM_STATS_UINT(v_interrupt_free_min, "Reserved pages for interrupt code", VPS_0);
 VM_STATS_UINT(v_free_severe, "Severe page depletion point", VPS_0);

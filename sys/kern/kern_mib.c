@@ -611,10 +611,9 @@ sysctl_kern_pid_max(SYSCTL_HANDLER_ARGS)
 	sx_xunlock(&V_proctree_lock);
 	return (error);
 }
-SYSCTL_PROC(_kern, OID_AUTO, pid_max, CTLTYPE_INT |
+_SYSCTL_PROC(_kern, OID_AUTO, pid_max, CTLTYPE_INT |
     CTLFLAG_RWTUN | CTLFLAG_NOFETCH | CTLFLAG_MPSAFE,
-    0, 0, sysctl_kern_pid_max, "I", "Maximum allowed pid");
-/* XXX-BZ virtualize */
+    0, 0, sysctl_kern_pid_max, "I", "Maximum allowed pid", VPS_PUBLIC);
 
 #include <sys/bio.h>
 #include <sys/buf.h>

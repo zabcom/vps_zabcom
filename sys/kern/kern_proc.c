@@ -3087,8 +3087,9 @@ static _SYSCTL_NODE(_kern_proc, KERN_PROC_VMMAP, vmmap, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_vmmap, "Process vm map entries", 0);
 
 #if defined(STACK) || defined(DDB)
-static SYSCTL_NODE(_kern_proc, KERN_PROC_KSTACK, kstack, CTLFLAG_RD |
-	CTLFLAG_MPSAFE, sysctl_kern_proc_kstack, "Process kernel stacks");
+static _SYSCTL_NODE(_kern_proc, KERN_PROC_KSTACK, kstack,
+	CTLFLAG_RD | CTLFLAG_MPSAFE,
+	sysctl_kern_proc_kstack, "Process kernel stacks", VPS_PUBLIC);
 #endif
 
 static _SYSCTL_NODE(_kern_proc, KERN_PROC_GROUPS, groups, CTLFLAG_RD |
