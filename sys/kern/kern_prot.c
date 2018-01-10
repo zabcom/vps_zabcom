@@ -1448,6 +1448,9 @@ cr_cansee(struct ucred *u1, struct ucred *u2)
 
 	if ((error = prison_check(u1, u2)))
 		return (error);
+#ifdef VPS
+	/* XXX-BZ while VPS are not part of jails add extra check here? */
+#endif
 #ifdef MAC
 	if ((error = mac_cred_check_visible(u1, u2)))
 		return (error);
