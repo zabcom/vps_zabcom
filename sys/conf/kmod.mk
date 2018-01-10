@@ -44,6 +44,10 @@
 #
 # DESTDIR	The tree where the module gets installed. [not set]
 #
+# KERNBUILDDIR
+#		Set to the location of the kernel build directory where
+#		the opt_*.h files, .o's and kernel winds up.
+#
 # +++ targets +++
 #
 # 	install:
@@ -125,7 +129,7 @@ CFLAGS.gcc+= --param large-function-growth=1000
 CFLAGS+=	-fno-common
 LDFLAGS+=	-d -warn-common
 
-.if ${LINKER_FEATURES:Mbuild-id}
+.if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mbuild-id}
 LDFLAGS+=	-Wl,--build-id=sha1
 .endif
 
@@ -366,7 +370,7 @@ ${_src}:
 .endif
 
 # Respect configuration-specific C flags.
-CFLAGS+=	${CONF_CFLAGS}
+CFLAGS+=	${ARCH_FLAGS} ${CONF_CFLAGS}
 
 .if !empty(SRCS:Mvnode_if.c)
 CLEANFILES+=	vnode_if.c
@@ -464,9 +468,6 @@ genassym.o: ${SRCS:Mopt_*.h}
 	${CC} -c ${CFLAGS:N-flto:N-fno-common} \
 	    ${SYSDIR}/${MACHINE}/${MACHINE}/genassym.c
 .endif
-
-lint: ${SRCS}
-	${LINT} ${LINTKERNFLAGS} ${CFLAGS:M-[DILU]*} ${.ALLSRC:M*.c}
 
 .if defined(KERNBUILDDIR)
 ${OBJS}: opt_global.h

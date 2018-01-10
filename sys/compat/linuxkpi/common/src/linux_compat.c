@@ -463,6 +463,8 @@ void
 linux_file_free(struct linux_file *filp)
 {
 	if (filp->_file == NULL) {
+		if (filp->f_shmem != NULL)
+			vm_object_deallocate(filp->f_shmem);
 		kfree(filp);
 	} else {
 		/*
@@ -474,11 +476,57 @@ linux_file_free(struct linux_file *filp)
 }
 
 static int
+linux_cdev_pager_fault(vm_object_t vm_obj, vm_ooffset_t offset, int prot,
+    vm_page_t *mres)
+{
+	struct vm_area_struct *vmap;
+
+	vmap = linux_cdev_handle_find(vm_obj->handle);
+
+	MPASS(vmap != NULL);
+	MPASS(vmap->vm_private_data == vm_obj->handle);
+
+	if (likely(vmap->vm_ops != NULL && offset < vmap->vm_len)) {
+		vm_paddr_t paddr = IDX_TO_OFF(vmap->vm_pfn) + offset;
+		vm_page_t page;
+
+		if (((*mres)->flags & PG_FICTITIOUS) != 0) {
+			/*
+			 * If the passed in result page is a fake
+			 * page, update it with the new physical
+			 * address.
+			 */
+			page = *mres;
+			vm_page_updatefake(page, paddr, vm_obj->memattr);
+		} else {
+			/*
+			 * Replace the passed in "mres" page with our
+			 * own fake page and free up the all of the
+			 * original pages.
+			 */
+			VM_OBJECT_WUNLOCK(vm_obj);
+			page = vm_page_getfake(paddr, vm_obj->memattr);
+			VM_OBJECT_WLOCK(vm_obj);
+
+			vm_page_replace_checked(page, vm_obj,
+			    (*mres)->pindex, *mres);
+
+			vm_page_lock(*mres);
+			vm_page_free(*mres);
+			vm_page_unlock(*mres);
+			*mres = page;
+		}
+		page->valid = VM_PAGE_BITS_ALL;
+		return (VM_PAGER_OK);
+	}
+	return (VM_PAGER_FAIL);
+}
+
+static int
 linux_cdev_pager_populate(vm_object_t vm_obj, vm_pindex_t pidx, int fault_type,
     vm_prot_t max_prot, vm_pindex_t *first, vm_pindex_t *last)
 {
 	struct vm_area_struct *vmap;
-	struct vm_fault vmf;
 	int err;
 
 	linux_set_current(curthread);
@@ -488,18 +536,20 @@ linux_cdev_pager_populate(vm_object_t vm_obj, vm_pindex_t pidx, int fault_type,
 	MPASS(vmap != NULL);
 	MPASS(vmap->vm_private_data == vm_obj->handle);
 
-	/* fill out VM fault structure */
-	vmf.virtual_address = (void *)((uintptr_t)pidx << PAGE_SHIFT);
-	vmf.flags = (fault_type & VM_PROT_WRITE) ? FAULT_FLAG_WRITE : 0;
-	vmf.pgoff = 0;
-	vmf.page = NULL;
-
 	VM_OBJECT_WUNLOCK(vm_obj);
 
 	down_write(&vmap->vm_mm->mmap_sem);
-	if (unlikely(vmap->vm_ops == NULL || vmap->vm_ops->fault == NULL)) {
+	if (unlikely(vmap->vm_ops == NULL)) {
 		err = VM_FAULT_SIGBUS;
 	} else {
+		struct vm_fault vmf;
+
+		/* fill out VM fault structure */
+		vmf.virtual_address = (void *)((uintptr_t)pidx << PAGE_SHIFT);
+		vmf.flags = (fault_type & VM_PROT_WRITE) ? FAULT_FLAG_WRITE : 0;
+		vmf.pgoff = 0;
+		vmf.page = NULL;
+
 		vmap->vm_pfn_count = 0;
 		vmap->vm_pfn_pcount = &vmap->vm_pfn_count;
 		vmap->vm_obj = vm_obj;
@@ -555,24 +605,6 @@ linux_cdev_handle_free(struct vm_area_struct *vmap)
 	mmput(vmap->vm_mm);
 
 	kfree(vmap);
-}
-
-static struct vm_area_struct *
-linux_cdev_handle_insert(void *handle, struct vm_area_struct *vmap)
-{
-	struct vm_area_struct *ptr;
-
-	rw_wlock(&linux_vma_lock);
-	TAILQ_FOREACH(ptr, &linux_vma_head, vm_entry) {
-		if (ptr->vm_private_data == handle) {
-			rw_wunlock(&linux_vma_lock);
-			linux_cdev_handle_free(vmap);
-			return (NULL);
-		}
-	}
-	TAILQ_INSERT_TAIL(&linux_vma_head, vmap, vm_entry);
-	rw_wunlock(&linux_vma_lock);
-	return (vmap);
 }
 
 static void
@@ -631,10 +663,19 @@ linux_cdev_pager_dtor(void *handle)
 	linux_cdev_handle_free(vmap);
 }
 
-static struct cdev_pager_ops linux_cdev_pager_ops = {
+static struct cdev_pager_ops linux_cdev_pager_ops[2] = {
+  {
+	/* OBJT_MGTDEVICE */
 	.cdev_pg_populate	= linux_cdev_pager_populate,
 	.cdev_pg_ctor	= linux_cdev_pager_ctor,
 	.cdev_pg_dtor	= linux_cdev_pager_dtor
+  },
+  {
+	/* OBJT_DEVICE */
+	.cdev_pg_fault	= linux_cdev_pager_fault,
+	.cdev_pg_ctor	= linux_cdev_pager_ctor,
+	.cdev_pg_dtor	= linux_cdev_pager_dtor
+  },
 };
 
 static int
@@ -686,8 +727,6 @@ linux_dev_close(struct cdev *dev, int fflag, int devtype, struct thread *td)
 	int error;
 
 	file = td->td_fpop;
-	if (dev->si_drv1 == NULL)
-		return (0);
 	if ((error = devfs_get_cdevpriv((void **)&filp)) != 0)
 		return (error);
 	filp->f_flags = file->f_flag;
@@ -820,8 +859,6 @@ linux_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 	int error;
 
 	file = td->td_fpop;
-	if (dev->si_drv1 == NULL)
-		return (ENXIO);
 	if ((error = devfs_get_cdevpriv((void **)&filp)) != 0)
 		return (error);
 	filp->f_flags = file->f_flag;
@@ -847,7 +884,20 @@ linux_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		/* fetch user-space pointer */
 		data = *(void **)data;
 	}
-	if (filp->f_op->unlocked_ioctl)
+#if defined(__amd64__)
+	if (td->td_proc->p_elf_machine == EM_386) {
+		/* try the compat IOCTL handler first */
+		if (filp->f_op->compat_ioctl != NULL)
+			error = -filp->f_op->compat_ioctl(filp, cmd, (u_long)data);
+		else
+			error = ENOTTY;
+
+		/* fallback to the regular IOCTL handler, if any */
+		if (error == ENOTTY && filp->f_op->unlocked_ioctl != NULL)
+			error = -filp->f_op->unlocked_ioctl(filp, cmd, (u_long)data);
+	} else
+#endif
+	if (filp->f_op->unlocked_ioctl != NULL)
 		error = -filp->f_op->unlocked_ioctl(filp, cmd, (u_long)data);
 	else
 		error = ENOTTY;
@@ -876,8 +926,6 @@ linux_dev_read(struct cdev *dev, struct uio *uio, int ioflag)
 
 	td = curthread;
 	file = td->td_fpop;
-	if (dev->si_drv1 == NULL)
-		return (ENXIO);
 	if ((error = devfs_get_cdevpriv((void **)&filp)) != 0)
 		return (error);
 	filp->f_flags = file->f_flag;
@@ -918,8 +966,6 @@ linux_dev_write(struct cdev *dev, struct uio *uio, int ioflag)
 
 	td = curthread;
 	file = td->td_fpop;
-	if (dev->si_drv1 == NULL)
-		return (ENXIO);
 	if ((error = devfs_get_cdevpriv((void **)&filp)) != 0)
 		return (error);
 	filp->f_flags = file->f_flag;
@@ -949,6 +995,8 @@ linux_dev_write(struct cdev *dev, struct uio *uio, int ioflag)
 	return (error);
 }
 
+#define	LINUX_POLL_TABLE_NORMAL ((poll_table *)1)
+
 static int
 linux_dev_poll(struct cdev *dev, int events, struct thread *td)
 {
@@ -956,23 +1004,108 @@ linux_dev_poll(struct cdev *dev, int events, struct thread *td)
 	struct file *file;
 	int revents;
 
-	if (dev->si_drv1 == NULL)
-		goto error;
 	if (devfs_get_cdevpriv((void **)&filp) != 0)
 		goto error;
 
 	file = td->td_fpop;
 	filp->f_flags = file->f_flag;
 	linux_set_current(td);
-	if (filp->f_op->poll != NULL) {
-		selrecord(td, &filp->f_selinfo);
-		revents = filp->f_op->poll(filp, NULL) & events;
-	} else
+	if (filp->f_op->poll != NULL)
+		revents = filp->f_op->poll(filp, LINUX_POLL_TABLE_NORMAL) & events;
+	else
 		revents = 0;
 
 	return (revents);
 error:
 	return (events & (POLLHUP|POLLIN|POLLRDNORM|POLLOUT|POLLWRNORM));
+}
+
+/*
+ * This function atomically updates the poll wakeup state and returns
+ * the previous state at the time of update.
+ */
+static uint8_t
+linux_poll_wakeup_state(atomic_t *v, const uint8_t *pstate)
+{
+	int c, old;
+
+	c = v->counter;
+
+	while ((old = atomic_cmpxchg(v, c, pstate[c])) != c)
+		c = old;
+
+	return (c);
+}
+
+
+static int
+linux_poll_wakeup_callback(wait_queue_t *wq, unsigned int wq_state, int flags, void *key)
+{
+	static const uint8_t state[LINUX_FWQ_STATE_MAX] = {
+		[LINUX_FWQ_STATE_INIT] = LINUX_FWQ_STATE_INIT, /* NOP */
+		[LINUX_FWQ_STATE_NOT_READY] = LINUX_FWQ_STATE_NOT_READY, /* NOP */
+		[LINUX_FWQ_STATE_QUEUED] = LINUX_FWQ_STATE_READY,
+		[LINUX_FWQ_STATE_READY] = LINUX_FWQ_STATE_READY, /* NOP */
+	};
+	struct linux_file *filp = container_of(wq, struct linux_file, f_wait_queue.wq);
+
+	switch (linux_poll_wakeup_state(&filp->f_wait_queue.state, state)) {
+	case LINUX_FWQ_STATE_QUEUED:
+		linux_poll_wakeup(filp);
+		return (1);
+	default:
+		return (0);
+	}
+}
+
+void
+linux_poll_wait(struct linux_file *filp, wait_queue_head_t *wqh, poll_table *p)
+{
+	static const uint8_t state[LINUX_FWQ_STATE_MAX] = {
+		[LINUX_FWQ_STATE_INIT] = LINUX_FWQ_STATE_NOT_READY,
+		[LINUX_FWQ_STATE_NOT_READY] = LINUX_FWQ_STATE_NOT_READY, /* NOP */
+		[LINUX_FWQ_STATE_QUEUED] = LINUX_FWQ_STATE_QUEUED, /* NOP */
+		[LINUX_FWQ_STATE_READY] = LINUX_FWQ_STATE_QUEUED,
+	};
+
+	/* check if we are called inside the select system call */
+	if (p == LINUX_POLL_TABLE_NORMAL)
+		selrecord(curthread, &filp->f_selinfo);
+
+	switch (linux_poll_wakeup_state(&filp->f_wait_queue.state, state)) {
+	case LINUX_FWQ_STATE_INIT:
+		/* NOTE: file handles can only belong to one wait-queue */
+		filp->f_wait_queue.wqh = wqh;
+		filp->f_wait_queue.wq.func = &linux_poll_wakeup_callback;
+		add_wait_queue(wqh, &filp->f_wait_queue.wq);
+		atomic_set(&filp->f_wait_queue.state, LINUX_FWQ_STATE_QUEUED);
+		break;
+	default:
+		break;
+	}
+}
+
+static void
+linux_poll_wait_dequeue(struct linux_file *filp)
+{
+	static const uint8_t state[LINUX_FWQ_STATE_MAX] = {
+		[LINUX_FWQ_STATE_INIT] = LINUX_FWQ_STATE_INIT,	/* NOP */
+		[LINUX_FWQ_STATE_NOT_READY] = LINUX_FWQ_STATE_INIT,
+		[LINUX_FWQ_STATE_QUEUED] = LINUX_FWQ_STATE_INIT,
+		[LINUX_FWQ_STATE_READY] = LINUX_FWQ_STATE_INIT,
+	};
+
+	seldrain(&filp->f_selinfo);
+
+	switch (linux_poll_wakeup_state(&filp->f_wait_queue.state, state)) {
+	case LINUX_FWQ_STATE_NOT_READY:
+	case LINUX_FWQ_STATE_QUEUED:
+	case LINUX_FWQ_STATE_READY:
+		remove_wait_queue(filp->f_wait_queue.wqh, &filp->f_wait_queue.wq);
+		break;
+	default:
+		break;
+	}
 }
 
 void
@@ -1072,8 +1205,6 @@ linux_dev_kqfilter(struct cdev *dev, struct knote *kn)
 
 	td = curthread;
 	file = td->td_fpop;
-	if (dev->si_drv1 == NULL)
-		return (ENXIO);
 	if ((error = devfs_get_cdevpriv((void **)&filp)) != 0)
 		return (error);
 	filp->f_flags = file->f_flag;
@@ -1124,8 +1255,6 @@ linux_dev_mmap_single(struct cdev *dev, vm_ooffset_t *offset,
 
 	td = curthread;
 	file = td->td_fpop;
-	if (dev->si_drv1 == NULL)
-		return (ENODEV);
 	if ((error = devfs_get_cdevpriv((void **)&filp)) != 0)
 		return (error);
 	filp->f_flags = file->f_flag;
@@ -1151,7 +1280,7 @@ linux_dev_mmap_single(struct cdev *dev, vm_ooffset_t *offset,
 	vmap->vm_end = size;
 	vmap->vm_pgoff = *offset / PAGE_SIZE;
 	vmap->vm_pfn = 0;
-	vmap->vm_flags = vmap->vm_page_prot = nprot;
+	vmap->vm_flags = vmap->vm_page_prot = (nprot & VM_PROT_ALL);
 	vmap->vm_ops = NULL;
 	vmap->vm_file = get_file(filp);
 	vmap->vm_mm = mm;
@@ -1171,32 +1300,80 @@ linux_dev_mmap_single(struct cdev *dev, vm_ooffset_t *offset,
 	attr = pgprot2cachemode(vmap->vm_page_prot);
 
 	if (vmap->vm_ops != NULL) {
+		struct vm_area_struct *ptr;
 		void *vm_private_data;
+		bool vm_no_fault;
 
 		if (vmap->vm_ops->open == NULL ||
 		    vmap->vm_ops->close == NULL ||
 		    vmap->vm_private_data == NULL) {
+			/* free allocated VM area struct */
 			linux_cdev_handle_free(vmap);
 			return (EINVAL);
 		}
 
 		vm_private_data = vmap->vm_private_data;
 
-		vmap = linux_cdev_handle_insert(vm_private_data, vmap);
+		rw_wlock(&linux_vma_lock);
+		TAILQ_FOREACH(ptr, &linux_vma_head, vm_entry) {
+			if (ptr->vm_private_data == vm_private_data)
+				break;
+		}
+		/* check if there is an existing VM area struct */
+		if (ptr != NULL) {
+			/* check if the VM area structure is invalid */
+			if (ptr->vm_ops == NULL ||
+			    ptr->vm_ops->open == NULL ||
+			    ptr->vm_ops->close == NULL) {
+				error = ESTALE;
+				vm_no_fault = 1;
+			} else {
+				error = EEXIST;
+				vm_no_fault = (ptr->vm_ops->fault == NULL);
+			}
+		} else {
+			/* insert VM area structure into list */
+			TAILQ_INSERT_TAIL(&linux_vma_head, vmap, vm_entry);
+			error = 0;
+			vm_no_fault = (vmap->vm_ops->fault == NULL);
+		}
+		rw_wunlock(&linux_vma_lock);
 
-		*object = cdev_pager_allocate(vm_private_data, OBJT_MGTDEVICE,
-		    &linux_cdev_pager_ops, size, nprot, *offset, curthread->td_ucred);
-
-		if (*object == NULL) {
-			linux_cdev_handle_remove(vmap);
+		if (error != 0) {
+			/* free allocated VM area struct */
 			linux_cdev_handle_free(vmap);
+			/* check for stale VM area struct */
+			if (error != EEXIST)
+				return (error);
+		}
+
+		/* check if there is no fault handler */
+		if (vm_no_fault) {
+			*object = cdev_pager_allocate(vm_private_data, OBJT_DEVICE,
+			    &linux_cdev_pager_ops[1], size, nprot, *offset,
+			    curthread->td_ucred);
+		} else {
+			*object = cdev_pager_allocate(vm_private_data, OBJT_MGTDEVICE,
+			    &linux_cdev_pager_ops[0], size, nprot, *offset,
+			    curthread->td_ucred);
+		}
+
+		/* check if allocating the VM object failed */
+		if (*object == NULL) {
+			if (error == 0) {
+				/* remove VM area struct from list */
+				linux_cdev_handle_remove(vmap);
+				/* free allocated VM area struct */
+				linux_cdev_handle_free(vmap);
+			}
 			return (EINVAL);
 		}
 	} else {
 		struct sglist *sg;
 
 		sg = sglist_alloc(1, M_WAITOK);
-		sglist_append_phys(sg, (vm_paddr_t)vmap->vm_pfn << PAGE_SHIFT, vmap->vm_len);
+		sglist_append_phys(sg,
+		    (vm_paddr_t)vmap->vm_pfn << PAGE_SHIFT, vmap->vm_len);
 
 		*object = vm_pager_allocate(OBJT_SG, sg, vmap->vm_len,
 		    nprot, 0, curthread->td_ucred);
@@ -1273,10 +1450,9 @@ linux_file_poll(struct file *file, int events, struct ucred *active_cred,
 	filp = (struct linux_file *)file->f_data;
 	filp->f_flags = file->f_flag;
 	linux_set_current(td);
-	if (filp->f_op->poll != NULL) {
-		selrecord(td, &filp->f_selinfo);
-		revents = filp->f_op->poll(filp, NULL) & events;
-	} else
+	if (filp->f_op->poll != NULL)
+		revents = filp->f_op->poll(filp, LINUX_POLL_TABLE_NORMAL) & events;
+	else
 		revents = 0;
 
 	return (revents);
@@ -1291,6 +1467,7 @@ linux_file_close(struct file *file, struct thread *td)
 	filp = (struct linux_file *)file->f_data;
 	filp->f_flags = file->f_flag;
 	linux_set_current(td);
+	linux_poll_wait_dequeue(filp);
 	error = -filp->f_op->release(NULL, filp);
 	funsetown(&filp->f_sigio);
 	kfree(filp);
@@ -1348,6 +1525,21 @@ linux_file_fill_kinfo(struct file *fp, struct kinfo_file *kif,
 {
 
 	return (0);
+}
+
+unsigned int
+linux_iminor(struct inode *inode)
+{
+	struct linux_cdev *ldev;
+
+	if (inode == NULL || inode->v_rdev == NULL ||
+	    inode->v_rdev->si_devsw != &linuxcdevsw)
+		return (-1U);
+	ldev = inode->v_rdev->si_drv1;
+	if (ldev == NULL)
+		return (-1U);
+
+	return (minor(ldev->dev));
 }
 
 struct fileops linuxfileops = {
@@ -1516,7 +1708,7 @@ linux_timer_callback_wrapper(void *context)
 }
 
 void
-mod_timer(struct timer_list *timer, unsigned long expires)
+mod_timer(struct timer_list *timer, int expires)
 {
 
 	timer->expires = expires;
@@ -1578,10 +1770,10 @@ linux_complete_common(struct completion *c, int all)
 /*
  * Indefinite wait for done != 0 with or without signals.
  */
-long
+int
 linux_wait_for_common(struct completion *c, int flags)
 {
-	long error;
+	int error;
 
 	if (SCHEDULER_STOPPED())
 		return (0);
@@ -1618,10 +1810,11 @@ intr:
 /*
  * Time limited wait for done != 0 with or without signals.
  */
-long
-linux_wait_for_timeout_common(struct completion *c, long timeout, int flags)
+int
+linux_wait_for_timeout_common(struct completion *c, int timeout, int flags)
 {
-	long end = jiffies + timeout, error;
+	int end = jiffies + timeout;
+	int error;
 	int ret;
 
 	if (SCHEDULER_STOPPED())
@@ -1908,13 +2101,13 @@ linux_in_atomic(void)
 struct linux_cdev *
 linux_find_cdev(const char *name, unsigned major, unsigned minor)
 {
-	int unit = MKDEV(major, minor);
+	dev_t dev = MKDEV(major, minor);
 	struct cdev *cdev;
 
 	dev_lock();
 	LIST_FOREACH(cdev, &linuxcdevsw.d_devs, si_list) {
 		struct linux_cdev *ldev = cdev->si_drv1;
-		if (dev2unit(cdev) == unit &&
+		if (ldev->dev == dev &&
 		    strcmp(kobject_name(&ldev->kobj), name) == 0) {
 			break;
 		}

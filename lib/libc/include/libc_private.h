@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1998 John Birrell <jb@cimlogic.com.au>.
  * All rights reserved.
  *
@@ -414,6 +416,11 @@ void __libc_map_stacks_exec(void);
 
 void	_pthread_cancel_enter(int);
 void	_pthread_cancel_leave(int);
+
+struct _pthread_cleanup_info;
+void	___pthread_cleanup_push_imp(void (*)(void *), void *,
+	    struct _pthread_cleanup_info *);
+void	___pthread_cleanup_pop_imp(int);
 
 void __throw_constraint_handler_s(const char * restrict msg, int error);
 

@@ -27,6 +27,7 @@ LDIRS=	BSD_daemon \
 	ipfw \
 	jails \
 	kld \
+	ldapd \
 	libvgl \
 	mdoc \
 	netgraph \
@@ -67,7 +68,6 @@ XFILES=	BSD_daemon/FreeBSD.pfa \
 	drivers/make_pseudo_driver.sh \
 	etc/README.examples \
 	etc/bsd-style-copyright \
-	etc/make.conf \
 	find_interface/Makefile \
 	find_interface/README \
 	find_interface/find_interface.c \
@@ -102,6 +102,7 @@ XFILES=	BSD_daemon/FreeBSD.pfa \
 	kld/syscall/module/syscall.c \
 	kld/syscall/test/Makefile \
 	kld/syscall/test/call.c \
+	ldapd/ldapd.conf \
 	libvgl/Makefile \
 	libvgl/demo.c \
 	mdoc/POSIX-copyright \
@@ -136,7 +137,6 @@ XFILES=	BSD_daemon/FreeBSD.pfa \
 	ppp/ppp.secret.sample \
 	ppp/ppp.secret.span-isp \
 	ppp/ppp.secret.span-isp.working \
-	printing/README \
 	printing/diablo-if-net \
 	printing/hpdf \
 	printing/hpif \
@@ -266,9 +266,8 @@ SUBDIR+=pf
 .endif
 .endif
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=tests
-.endif
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 SUBDIR_PARALLEL=
 

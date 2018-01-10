@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2001 Julian Elischer <julian@freebsd.org>.
  *  All rights reserved.
  *
@@ -146,6 +148,11 @@ struct	tidhashhead *tidhashtbl;
 u_long	tidhash;
 struct	rwlock tidhash_lock;
 
+EVENTHANDLER_LIST_DEFINE(thread_ctor);
+EVENTHANDLER_LIST_DEFINE(thread_dtor);
+EVENTHANDLER_LIST_DEFINE(thread_init);
+EVENTHANDLER_LIST_DEFINE(thread_fini);
+
 static lwpid_t
 tid_alloc(void)
 {
@@ -203,7 +210,7 @@ thread_ctor(void *mem, int size, void *arg, int flags)
 	 */
 	td->td_critnest = 1;
 	td->td_lend_user_pri = PRI_MAX;
-	EVENTHANDLER_INVOKE(thread_ctor, td);
+	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
 #ifdef AUDIT
 	audit_thread_alloc(td);
 #endif
@@ -249,7 +256,7 @@ thread_dtor(void *mem, int size, void *arg)
 	td_softdep_cleanup(td);
 	MPASS(td->td_su == NULL);
 
-	EVENTHANDLER_INVOKE(thread_dtor, td);
+	EVENTHANDLER_DIRECT_INVOKE(thread_dtor, td);
 	tid_free(td->td_tid);
 }
 
@@ -266,7 +273,7 @@ thread_init(void *mem, int size, int flags)
 	td->td_sleepqueue = sleepq_alloc();
 	td->td_turnstile = turnstile_alloc();
 	td->td_rlqe = NULL;
-	EVENTHANDLER_INVOKE(thread_init, td);
+	EVENTHANDLER_DIRECT_INVOKE(thread_init, td);
 	umtx_thread_init(td);
 	td->td_kstack = 0;
 	td->td_sel = NULL;
@@ -282,7 +289,7 @@ thread_fini(void *mem, int size)
 	struct thread *td;
 
 	td = (struct thread *)mem;
-	EVENTHANDLER_INVOKE(thread_fini, td);
+	EVENTHANDLER_DIRECT_INVOKE(thread_fini, td);
 	rlqentry_free(td->td_rlqe);
 	turnstile_free(td->td_turnstile);
 	sleepq_free(td->td_sleepqueue);

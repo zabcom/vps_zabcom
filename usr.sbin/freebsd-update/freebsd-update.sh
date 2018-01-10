@@ -1,6 +1,8 @@
 #!/bin/sh
 
 #-
+# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+#
 # Copyright 2004-2007 Colin Percival
 # All rights reserved
 #
@@ -25,13 +27,14 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# $FreeBSD$
+# $FreeBSD: releng/9.1/usr.sbin/freebsd-update/freebsd-update.sh 226811 2011-10-26 20:01:43Z cperciva $
 
 #### Usage function -- called from command-line handling code.
 
 # Usage instructions.  Options not listed:
-# --debug	-- don't filter output from utilities
-# --no-stats	-- don't show progress statistics while fetching files
+# --debug		-- don't filter output from utilities
+# --non-interactive	-- run in non-interactive mode
+# --no-stats		-- don't show progress statistics while fetching files
 usage () {
 	cat <<EOF
 usage: `basename $0` [options] command ... [path]
@@ -94,6 +97,9 @@ CONFIGOPTIONS="KEYPRINT WORKDIR SERVERNAME MAILTO ALLOWADD ALLOWDELETE
     KEEPMODIFIEDMETADATA COMPONENTS IGNOREPATHS UPDATEIFUNMODIFIED
     BASEDIR VERBOSELEVEL TARGETRELEASE STRICTCOMPONENTS MERGECHANGES
     IDSIGNOREPATHS BACKUPKERNEL BACKUPKERNELDIR BACKUPKERNELSYMBOLFILES"
+
+# Set to force updates on specific files that we don't want changed
+FORCEUPDATES="/etc/rc.conf.pcbsd /etc/rc /boot/loader.conf.pcbsd"
 
 # Set all the configuration options to "".
 nullconfig () {
@@ -418,6 +424,9 @@ init_params () {
 
 	# Run without a TTY
 	NOTTYOK=0
+
+	# Fetched first in a chain of commands
+	ISFETCHED=0
 }
 
 # Parse the command line
@@ -468,6 +477,10 @@ parse_cmdline () {
 		-v)
 			if [ $# -eq 1 ]; then usage; fi; shift
 			config_VerboseLevel $1 || usage
+			;;
+
+		--non-interactive)
+			NON_INTERACTIVE=yes
 			;;
 
 		# Aliases for "-v debug" and "-v nostats"
@@ -655,6 +668,8 @@ fetchupgrade_check_params () {
 
 	# Figure out what directory contains the running kernel
 	BOOTFILE=`sysctl -n kern.bootfile`
+	# KPM - 07-18-2013 - If we boot from GRUB kern.bootfile may not be accurate
+	if [ "$BOOTFILE" = "/kernel" ] ; then BOOTFILE="/boot/kernel/kernel"; fi
 	KERNELDIR=${BOOTFILE%/kernel}
 	if ! [ -d ${KERNELDIR} ]; then
 		echo "Cannot identify running kernel"
@@ -783,8 +798,10 @@ install_check_params () {
 	# Check that we have updates ready to install
 	if ! [ -L ${BDHASH}-install ]; then
 		echo "No updates are available to install."
-		echo "Run '$0 fetch' first."
-		exit 1
+		if [ $ISFETCHED -eq 0 ]; then
+			echo "Run '$0 fetch' first."
+		fi
+		exit 0
 	fi
 	if ! [ -f ${BDHASH}-install/INDEX-OLD ] ||
 	    ! [ -f ${BDHASH}-install/INDEX-NEW ]; then
@@ -795,6 +812,8 @@ install_check_params () {
 
 	# Figure out what directory contains the running kernel
 	BOOTFILE=`sysctl -n kern.bootfile`
+	# KPM - 07-18-2013 - If we boot from GRUB kern.bootfile may not be accurate
+	if [ "$BOOTFILE" = "/kernel" ] ; then BOOTFILE="/boot/kernel/kernel"; fi
 	KERNELDIR=${BOOTFILE%/kernel}
 	if ! [ -d ${KERNELDIR} ]; then
 		echo "Cannot identify running kernel"
@@ -889,6 +908,8 @@ IDS_check_params () {
 
 	# Figure out what directory contains the running kernel
 	BOOTFILE=`sysctl -n kern.bootfile`
+	# KPM - 07-18-2013 - If we boot from GRUB kern.bootfile may not be accurate
+	if [ "$BOOTFILE" = "/kernel" ] ; then BOOTFILE="/boot/kernel/kernel"; fi
 	KERNELDIR=${BOOTFILE%/kernel}
 	if ! [ -d ${KERNELDIR} ]; then
 		echo "Cannot identify running kernel"
@@ -1047,7 +1068,7 @@ fetch_make_patchlist () {
 				continue
 			fi
 			echo "${X}|${Y}"
-		done | uniq
+		done | sort -u
 }
 
 # Print user-friendly progress statistics
@@ -1066,6 +1087,7 @@ fetch_progress () {
 
 # Function for asking the user if everything is ok
 continuep () {
+ 	if [ "$NON_INTERACTIVE" = "yes" ] ; then return; fi
 	while read -p "Does this look reasonable (y/n)? " CONTINUE; do
 		case "${CONTINUE}" in
 		y*)
@@ -1615,6 +1637,26 @@ fetch_filter_unmodified_notpresent () {
 	    cut -f 1,2,7 -d '|' |
 	    fgrep '|-|' >> mlines
 
+	# Any files which have already been removed from system can be removed
+        # from mlines as well
+	if [ "$4" != "/dev/null" ] ; then
+		while read f
+		do
+			file=`echo $f | cut -f 1 -d '|'`
+			if [ -e "$file" ] ; then
+				echo "$file" > mlines.tmp
+			fi
+		done < mlines
+		mv mlines.tmp mlines 2>/dev/null
+	fi
+
+	# If we have items to force updates on, remove from mlines
+	for fUp in $FORCEUPDATES
+	do
+		grep -v "^${fUp}|f|" mlines > mlines.tmp
+		mv mlines.tmp mlines 2>/dev/null
+	done
+
 	# Remove lines from $1, $2, and $3
 	for X in $1 $2 $3; do
 		sort -t '|' -k 1,1 ${X} > ${X}.tmp
@@ -1724,6 +1766,24 @@ fetch_filter_uptodate () {
 
 	mv $1.tmp $1
 	mv $2.tmp $2
+
+	# KPM 8-2-2013
+	# Kludge work-around, check lines in $1 again
+	# strip out matches in $2 with grep -v
+	# This fixes an issue with hard-linked files which may be missing
+	# field | 8
+	while read line
+	do
+	   cat $2 | grep -q -F "${line}"
+	   if [ $? -eq 0 ] ; then
+	        cat $2 | grep -v -F "${line}" > $2.tmp
+	   	mv $2.tmp $2
+		touch $1.tmp
+	   else
+		echo $line >> $1.tmp
+	   fi
+	done < $1
+	if [ -e "$1.tmp" ]; then mv $1.tmp $1; fi
 }
 
 # Fetch any "clean" old versions of files we need for merging changes.
@@ -2403,6 +2463,15 @@ upgrade_merge () {
 				continue
 			fi
 
+			if [ "$NON_INTERACTIVE" = "yes" ] ; then
+				cat <<-EOF
+The following file could not be merged automatically: ${F}
+Defaulting to the old copy.
+				EOF
+				cp merge/old/${F} merge/new/${F}
+				continue
+			fi
+
 			cat <<-EOF
 
 The following file could not be merged automatically: ${F}
@@ -2439,8 +2508,12 @@ manually...
 The following file will be removed, as it no longer exists in
 FreeBSD ${RELNUM}: ${F}
 				EOF
-				continuep < /dev/tty || return 1
-				continue
+				if [ "$NON_INTERACTIVE" = "yes" ] ; then
+					continue
+				else
+					continuep < /dev/tty || return 1
+					continue
+				fi
 			fi
 
 			# Print changes for the user's approval.
@@ -2451,7 +2524,11 @@ FreeBSD ${RELNUM} have been merged into ${F}:
 EOF
 			diff -U 5 -L "current version" -L "new version"	\
 			    merge/old/${F} merge/new/${F} || true
-			continuep < /dev/tty || return 1
+			if [ "$NON_INTERACTIVE" = "yes" ] ; then
+				continue
+			else
+				continuep < /dev/tty || return 1
+			fi
 		done < $1-paths
 
 		# Store merged files.
@@ -2848,6 +2925,9 @@ install_files () {
 		# Do we need to ask for a reboot now?
 		if [ -f $1/kernelfirst ] &&
 		    [ -s INDEX-OLD -o -s INDEX-NEW ]; then
+			if [ "$NON_INTERACTIVE" = "yes" ] ; then
+				touch /var/.freebsd-update-finish
+			fi
 			cat <<-EOF
 
 Kernel updates have been installed.  Please reboot and run
@@ -3241,6 +3321,7 @@ cmd_fetch () {
 	fi
 	fetch_check_params
 	fetch_run || exit 1
+	ISFETCHED=1
 }
 
 # Cron command.  Make sure the parameters are sensible; wait
@@ -3299,6 +3380,12 @@ fi
 export LC_ALL=C
 
 get_params $@
+
+# Set PAGER to /bin/cat if non-interactive
+if [ "$NON_INTERACTIVE" = "yes" ] ; then
+	PAGER=/bin/cat
+fi
+
 for COMMAND in ${COMMANDS}; do
 	cmd_${COMMAND}
 done

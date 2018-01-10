@@ -21,6 +21,7 @@ SUBDIR=	adduser \
 	dconschat \
 	devctl \
 	devinfo \
+	devmatch \
 	digictl \
 	diskinfo \
 	dumpcis \
@@ -60,8 +61,8 @@ SUBDIR=	adduser \
 	nologin \
 	pciconf \
 	periodic \
+	pkg_sanity \
 	powerd \
-	procctl \
 	prometheus_sysctl_exporter \
 	pstat \
 	pw \
@@ -74,7 +75,7 @@ SUBDIR=	adduser \
 	rpc.statd \
 	rpc.umntall \
 	rtprio \
-	service \
+	rwhod \
 	services_mkdb \
 	sesutil \
 	setfib \
@@ -115,10 +116,8 @@ SUBDIR.${MK_AUDIT}+=	auditreduce
 SUBDIR.${MK_AUDIT}+=	praudit
 SUBDIR.${MK_AUTHPF}+=	authpf
 SUBDIR.${MK_AUTOFS}+=	autofs
-.if ${MK_BLACKLIST} != "no"
 SUBDIR.${MK_BLACKLIST}+=	blacklistctl
 SUBDIR.${MK_BLACKLIST}+=	blacklistd
-.endif
 SUBDIR.${MK_BLUETOOTH}+=	bluetooth
 SUBDIR.${MK_BOOTPARAMD}+=	bootparamd
 SUBDIR.${MK_BSDINSTALL}+=	bsdinstall
@@ -126,7 +125,7 @@ SUBDIR.${MK_BSNMP}+=	bsnmpd
 SUBDIR.${MK_CTM}+=	ctm
 SUBDIR.${MK_CXGBETOOL}+=	cxgbetool
 SUBDIR.${MK_DIALOG}+=	bsdconfig
-SUBDIR.${MK_EFI}+=	efivar efidp
+SUBDIR.${MK_EFI}+=	efivar efidp efibootmgr
 SUBDIR.${MK_FLOPPY}+=	fdcontrol
 SUBDIR.${MK_FLOPPY}+=	fdformat
 SUBDIR.${MK_FLOPPY}+=	fdread
@@ -149,7 +148,10 @@ SUBDIR.${MK_INETD}+=	inetd
 SUBDIR.${MK_IPFW}+=	ipfwpcap
 SUBDIR.${MK_ISCSI}+=	iscsid
 SUBDIR.${MK_JAIL}+=	jail
+SUBDIR.${MK_JAIL}+=	jbootstrap
+SUBDIR.${MK_JAIL}+=	jdestroy
 SUBDIR.${MK_JAIL}+=	jexec
+SUBDIR.${MK_JAIL}+=	jinit
 SUBDIR.${MK_JAIL}+=	jls
 # XXX MK_SYSCONS
 SUBDIR.${MK_LEGACY_CONSOLE}+=	kbdcontrol
@@ -192,7 +194,6 @@ SUBDIR.${MK_PPP}+=	ppp
 SUBDIR.${MK_QUOTAS}+=	edquota
 SUBDIR.${MK_QUOTAS}+=	quotaon
 SUBDIR.${MK_QUOTAS}+=	repquota
-SUBDIR.${MK_RCMDS}+=	rwhod
 SUBDIR.${MK_SENDMAIL}+=	editmap
 SUBDIR.${MK_SENDMAIL}+=	mailstats
 SUBDIR.${MK_SENDMAIL}+=	makemap
@@ -218,8 +219,6 @@ SUBDIR.${MK_WIRELESS}+=	wpa
 SUBDIR.${MK_TESTS}+=	tests
 
 .include <bsd.arch.inc.mk>
-
-SUBDIR:=	${SUBDIR:O}
 
 SUBDIR_PARALLEL=
 

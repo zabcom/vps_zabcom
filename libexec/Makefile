@@ -15,6 +15,7 @@ SUBDIR=	${_atf} \
 	${_pppoed} \
 	revnetgroup \
 	${_rlogind} \
+	rc \
 	rpc.rquotad \
 	rpc.rstatd \
 	rpc.rusersd \
@@ -77,11 +78,6 @@ _rtld-elf=	rtld-elf
 
 .if ${MK_RBOOTD} != "no"
 SUBDIR+=	rbootd
-.endif
-
-.if ${MK_RCMDS} != "no"
-_rlogind=	rlogind
-_rshd=		rshd
 .endif
 
 .if ${MK_SENDMAIL} != "no"

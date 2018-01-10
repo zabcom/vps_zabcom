@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -54,11 +56,11 @@
  *
  * scheme is:  <major><two digit minor>Rxx
  *		'R' is in the range 0 to 4 if this is a release branch or
- *		x.0-CURRENT before RELENG_*_0 is created, otherwise 'R' is
+ *		X.0-CURRENT before releng/X.0 is created, otherwise 'R' is
  *		in the range 5 to 9.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1200036	/* Master, propagated to newvers */
+#define __FreeBSD_version 1200054	/* Master, propagated to newvers */
 
 /*
  * __FreeBSD_kernel__ indicates that this system uses the kernel of FreeBSD,
@@ -83,6 +85,9 @@
 #define	P_OSREL_MAP_FSTRICT		1100036
 #define	P_OSREL_SHUTDOWN_ENOTCONN	1100077
 #define	P_OSREL_MAP_GUARD		1200035
+#define	P_OSREL_WRFSBASE		1200041
+#define	P_OSREL_CK_CYLGRP		1200046
+#define	P_OSREL_VMTOTAL64		1200054
 
 #define	P_OSREL_MAJOR(x)		((x) / 100000)
 #endif
@@ -316,7 +321,6 @@ __END_DECLS
 #endif
 #endif
 
-#ifndef lint
 #ifndef _BYTEORDER_FUNC_DEFINED
 #define	_BYTEORDER_FUNC_DEFINED
 #define	htonl(x)	__htonl(x)
@@ -324,7 +328,6 @@ __END_DECLS
 #define	ntohl(x)	__ntohl(x)
 #define	ntohs(x)	__ntohs(x)
 #endif /* !_BYTEORDER_FUNC_DEFINED */
-#endif /* lint */
 #endif /* _KERNEL */
 
 /*

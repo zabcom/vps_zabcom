@@ -21,10 +21,9 @@ stripdirs="generate libraries parsers preprocessor tests tools"
 stripfiles="Makefile README accygwin.h acdragonfly.h acdragonflyex.h	\
 	acefi.h acefiex.h achaiku.h acintel.h aclinux.h aclinuxex.h	\
 	acmacosx.h acmsvc.h acmsvcex.h acnetbsd.h acos2.h acqnx.h	\
-	acwin.h acwin64.h acwinex.h dspkginit.c new_table.txt		\
-	osbsdtbl.c osefitbl.c osefixf.c osfreebsdtbl.c oslinuxtbl.c	\
-	osunixdir.c osunixmap.c oswindir.c oswintbl.c oswinxf.c		\
-	readme.txt utclib.c utprint.c"
+	acwin.h acwin64.h acwinex.h new_table.txt osbsdtbl.c osefitbl.c	\
+	osefixf.c osfreebsdtbl.c oslinuxtbl.c osunixdir.c osunixmap.c	\
+	oswindir.c oswintbl.c oswinxf.c readme.txt utclib.c utprint.c"
 
 # include files to canonify
 src_headers="acapps.h acbuffer.h acclib.h accommon.h acconfig.h		\
@@ -91,4 +90,4 @@ echo "Directories you may want to 'svn diff':"
 echo "    sys/contrib/dev/acpica sys/dev/acpica \\"
 echo "    sys/amd64/acpica sys/arm64/acpica sys/i386/acpica sys/x86/acpica \\"
 echo "    sys/amd64/include sys/arm64/include sys/i386/include include \\"
-echo "    sys/boot sys/conf sys/modules/acpi usr.sbin/acpi"
+echo "    stand sys/conf sys/modules/acpi usr.sbin/acpi"

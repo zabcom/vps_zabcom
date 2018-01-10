@@ -29,6 +29,7 @@ SUBDIR= cat \
 	ps \
 	pwait \
 	pwd \
+	rc-status \
 	realpath \
 	rm \
 	rmdir \
@@ -40,14 +41,11 @@ SUBDIR= cat \
 	test \
 	uuidgen
 
-SUBDIR.${MK_RCMDS}+=	rcp
 SUBDIR.${MK_SENDMAIL}+=	rmail
 SUBDIR.${MK_TCSH}+=	csh
 SUBDIR.${MK_TESTS}+=	tests
 
 .include <bsd.arch.inc.mk>
-
-SUBDIR:=	${SUBDIR:O}
 
 SUBDIR_PARALLEL=
 

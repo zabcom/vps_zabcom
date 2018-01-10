@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012-2014 Baptiste Daroussin <bapt@FreeBSD.org>
  * Copyright (c) 2013 Bryan Drewery <bdrewery@FreeBSD.org>
  * All rights reserved.
@@ -1101,6 +1103,9 @@ main(int argc, char *argv[])
 		printf("pkg already bootstrapped at %s\n", pkgpath);
 		exit(EXIT_SUCCESS);
 	}
+
+	/* Replace call to pkg with our sanity rolling-release check */
+	snprintf(pkgpath, MAXPATHLEN, "/usr/sbin/pkg_sanity");
 
 	execv(pkgpath, argv);
 

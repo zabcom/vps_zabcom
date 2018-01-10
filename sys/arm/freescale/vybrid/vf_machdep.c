@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
@@ -83,4 +85,4 @@ static platform_method_t vf_methods[] = {
 	PLATFORMMETHOD_END,
 };
 
-FDT_PLATFORM_DEF(vf, "vybrid", 0, "freescale,vybrid", 0);
+FDT_PLATFORM_DEF(vf, "vybrid", 0, "freescale,vybrid", 200);

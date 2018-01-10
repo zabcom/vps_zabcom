@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2001 Doug Rabson
  * All rights reserved.
  *
@@ -43,12 +45,12 @@
 	do { (dst).fld = PTROUT((src).fld); } while (0)
 
 /*
- * Being a newer port, 32-bit FreeBSD/MIPS uses 64-bit time_t.
+ * i386 is the only arch with a 32-bit time_t
  */
-#if defined (__mips__) || defined(__powerpc__)
-typedef	int64_t	time32_t;
-#else
+#ifdef __amd64__
 typedef	int32_t	time32_t;
+#else
+typedef	int64_t	time32_t;
 #endif
 
 struct timeval32 {
@@ -76,6 +78,15 @@ struct itimerspec32 {
 #define ITS_CP(src, dst) do {			\
 	TS_CP((src), (dst), it_interval);	\
 	TS_CP((src), (dst), it_value);		\
+} while (0)
+
+struct bintime32 {
+	time32_t sec;
+	uint32_t frac[2];
+};
+#define BT_CP(src, dst, fld) do {				\
+	CP((src).fld, (dst).fld, sec);				\
+	*(uint64_t *)&(dst).fld.frac[0] = (src).fld.frac;	\
 } while (0)
 
 struct rusage32 {
@@ -134,16 +145,6 @@ struct statfs32 {
 	char	f_mntfromname[FREEBSD4_MNAMELEN];
 	int16_t	f_spares2 __packed;
 	int32_t f_spare[2];
-};
-
-struct kevent32 {
-	uint32_t	ident;		/* identifier for this event */
-	short		filter;		/* filter for event */
-	u_short		flags;
-	u_int		fflags;
-	int32_t		data1, data2;
-	uint32_t	udata;		/* opaque user data identifier */
-	uint32_t	ext64[8];
 };
 
 struct iovec32 {

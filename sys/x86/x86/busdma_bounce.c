@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1997, 1998 Justin T. Gibbs.
  * All rights reserved.
  *
@@ -262,6 +264,8 @@ bounce_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 	struct bounce_zone *bz;
 	int error, maxpages, pages;
 
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, "%s", __func__);
+
 	error = 0;
 
 	if (dmat->segments == NULL) {
@@ -370,6 +374,8 @@ bounce_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 {
 	vm_memattr_t attr;
 	int mflags;
+
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, "%s", __func__);
 
 	if (flags & BUS_DMA_NOWAIT)
 		mflags = M_NOWAIT;

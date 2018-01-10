@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (C) 2013-2014 Universita` di Pisa. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -671,7 +673,7 @@ nm_os_pt_memdev_iomap(struct ptnetmap_memdev *ptn_dev, vm_paddr_t *nm_paddr,
 			&rid, 0, ~0, *mem_size, RF_ACTIVE);
 	if (ptn_dev->pci_mem == NULL) {
 		*nm_paddr = 0;
-		*nm_addr = 0;
+		*nm_addr = NULL;
 		return ENOMEM;
 	}
 

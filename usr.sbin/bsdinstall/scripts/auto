@@ -319,7 +319,7 @@ if [ ! -z "$FETCH_DISTRIBUTIONS" ]; then
 		export DISTRIBUTIONS="$FETCH_DISTRIBUTIONS"
 		export BSDINSTALL_DISTDIR="$BSDINSTALL_FETCHDEST"
 	fi
-		
+
 	export FTP_PASSIVE_MODE=YES
 	# Iterate through the distribution list and set a flag if debugging
 	# distributions have been selected.
@@ -377,6 +377,10 @@ fi
 
 bsdinstall checksum || error "Distribution checksum failed"
 bsdinstall distextract || error "Distribution extract failed"
+
+# Set up boot loader
+bsdinstall bootconfig || error "Failed to configure bootloader"
+
 bsdinstall rootpass || error "Could not set root password"
 
 trap true SIGINT	# This section is optional
@@ -413,7 +417,7 @@ finalconfig() {
 		finalconfig
 		;;
 	"Root Password")
-		bsdinstall rootpass 
+		bsdinstall rootpass
 		finalconfig
 		;;
 	"Hostname")

@@ -10,8 +10,10 @@ SUBDIR+=libssh
 .endif
 .endif
 
-.if ${MK_TESTS} != "no"
-SUBDIR+=tests
+.if ${MK_LIBRESSL} != "no"
+SUBDIR+=libtls
 .endif
+
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.subdir.mk>

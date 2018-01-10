@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2011 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -59,9 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
-#ifdef MULTIDELAY
 #include <machine/machdep.h> /* For arm_set_delay */
-#endif
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus.h>
@@ -353,7 +353,7 @@ attach_et(struct arm_tmr_softc *sc)
 	sc->et.et_flags = ET_FLAGS_PERIODIC | ET_FLAGS_ONESHOT | ET_FLAGS_PERCPU;
 	sc->et.et_quality = 1000;
 	sc->et.et_frequency = sc->clkfreq;
-	sc->et.et_min_period = 20 * SBT_1NS;
+	sc->et.et_min_period = nstosbt(20);
 	sc->et.et_max_period =  2 * SBT_1S;
 	sc->et.et_start = arm_tmr_start;
 	sc->et.et_stop = arm_tmr_stop;
@@ -438,7 +438,7 @@ arm_tmr_attach(device_t dev)
 		return (ENXIO);
 	}
 
-#ifdef MULTIDELAY
+#ifdef PLATFORM
 	/*
 	 * We can register as the DELAY() implementation only if we successfully
 	 * set up the global timer.
@@ -529,7 +529,7 @@ arm_tmr_delay(int usec, void *arg)
 	}
 }
 
-#ifndef MULTIDELAY
+#ifndef PLATFORM
 /**
  *	DELAY - Delay for at least usec microseconds.
  *	@usec: number of microseconds to delay by
@@ -547,6 +547,7 @@ DELAY(int usec)
 	struct arm_tmr_softc *sc;
 	int32_t counts;
 
+	TSENTER();
 	/* Check the timers are setup, if not just use a for loop for the meantime */
 	if (arm_tmr_tc == NULL || arm_tmr_timecount.tc_frequency == 0) {
 		for (; usec > 0; usec--)
@@ -558,5 +559,6 @@ DELAY(int usec)
 		sc = arm_tmr_tc->tc_priv;
 		arm_tmr_delay(usec, sc);
 	}
+	TSEXIT();
 }
 #endif

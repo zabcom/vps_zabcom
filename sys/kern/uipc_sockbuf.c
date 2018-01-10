@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1982, 1986, 1988, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -322,7 +324,7 @@ sowakeup(struct socket *so, struct sockbuf *sb)
 		wakeup(&sb->sb_acc);
 	}
 	KNOTE_LOCKED(&sb->sb_sel->si_note, 0);
-	if (sb->sb_upcall != NULL && !(so->so_state & SS_ISDISCONNECTED)) {
+	if (sb->sb_upcall != NULL) {
 		ret = sb->sb_upcall(so, sb->sb_upcallarg, M_NOWAIT);
 		if (ret == SU_ISCONNECTED) {
 			KASSERT(sb == &so->so_rcv,

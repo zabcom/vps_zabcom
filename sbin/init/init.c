@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -107,6 +109,7 @@ static void disaster(int);
 static void badsys(int);
 static void revoke_ttys(void);
 static int  runshutdown(void);
+static int  runupdate(void);
 static char *strk(char *);
 
 /*
@@ -305,12 +308,12 @@ invalid:
 	handle(disaster, SIGABRT, SIGFPE, SIGILL, SIGSEGV, SIGBUS, SIGXCPU,
 	    SIGXFSZ, 0);
 	handle(transition_handler, SIGHUP, SIGINT, SIGEMT, SIGTERM, SIGTSTP,
-	    SIGUSR1, SIGUSR2, 0);
+	    SIGUSR1, SIGUSR2, SIGWINCH, 0);
 	handle(alrm_handler, SIGALRM, 0);
 	sigfillset(&mask);
 	delset(&mask, SIGABRT, SIGFPE, SIGILL, SIGSEGV, SIGBUS, SIGSYS,
 	    SIGXCPU, SIGXFSZ, SIGHUP, SIGINT, SIGEMT, SIGTERM, SIGTSTP,
-	    SIGALRM, SIGUSR1, SIGUSR2, 0);
+	    SIGALRM, SIGUSR1, SIGUSR2, SIGWINCH, 0);
 	sigprocmask(SIG_SETMASK, &mask, (sigset_t *) 0);
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = 0;
@@ -770,6 +773,9 @@ reroot(void)
 	revoke_ttys();
 	runshutdown();
 
+	/* Check for any system updates and run if so */
+	runupdate();
+
 	/*
 	 * Make sure nobody can interfere with our scheme.
 	 * Ignore ESRCH, which can apparently happen when
@@ -919,7 +925,7 @@ single_user(void)
 					_exit(0);
 				password = crypt(clear, pp->pw_passwd);
 				bzero(clear, _PASSWORD_LEN);
-				if (password == NULL ||
+				if (password != NULL &&
 				    strcmp(password, pp->pw_passwd) == 0)
 					break;
 				warning("single-user login failed\n");
@@ -1271,8 +1277,8 @@ new_session(session_t *sprev, struct ttyent *typ)
 
 	sp->se_flags |= SE_PRESENT;
 
-	sp->se_device = malloc(sizeof(_PATH_DEV) + strlen(typ->ty_name));
-	sprintf(sp->se_device, "%s%s", _PATH_DEV, typ->ty_name);
+	if (asprintf(&sp->se_device, "%s%s", _PATH_DEV, typ->ty_name) < 0)
+		err(1, "asprintf");
 
 	/*
 	 * Attempt to open the device, if we get "device not configured"
@@ -1315,8 +1321,8 @@ setupargv(session_t *sp, struct ttyent *typ)
 		free(sp->se_getty_argv_space);
 		free(sp->se_getty_argv);
 	}
-	sp->se_getty = malloc(strlen(typ->ty_getty) + strlen(typ->ty_name) + 2);
-	sprintf(sp->se_getty, "%s %s", typ->ty_getty, typ->ty_name);
+	if (asprintf(&sp->se_getty, "%s %s", typ->ty_getty, typ->ty_name) < 0)
+		err(1, "asprintf");
 	sp->se_getty_argv_space = strdup(sp->se_getty);
 	sp->se_getty_argv = construct_argv(sp->se_getty_argv_space);
 	if (sp->se_getty_argv == NULL) {
@@ -1429,7 +1435,7 @@ start_window_system(session_t *sp)
 	if (sp->se_type) {
 		/* Don't use malloc after fork */
 		strcpy(term, "TERM=");
-		strncat(term, sp->se_type, sizeof(term) - 6);
+		strlcat(term, sp->se_type, sizeof(term));
 		env[0] = term;
 		env[1] = 0;
 	}
@@ -1493,7 +1499,7 @@ start_getty(session_t *sp)
 	if (sp->se_type) {
 		/* Don't use malloc after fork */
 		strcpy(term, "TERM=");
-		strncat(term, sp->se_type, sizeof(term) - 6);
+		strlcat(term, sp->se_type, sizeof(term));
 		env[0] = term;
 		env[1] = 0;
 	} else
@@ -1557,8 +1563,9 @@ transition_handler(int sig)
 		    current_state == clean_ttys || current_state == catatonia)
 			requested_transition = clean_ttys;
 		break;
+	case SIGWINCH:
 	case SIGUSR2:
-		howto = RB_POWEROFF;
+		howto = sig == SIGUSR2 ? RB_POWEROFF : RB_POWERCYCLE;
 	case SIGUSR1:
 		howto |= RB_HALT;
 	case SIGINT:
@@ -1763,6 +1770,9 @@ death(void)
 	/* Try to run the rc.shutdown script within a period of time */
 	runshutdown();
 
+	/* Check for any system updates and run if so */
+	runupdate();
+
 	/* Unblock suspend if we blocked it. */
 	if (!blocked)
 		sysctlbyname("kern.suspend_blocked", NULL, NULL,
@@ -1922,6 +1932,121 @@ runshutdown(void)
 
 	/* Turn off the alarm */
 	alarm(0);
+
+	if (WIFSIGNALED(status) && WTERMSIG(status) == SIGTERM &&
+	    requested_transition == catatonia) {
+		/*
+		 * /etc/rc.shutdown executed /sbin/reboot;
+		 * wait for the end quietly
+		 */
+		sigset_t s;
+
+		sigfillset(&s);
+		for (;;)
+			sigsuspend(&s);
+	}
+
+	if (!WIFEXITED(status)) {
+		warning("%s on %s terminated abnormally, going to "
+		    "single user mode", shell, _PATH_RUNDOWN);
+		return -2;
+	}
+
+	if ((status = WEXITSTATUS(status)) != 0)
+		warning("%s returned status %d", _PATH_RUNDOWN, status);
+
+	return status;
+}
+
+/*
+ * Run the system update script
+ */
+static int
+runupdate(void)
+{
+	pid_t pid, wpid;
+	int status;
+	char *argv[4];
+	const char *shell;
+	struct sigaction sa;
+	struct stat sb;
+
+	/*
+	 * If there is no update trigger marked, we can safely end here
+	 */
+	if (stat(_PATH_UPDATE_TRIGGER, &sb) == -1 && errno == ENOENT)
+		return 0;
+
+	shell = get_shell();
+
+	if ((pid = fork()) == 0) {
+		sigemptyset(&sa.sa_mask);
+		sa.sa_flags = 0;
+		sa.sa_handler = SIG_IGN;
+		sigaction(SIGTSTP, &sa, (struct sigaction *)0);
+		sigaction(SIGHUP, &sa, (struct sigaction *)0);
+
+		open_console();
+
+		char _sh[]	= "sh";
+		char _douparg[]	= "doshutdownupdate";
+		char _path_update[] = _PATH_UPDATE_CMD;
+
+		argv[0] = _sh;
+		argv[1] = _path_update;
+		argv[2] = _douparg;
+		argv[3] = 0;
+
+		sigprocmask(SIG_SETMASK, &sa.sa_mask, (sigset_t *) 0);
+
+#ifdef LOGIN_CAP
+		setprocresources(RESOURCE_RC);
+#endif
+		execv(shell, argv);
+		warning("can't exec %s for %s: %m", shell, _PATH_UPDATE_CMD);
+		_exit(1);	/* force single user mode */
+	}
+
+	if (pid == -1) {
+		emergency("can't fork for %s on %s: %m", shell, _PATH_UPDATE_CMD);
+		while (waitpid(-1, (int *) 0, WNOHANG) > 0)
+			continue;
+		sleep(STALL_TIMEOUT);
+		return -1;
+	}
+
+	/* Turn off the alarm */
+	alarm(0);
+
+	clang = 0;
+	/*
+	 * Copied from single_user().  This is a bit paranoid.
+	 * Use the same ALRM handler.
+	 */
+	do {
+		if ((wpid = waitpid(-1, &status, WUNTRACED)) != -1)
+			collect_child(wpid);
+		if (clang == 1) {
+			/* we were waiting for the sub-shell */
+			kill(wpid, SIGTERM);
+			warning("timeout expired for %s on %s: %m; going to "
+			    "single user mode", shell, _PATH_RUNDOWN);
+			return -1;
+		}
+		if (wpid == -1) {
+			if (errno == EINTR)
+				continue;
+			warning("wait for %s on %s failed: %m; going to "
+			    "single user mode", shell, _PATH_RUNDOWN);
+			return -1;
+		}
+		if (wpid == pid && WIFSTOPPED(status)) {
+			warning("init: %s on %s stopped, restarting\n",
+				shell, _PATH_RUNDOWN);
+			kill(pid, SIGCONT);
+			wpid = -1;
+		}
+	} while (wpid != pid && !clang);
 
 	if (WIFSIGNALED(status) && WTERMSIG(status) == SIGTERM &&
 	    requested_transition == catatonia) {

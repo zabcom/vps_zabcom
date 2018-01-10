@@ -46,6 +46,7 @@ MAN=	aac.4 \
 	amdpm.4 \
 	${_amdsbwd.4} \
 	${_amdsmb.4} \
+	${_amdsmn.4} \
 	${_amdtemp.4} \
 	${_bxe.4} \
 	amr.4 \
@@ -69,6 +70,10 @@ MAN=	aac.4 \
 	audit.4 \
 	auditpipe.4 \
 	aue.4 \
+	${_aw_gpio.4} \
+	${_aw_mmc.4} \
+	${_aw_rtc.4} \
+	${_aw_sid.4} \
 	axe.4 \
 	axge.4 \
 	bce.4 \
@@ -77,7 +82,10 @@ MAN=	aac.4 \
 	bge.4 \
 	${_bhyve.4} \
 	bhnd.4 \
+	bhnd_chipc.4 \
+	bhnd_pmu.4 \
 	bhndb.4 \
+	bhndb_pci.4 \
 	bktr.4 \
 	blackhole.4 \
 	bnxt.4 \
@@ -141,6 +149,7 @@ MAN=	aac.4 \
 	edsc.4 \
 	ehci.4 \
 	em.4 \
+	ena.4 \
 	enc.4 \
 	epair.4 \
 	esp.4 \
@@ -251,6 +260,7 @@ MAN=	aac.4 \
 	led.4 \
 	lge.4 \
 	${_linux.4} \
+	liquidio.4 \
 	lm75.4 \
 	lmc.4 \
 	lo.4 \
@@ -372,8 +382,11 @@ MAN=	aac.4 \
 	ng_vlan.4 \
 	nmdm.4 \
 	nsp.4 \
-	${_ntb_hw.4} \
+	${_ntb.4} \
+	${_ntb_hw_intel.4} \
+	${_ntb_hw_plx.4} \
 	${_ntb_transport.4} \
+	${_nda.4} \
 	${_if_ntb.4} \
 	null.4 \
 	numa.4 \
@@ -561,6 +574,7 @@ MAN=	aac.4 \
 	wlan_tkip.4 \
 	wlan_wep.4 \
 	wlan_xauth.4 \
+	wmt.4 \
 	${_wpi.4} \
 	wsp.4 \
 	xe.4 \
@@ -596,7 +610,8 @@ MLINKS+=${_bxe.4} ${_if_bxe.4}
 MLINKS+=cas.4 if_cas.4
 MLINKS+=cdce.4 if_cdce.4
 MLINKS+=cfi.4 cfid.4
-MLINKS+=cloudabi.4 cloudabi64.4
+MLINKS+=cloudabi.4 cloudabi32.4 \
+	cloudabi.4 cloudabi64.4
 MLINKS+=crypto.4 cryptodev.4
 MLINKS+=cue.4 if_cue.4
 MLINKS+=cxgb.4 if_cxgb.4
@@ -684,7 +699,6 @@ MLINKS+=netintro.4 net.4 \
 	netintro.4 networking.4
 MLINKS+=${_nfe.4} ${_if_nfe.4}
 MLINKS+=nge.4 if_nge.4
-MLINKS+=${_ntb_hw.4} ${_ntb.4}
 MLINKS+=${_nxge.4} ${_if_nxge.4}
 MLINKS+=ow.4 onewire.4
 MLINKS+=pccbb.4 cbb.4
@@ -746,6 +760,13 @@ MLINKS+=xl.4 if_xl.4
 _armv8crypto.4=	armv8crypto.4
 .endif
 
+.if ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "aarch64"
+_aw_gpio.4=	aw_gpio.4
+_aw_mmc.4=	aw_mmc.4
+_aw_rtc.4=	aw_rtc.4
+_aw_sid.4=	aw_sid.4
+.endif
+
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 _acpi_asus.4=	acpi_asus.4
 _acpi_asus_wmi.4=	acpi_asus_wmi.4
@@ -766,6 +787,7 @@ _attimer.4=	attimer.4
 _aibs.4=	aibs.4
 _amdsbwd.4=	amdsbwd.4
 _amdsmb.4=	amdsmb.4
+_amdsmn.4=	amdsmn.4
 _amdtemp.4=	amdtemp.4
 _asmc.4=	asmc.4
 _bxe.4=		bxe.4
@@ -798,6 +820,7 @@ _if_wpi.4=	if_wpi.4
 _ipmi.4=	ipmi.4
 _io.4=		io.4
 _linux.4=	linux.4
+_nda.4=		nda.4
 _ndis.4=	ndis.4
 _nfe.4=		nfe.4
 _nfsmb.4=	nfsmb.4
@@ -832,7 +855,8 @@ _xnb.4=		xnb.4
 _if_ntb.4=	if_ntb.4
 _ioat.4=	ioat.4
 _ntb.4=		ntb.4
-_ntb_hw.4=	ntb_hw.4
+_ntb_hw_intel.4=	ntb_hw_intel.4
+_ntb_hw_plx.4=	ntb_hw_plx.4
 _ntb_transport.4=ntb_transport.4
 _qlxge.4=	qlxge.4
 _qlxgb.4=	qlxgb.4
@@ -886,6 +910,7 @@ MAN+=		iser.4
 
 .if ${MK_OFED} != "no"
 MAN+=		mlx4ib.4
+MAN+=		mlx5ib.4
 .endif
 
 .if ${MK_TESTS} != "no"

@@ -6,7 +6,6 @@
 # XXX MISSING:		icheck ncheck
 
 SUBDIR=adjkerntz \
-	badsect \
 	camcontrol \
 	clri \
 	comcontrol \
@@ -55,8 +54,12 @@ SUBDIR=adjkerntz \
 	newfs_msdos \
 	nfsiod \
 	nos-tun \
+	openrc \
+	openrc-run \
 	ping \
 	rcorder \
+	rc-service \
+	rc-update \
 	reboot \
 	recoverdisk \
 	resolvconf \
@@ -66,6 +69,8 @@ SUBDIR=adjkerntz \
 	setkey \
 	shutdown \
 	spppcontrol \
+	start-stop-daemon \
+	supervise-daemon \
 	swapon \
 	sysctl \
 	tunefs \
@@ -93,8 +98,6 @@ SUBDIR.${MK_ZFS}+=	zfsbootcfg
 SUBDIR.${MK_TESTS}+=	tests
 
 .include <bsd.arch.inc.mk>
-
-SUBDIR:=	${SUBDIR:O}
 
 SUBDIR_PARALLEL=
 

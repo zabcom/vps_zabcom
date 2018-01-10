@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -41,3 +43,5 @@
 #define	_PATH_RUNDOWN		"/etc/rc.shutdown"
 #define	_PATH_REROOT		"/dev/reroot"
 #define	_PATH_REROOT_INIT	_PATH_REROOT "/init"
+#define _PATH_UPDATE_TRIGGER	"/var/db/pc-updatemanager/shutdown-update-trigger"
+#define _PATH_UPDATE_CMD	"/usr/local/bin/pc-updatemanager"

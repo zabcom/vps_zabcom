@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2003-2007 Tim Kientzle
  * All rights reserved.
  *
@@ -240,6 +242,8 @@
 #define uintmax_t uint64_t
 #endif
 
+#define HAVE_LIBRESSL	1
+
 /* FreeBSD defines for archive_hash.h */
 #ifdef WITH_OPENSSL
 #define ARCHIVE_CRYPTO_MD5_OPENSSL 1
@@ -253,4 +257,7 @@
 #define ARCHIVE_CRYPTO_SHA1_LIBMD 1
 #define ARCHIVE_CRYPTO_SHA256_LIBMD 1
 #define ARCHIVE_CRYPTO_SHA512_LIBMD 1
+#endif
+#ifdef WITH_LIBRESSL
+#define HAVE_LIBRESSL 1
 #endif

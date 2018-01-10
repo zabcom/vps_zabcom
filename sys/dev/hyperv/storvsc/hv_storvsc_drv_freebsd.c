@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2009-2012,2016 Microsoft Corp.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2009-2012,2016-2017 Microsoft Corp.
  * Copyright (c) 2012 NetApp Inc.
  * Copyright (c) 2012 Citrix Inc.
  * All rights reserved.
@@ -62,7 +64,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sglist.h>
 #include <sys/eventhandler.h>
 #include <machine/bus.h>
-#include <sys/bus_dma.h>
 
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
@@ -2211,6 +2212,23 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 				    resp_buf[3], resp_buf[4]);
 			}
 			/*
+			 * XXX: Hyper-V (since win2012r2) responses inquiry with
+			 * unknown version (0) for GEN-2 DVD device.
+			 * Manually set the version number to SPC3 in order to
+			 * ask CAM to continue probing with "PROBE_REPORT_LUNS".
+			 * see probedone() in scsi_xpt.c
+			 */
+			if (SID_TYPE(inq_data) == T_CDROM &&
+			    inq_data->version == 0 &&
+			    (vmstor_proto_version >= VMSTOR_PROTOCOL_VERSION_WIN8)) {
+				inq_data->version = SCSI_REV_SPC3;
+				if (bootverbose) {
+					xpt_print(ccb->ccb_h.path,
+					    "set version from 0 to %d\n",
+					    inq_data->version);
+				}
+			}
+			/*
 			 * XXX: Manually fix the wrong response returned from WS2012
 			 */
 			if (!is_scsi_valid(inq_data) &&
@@ -2219,7 +2237,7 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 			    vmstor_proto_version == VMSTOR_PROTOCOL_VERSION_WIN7)) {
 				if (data_len >= 4 &&
 				    (resp_buf[2] == 0 || resp_buf[3] == 0)) {
-					resp_buf[2] = 5; // verion=5 means SPC-3
+					resp_buf[2] = SCSI_REV_SPC3;
 					resp_buf[3] = 2; // resp fmt must be 2
 					if (bootverbose)
 						xpt_print(ccb->ccb_h.path,
@@ -2346,10 +2364,7 @@ storvsc_ada_probe_veto(void *arg __unused, struct cam_path *path,
 	if (path->device->protocol == PROTO_ATA) {
 		struct ccb_pathinq cpi;
 
-		bzero(&cpi, sizeof(cpi));
-		xpt_setup_ccb(&cpi.ccb_h, path, CAM_PRIORITY_NONE);
-		cpi.ccb_h.func_code = XPT_PATH_INQ;
-		xpt_action((union ccb *)&cpi);
+		xpt_path_inq(&cpi, path);
 		if (cpi.ccb_h.status == CAM_REQ_CMP &&
 		    cpi.hba_vendor == PCI_VENDOR_INTEL &&
 		    cpi.hba_device == PCI_PRODUCT_PIIX4) {

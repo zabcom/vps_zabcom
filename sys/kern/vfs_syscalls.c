@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -1272,9 +1274,6 @@ kern_mknodat(struct thread *td, int fd, char *path, enum uio_seg pathseg,
 		if (error == 0 && dev == VNOVAL)
 			error = EINVAL;
 		break;
-	case S_IFMT:
-		error = priv_check(td, PRIV_VFS_MKNOD_BAD);
-		break;
 	case S_IFWHT:
 		error = priv_check(td, PRIV_VFS_MKNOD_WHT);
 		break;
@@ -1312,9 +1311,6 @@ restart:
 		whiteout = 0;
 
 		switch (mode & S_IFMT) {
-		case S_IFMT:	/* used by badsect to flag bad sectors */
-			vattr.va_type = VBAD;
-			break;
 		case S_IFCHR:
 			vattr.va_type = VCHR;
 			break;
@@ -2130,7 +2126,7 @@ cvtstat(struct stat *st, struct ostat *ost)
 }
 #endif /* COMPAT_43 */
 
-#if defined(COMPAT_FREEBSD11)
+#if defined(COMPAT_43) || defined(COMPAT_FREEBSD11)
 int ino64_trunc_error;
 SYSCTL_INT(_vfs, OID_AUTO, ino64_trunc_error, CTLFLAG_RW,
     &ino64_trunc_error, 0,
@@ -2508,7 +2504,7 @@ kern_readlinkat(struct thread *td, int fd, char *path, enum uio_seg pathseg,
 		return (error);
 	}
 #endif
-	if (vp->v_type != VLNK)
+	if (vp->v_type != VLNK && (vp->v_vflag & VV_READLINK) == 0)
 		error = EINVAL;
 	else {
 		aiov.iov_base = buf;
@@ -4429,7 +4425,7 @@ kern_posix_fallocate(struct thread *td, int fd, off_t offset, off_t len)
 	if (offset > OFF_MAX - len)
 		return (EFBIG);
 	AUDIT_ARG_FD(fd);
-	error = fget(td, fd, cap_rights_init(&rights, CAP_WRITE), &fp);
+	error = fget(td, fd, cap_rights_init(&rights, CAP_PWRITE), &fp);
 	if (error != 0)
 		return (error);
 	AUDIT_ARG_FILE(td->td_proc, fp);

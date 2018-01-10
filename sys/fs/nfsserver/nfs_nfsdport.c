@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -87,7 +89,6 @@ static int nfs_commit_miss;
 extern int nfsrv_issuedelegs;
 extern int nfsrv_dolocallocks;
 extern int nfsd_enable_stringtouid;
-extern int nfsd_enable_uidtostring;
 
 SYSCTL_NODE(_vfs, OID_AUTO, nfsd, CTLFLAG_RW, 0, "NFS server");
 SYSCTL_INT(_vfs_nfsd, OID_AUTO, mirrormnt, CTLFLAG_RW,
@@ -104,8 +105,6 @@ SYSCTL_INT(_vfs_nfsd, OID_AUTO, debuglevel, CTLFLAG_RW, &nfsd_debuglevel,
     0, "Debug level for NFS server");
 SYSCTL_INT(_vfs_nfsd, OID_AUTO, enable_stringtouid, CTLFLAG_RW,
     &nfsd_enable_stringtouid, 0, "Enable nfsd to accept numeric owner_names");
-SYSCTL_INT(_vfs_nfsd, OID_AUTO, enable_uidtostring, CTLFLAG_RW,
-    &nfsd_enable_uidtostring, 0, "Make nfsd always send numeric owner_names");
 
 #define	MAX_REORDERED_RPC	16
 #define	NUM_HEURISTIC		1031
@@ -348,7 +347,7 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 	struct iovec aiov;
 	struct uio auio;
 	int lockleaf = (cnp->cn_flags & LOCKLEAF) != 0, linklen;
-	int error = 0, crossmnt;
+	int error = 0;
 	char *cp;
 
 	*retdirp = NULL;
@@ -373,7 +372,6 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 	if (NFSVNO_EXRDONLY(exp))
 		cnp->cn_flags |= RDONLY;
 	ndp->ni_segflg = UIO_SYSSPACE;
-	crossmnt = 1;
 
 	if (nd->nd_flag & ND_PUBLOOKUP) {
 		ndp->ni_loopcnt = 0;
@@ -401,7 +399,6 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 		 * the mount point, unless nfsrv_enable_crossmntpt is set.
 		 */
 		cnp->cn_flags |= NOCROSSMOUNT;
-		crossmnt = 0;
 	}
 
 	/*

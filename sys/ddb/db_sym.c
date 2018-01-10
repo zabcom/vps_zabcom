@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: MIT-CMU
+ *
  * Mach Operating System
  * Copyright (c) 1991,1990 Carnegie Mellon University
  * All Rights Reserved.
@@ -44,7 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <ddb/db_sym.h>
 #include <ddb/db_variables.h>
 
-#include <opt_ddb.h>
+#include "opt_ddb.h"
 
 /*
  * Multiple symbol tables
@@ -83,8 +85,8 @@ db_var_db_cpu(struct db_variable *vp, db_expr_t *valuep, int op)
 		return (1);
 
 	case DB_VAR_SET:
-		if (*(int *)valuep < -1 && *(int *)valuep > mp_maxid) {
-			db_printf("Invalid value: %d", *(int*)valuep);
+		if (*(int *)valuep < -1 || *(int *)valuep > mp_maxid) {
+			db_printf("Invalid value: %d\n", *(int*)valuep);
 			return (0);
 		}
 		db_cpu = *(int *)valuep;

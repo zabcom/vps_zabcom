@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
  * Copyright (C) 1995, 1996 TooLs GmbH.
  * All rights reserved.
@@ -46,7 +48,11 @@
 #endif
 
 #ifndef	MAXDSIZ
+#ifdef __powerpc64__
+#define	MAXDSIZ		(32UL*1024*1024*1024)	/* max data size */
+#else
 #define	MAXDSIZ		(1*1024*1024*1024)	/* max data size */
+#endif
 #endif
 
 #ifndef	DFLSSIZ
@@ -54,7 +60,11 @@
 #endif
 
 #ifndef	MAXSSIZ
+#ifdef __powerpc64__
+#define	MAXSSIZ		(512*1024*1024)		/* max stack size */
+#else
 #define	MAXSSIZ		(64*1024*1024)		/* max stack size */
+#endif
 #endif
 
 #ifdef AIM
@@ -102,7 +112,7 @@
 #endif
 
 #ifdef AIM
-#define	KERNBASE		0x00100000UL	/* start of kernel virtual */
+#define	KERNBASE		0x00100100UL	/* start of kernel virtual */
 
 #ifndef __powerpc64__
 #define	VM_MIN_KERNEL_ADDRESS	((vm_offset_t)KERNEL_SR << ADDR_SR_SHFT)

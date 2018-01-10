@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1991, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -199,6 +201,8 @@ newnfs_connect(struct nfsmount *nmp, struct nfssockreq *nrp,
 			nconf = getnetconfigent("udp");
 		else
 			nconf = getnetconfigent("tcp");
+	else if (saddr->sa_family == AF_LOCAL)
+		nconf = getnetconfigent("local");
 	else
 		if (nrp->nr_sotype == SOCK_DGRAM)
 			nconf = getnetconfigent("udp6");
@@ -489,7 +493,7 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 	uint32_t retseq, retval, slotseq, *tl;
 	time_t waituntil;
 	int i = 0, j = 0, opcnt, set_sigset = 0, slot;
-	int trycnt, error = 0, usegssname = 0, secflavour = AUTH_SYS;
+	int error = 0, usegssname = 0, secflavour = AUTH_SYS;
 	int freeslot, maxslot, reterr, slotpos, timeo;
 	u_int16_t procnum;
 	u_int trylater_delay = 1;
@@ -509,7 +513,7 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 	if (xidp != NULL)
 		*xidp = 0;
 	/* Reject requests while attempting a forced unmount. */
-	if (nmp != NULL && (nmp->nm_mountp->mnt_kern_flag & MNTK_UNMOUNTF)) {
+	if (nmp != NULL && NFSCL_FORCEDISM(nmp->nm_mountp)) {
 		m_freem(nd->nd_mreq);
 		return (ESTALE);
 	}
@@ -698,7 +702,6 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		}
 #endif
 	}
-	trycnt = 0;
 	freeslot = -1;		/* Set to slot that needs to be free'd */
 tryagain:
 	slot = -1;		/* Slot that needs a sequence# increment. */
@@ -1119,9 +1122,29 @@ nfsmout:
 int
 newnfs_nmcancelreqs(struct nfsmount *nmp)
 {
+	struct nfsclds *dsp;
+	struct __rpc_client *cl;
 
 	if (nmp->nm_sockreq.nr_client != NULL)
 		CLNT_CLOSE(nmp->nm_sockreq.nr_client);
+lookformore:
+	NFSLOCKMNT(nmp);
+	TAILQ_FOREACH(dsp, &nmp->nm_sess, nfsclds_list) {
+		NFSLOCKDS(dsp);
+		if (dsp != TAILQ_FIRST(&nmp->nm_sess) &&
+		    (dsp->nfsclds_flags & NFSCLDS_CLOSED) == 0 &&
+		    dsp->nfsclds_sockp != NULL &&
+		    dsp->nfsclds_sockp->nr_client != NULL) {
+			dsp->nfsclds_flags |= NFSCLDS_CLOSED;
+			cl = dsp->nfsclds_sockp->nr_client;
+			NFSUNLOCKDS(dsp);
+			NFSUNLOCKMNT(nmp);
+			CLNT_CLOSE(cl);
+			goto lookformore;
+		}
+		NFSUNLOCKDS(dsp);
+	}
+	NFSUNLOCKMNT(nmp);
 	return (0);
 }
 
@@ -1205,8 +1228,7 @@ newnfs_msleep(struct thread *td, void *ident, struct mtx *mtx, int priority, cha
 {
 	sigset_t oldset;
 	int error;
-	struct proc *p;
-	
+
 	if ((priority & PCATCH) == 0)
 		return msleep(ident, mtx, priority, wmesg, timo);
 	if (td == NULL)
@@ -1214,7 +1236,6 @@ newnfs_msleep(struct thread *td, void *ident, struct mtx *mtx, int priority, cha
 	newnfs_set_sigmask(td, &oldset);
 	error = msleep(ident, mtx, priority, wmesg, timo);
 	newnfs_restore_sigmask(td, &oldset);
-	p = td->td_proc;
 	return (error);
 }
 
@@ -1229,7 +1250,7 @@ newnfs_sigintr(struct nfsmount *nmp, struct thread *td)
 	sigset_t tmpset;
 	
 	/* Terminate all requests while attempting a forced unmount. */
-	if (nmp->nm_mountp->mnt_kern_flag & MNTK_UNMOUNTF)
+	if (NFSCL_FORCEDISM(nmp->nm_mountp))
 		return (EIO);
 	if (!(nmp->nm_flag & NFSMNT_INT))
 		return (0);

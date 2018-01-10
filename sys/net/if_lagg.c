@@ -244,7 +244,7 @@ SYSCTL_INT(_net_link_lagg, OID_AUTO, failover_rx_all, CTLFLAG_RW | CTLFLAG_VNET,
     "Accept input from any interface in a failover lagg");
 
 /* Default value for using flowid */
-static VNET_DEFINE(int, def_use_flowid) = 1;
+static VNET_DEFINE(int, def_use_flowid) = 0;
 #define	V_def_use_flowid	VNET(def_use_flowid)
 SYSCTL_INT(_net_link_lagg, OID_AUTO, default_use_flowid, CTLFLAG_RWTUN,
     &VNET_NAME(def_use_flowid), 0,
@@ -738,14 +738,15 @@ lagg_port_create(struct lagg_softc *sc, struct ifnet *ifp)
 
 	lagg_setmulti(lp);
 
+	LAGG_WUNLOCK(sc);
+
 	if ((error = lagg_proto_addport(sc, lp)) != 0) {
 		/* Remove the port, without calling pr_delport. */
+		LAGG_WLOCK(sc);
 		lagg_port_destroy(lp, 0);
 		LAGG_UNLOCK_ASSERT(sc);
 		return (error);
 	}
-
-	LAGG_WUNLOCK(sc);
 
 	/* Update lagg capabilities */
 	lagg_capabilities(sc);

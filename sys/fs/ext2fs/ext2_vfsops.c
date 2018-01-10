@@ -5,6 +5,8 @@
  *  University of Utah, Department of Computer Science
  */
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1989, 1991, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -279,6 +281,7 @@ ext2_mount(struct mount *mp)
 static int
 ext2_check_sb_compat(struct ext2fs *es, struct cdev *dev, int ronly)
 {
+	uint32_t i, mask;
 
 	if (es->e2fs_magic != E2FS_MAGIC) {
 		printf("ext2fs: %s: wrong magic number %#x (expected %#x)\n",
@@ -286,17 +289,29 @@ ext2_check_sb_compat(struct ext2fs *es, struct cdev *dev, int ronly)
 		return (1);
 	}
 	if (es->e2fs_rev > E2FS_REV0) {
-		if (es->e2fs_features_incompat & ~(EXT2F_INCOMPAT_SUPP |
-						   EXT4F_RO_INCOMPAT_SUPP)) {
-			printf(
-"WARNING: mount of %s denied due to unsupported optional features\n",
-			    devtoname(dev));
+		mask = es->e2fs_features_incompat & ~(EXT2F_INCOMPAT_SUPP |
+		    EXT4F_RO_INCOMPAT_SUPP);
+		if (mask) {
+			printf("WARNING: mount of %s denied due to "
+			    "unsupported optional features:\n", devtoname(dev));
+			for (i = 0;
+			    i < sizeof(incompat)/sizeof(struct ext2_feature);
+			    i++)
+				if (mask & incompat[i].mask)
+					printf("%s ", incompat[i].name);
+			printf("\n");
 			return (1);
 		}
-		if (!ronly &&
-		    (es->e2fs_features_rocompat & ~EXT2F_ROCOMPAT_SUPP)) {
+		mask = es->e2fs_features_rocompat & ~EXT2F_ROCOMPAT_SUPP;
+		if (!ronly && mask) {
 			printf("WARNING: R/W mount of %s denied due to "
-			    "unsupported optional features\n", devtoname(dev));
+			    "unsupported optional features:\n", devtoname(dev));
+			for (i = 0;
+			    i < sizeof(ro_compat)/sizeof(struct ext2_feature);
+			    i++)
+				if (mask & ro_compat[i].mask)
+					printf("%s ", ro_compat[i].name);
+			printf("\n");
 			return (1);
 		}
 	}
@@ -979,6 +994,7 @@ ext2_vget(struct mount *mp, ino_t ino, int flags, struct vnode **vpp)
 	}
 #ifdef EXT2FS_DEBUG
 	ext2_print_inode(ip);
+	ext4_ext_print_extent_tree_status(ip);
 #endif
 	bqrelse(bp);
 

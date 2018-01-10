@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: (BSD-3-Clause AND MIT-CMU)
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -134,6 +136,9 @@ static int vmspace_zinit(void *mem, int size, int flags);
 static int vm_map_zinit(void *mem, int ize, int flags);
 static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min,
     vm_offset_t max);
+static int vm_map_alignspace(vm_map_t map, vm_object_t object,
+    vm_ooffset_t offset, vm_offset_t *addr, vm_size_t length,
+    vm_offset_t max_addr, vm_offset_t alignment);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_unwire(vm_map_t map, vm_map_entry_t entry);
@@ -1191,9 +1196,9 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	vm_inherit_t inheritance;
 
 	VM_MAP_ASSERT_LOCKED(map);
-	KASSERT((object != kmem_object && object != kernel_object) ||
+	KASSERT(object != kernel_object ||
 	    (cow & MAP_COPY_ON_WRITE) == 0,
-	    ("vm_map_insert: kmem or kernel object and COW"));
+	    ("vm_map_insert: kernel object and COW"));
 	KASSERT(object == NULL || (cow & MAP_NOFAULT) == 0,
 	    ("vm_map_insert: paradoxical MAP_NOFAULT request"));
 	KASSERT((prot & ~max) == 0,
@@ -1494,6 +1499,70 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 }
 
 /*
+ * Searches for the specified amount of free space in the given map with the
+ * specified alignment.  Performs an address-ordered, first-fit search from
+ * the given address "*addr", with an optional upper bound "max_addr".  If the
+ * parameter "alignment" is zero, then the alignment is computed from the
+ * given (object, offset) pair so as to enable the greatest possible use of
+ * superpage mappings.  Returns KERN_SUCCESS and the address of the free space
+ * in "*addr" if successful.  Otherwise, returns KERN_NO_SPACE.
+ *
+ * The map must be locked.  Initially, there must be at least "length" bytes
+ * of free space at the given address.
+ */
+static int
+vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
+    vm_offset_t *addr, vm_size_t length, vm_offset_t max_addr,
+    vm_offset_t alignment)
+{
+	vm_offset_t aligned_addr, free_addr;
+
+	VM_MAP_ASSERT_LOCKED(map);
+	free_addr = *addr;
+	KASSERT(!vm_map_findspace(map, free_addr, length, addr) &&
+	    free_addr == *addr, ("caller provided insufficient free space"));
+	for (;;) {
+		/*
+		 * At the start of every iteration, the free space at address
+		 * "*addr" is at least "length" bytes.
+		 */
+		if (alignment == 0)
+			pmap_align_superpage(object, offset, addr, length);
+		else if ((*addr & (alignment - 1)) != 0) {
+			*addr &= ~(alignment - 1);
+			*addr += alignment;
+		}
+		aligned_addr = *addr;
+		if (aligned_addr == free_addr) {
+			/*
+			 * Alignment did not change "*addr", so "*addr" must
+			 * still provide sufficient free space.
+			 */
+			return (KERN_SUCCESS);
+		}
+
+		/*
+		 * Test for address wrap on "*addr".  A wrapped "*addr" could
+		 * be a valid address, in which case vm_map_findspace() cannot
+		 * be relied upon to fail.
+		 */
+		if (aligned_addr < free_addr ||
+		    vm_map_findspace(map, aligned_addr, length, addr) ||
+		    (max_addr != 0 && *addr + length > max_addr))
+			return (KERN_NO_SPACE);
+		free_addr = *addr;
+		if (free_addr == aligned_addr) {
+			/*
+			 * If a successful call to vm_map_findspace() did not
+			 * change "*addr", then "*addr" must still be aligned
+			 * and provide sufficient free space.
+			 */
+			return (KERN_SUCCESS);
+		}
+	}
+}
+
+/*
  *	vm_map_find finds an unallocated region in the target address
  *	map with the given length.  The search is defined to be
  *	first-fit from the specified address; the region found is
@@ -1508,8 +1577,8 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    vm_size_t length, vm_offset_t max_addr, int find_space,
 	    vm_prot_t prot, vm_prot_t max, int cow)
 {
-	vm_offset_t alignment, initial_addr, start;
-	int result;
+	vm_offset_t alignment, min_addr;
+	int rv;
 
 	KASSERT((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 ||
 	    object == NULL,
@@ -1522,50 +1591,70 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		alignment = (vm_offset_t)1 << (find_space >> 8);
 	} else
 		alignment = 0;
-	initial_addr = *addr;
-again:
-	start = initial_addr;
 	vm_map_lock(map);
-	do {
-		if (find_space != VMFS_NO_SPACE) {
-			if (vm_map_findspace(map, start, length, addr) ||
-			    (max_addr != 0 && *addr + length > max_addr)) {
-				vm_map_unlock(map);
-				if (find_space == VMFS_OPTIMAL_SPACE) {
-					find_space = VMFS_ANY_SPACE;
-					goto again;
-				}
-				return (KERN_NO_SPACE);
-			}
-			switch (find_space) {
-			case VMFS_SUPER_SPACE:
-			case VMFS_OPTIMAL_SPACE:
-				pmap_align_superpage(object, offset, addr,
-				    length);
-				break;
-			case VMFS_ANY_SPACE:
-				break;
-			default:
-				if ((*addr & (alignment - 1)) != 0) {
-					*addr &= ~(alignment - 1);
-					*addr += alignment;
-				}
-				break;
-			}
-
-			start = *addr;
+	if (find_space != VMFS_NO_SPACE) {
+		KASSERT(find_space == VMFS_ANY_SPACE ||
+		    find_space == VMFS_OPTIMAL_SPACE ||
+		    find_space == VMFS_SUPER_SPACE ||
+		    alignment != 0, ("unexpected VMFS flag"));
+		min_addr = *addr;
+again:
+		if (vm_map_findspace(map, min_addr, length, addr) ||
+		    (max_addr != 0 && *addr + length > max_addr)) {
+			rv = KERN_NO_SPACE;
+			goto done;
 		}
-		if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
-			result = vm_map_stack_locked(map, start, length,
-			    sgrowsiz, prot, max, cow);
-		} else {
-			result = vm_map_insert(map, object, offset, start,
-			    start + length, prot, max, cow);
+		if (find_space != VMFS_ANY_SPACE &&
+		    (rv = vm_map_alignspace(map, object, offset, addr, length,
+		    max_addr, alignment)) != KERN_SUCCESS) {
+			if (find_space == VMFS_OPTIMAL_SPACE) {
+				find_space = VMFS_ANY_SPACE;
+				goto again;
+			}
+			goto done;
 		}
-	} while (result == KERN_NO_SPACE && find_space != VMFS_NO_SPACE &&
-	    find_space != VMFS_ANY_SPACE);
+	}
+	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
+		rv = vm_map_stack_locked(map, *addr, length, sgrowsiz, prot,
+		    max, cow);
+	} else {
+		rv = vm_map_insert(map, object, offset, *addr, *addr + length,
+		    prot, max, cow);
+	}
+done:
 	vm_map_unlock(map);
-	return (result);
+	return (rv);
+}
+
+/*
+ *	vm_map_find_min() is a variant of vm_map_find() that takes an
+ *	additional parameter (min_addr) and treats the given address
+ *	(*addr) differently.  Specifically, it treats *addr as a hint
+ *	and not as the minimum address where the mapping is created.
+ *
+ *	This function works in two phases.  First, it tries to
+ *	allocate above the hint.  If that fails and the hint is
+ *	greater than min_addr, it performs a second pass, replacing
+ *	the hint with min_addr as the minimum address for the
+ *	allocation.
+ */
+int
+vm_map_find_min(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
+    vm_offset_t *addr, vm_size_t length, vm_offset_t min_addr,
+    vm_offset_t max_addr, int find_space, vm_prot_t prot, vm_prot_t max,
+    int cow)
+{
+	vm_offset_t hint;
+	int rv;
+
+	hint = *addr;
+	for (;;) {
+		rv = vm_map_find(map, object, offset, addr, length, max_addr,
+		    find_space, prot, max, cow);
+		if (rv == KERN_SUCCESS || min_addr >= hint)
+			return (rv);
+		*addr = hint = min_addr;
+	}
 }
 
 /*
@@ -1955,7 +2044,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 			    (pagesizes[p->psind] - 1)) == 0) {
 				mask = atop(pagesizes[p->psind]) - 1;
 				if (tmpidx + mask < psize &&
-				    vm_page_ps_is_valid(p)) {
+				    vm_page_ps_test(p, PS_ALL_VALID, NULL)) {
 					p += mask;
 					threshold += mask;
 				}
@@ -2986,7 +3075,7 @@ vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry)
 		VM_OBJECT_WLOCK(object);
 		if (object->ref_count != 1 && ((object->flags & (OBJ_NOSPLIT |
 		    OBJ_ONEMAPPING)) == OBJ_ONEMAPPING ||
-		    object == kernel_object || object == kmem_object)) {
+		    object == kernel_object)) {
 			vm_object_collapse(object);
 
 			/*
@@ -3555,25 +3644,23 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	return (vm2);
 }
 
+/*
+ * Create a process's stack for exec_new_vmspace().  This function is never
+ * asked to wire the newly created stack.
+ */
 int
 vm_map_stack(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
     vm_prot_t prot, vm_prot_t max, int cow)
 {
 	vm_size_t growsize, init_ssize;
-	rlim_t lmemlim, vmemlim;
+	rlim_t vmemlim;
 	int rv;
 
+	MPASS((map->flags & MAP_WIREFUTURE) == 0);
 	growsize = sgrowsiz;
 	init_ssize = (max_ssize < growsize) ? max_ssize : growsize;
 	vm_map_lock(map);
-	lmemlim = lim_cur(curthread, RLIMIT_MEMLOCK);
 	vmemlim = lim_cur(curthread, RLIMIT_VMEM);
-	if (!old_mlock && map->flags & MAP_WIREFUTURE) {
-		if (ptoa(pmap_wired_count(map->pmap)) + init_ssize > lmemlim) {
-			rv = KERN_NO_SPACE;
-			goto out;
-		}
-	}
 	/* If we would blow our VMEM resource limit, no go */
 	if (map->size + init_ssize > vmemlim) {
 		rv = KERN_NO_SPACE;
@@ -3610,12 +3697,13 @@ vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 	KASSERT(orient != (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP),
 	    ("bi-dir stack"));
 
-	sgp = (vm_size_t)stack_guard_page * PAGE_SIZE;
 	if (addrbos < vm_map_min(map) ||
-	    addrbos > vm_map_max(map) ||
-	    addrbos + max_ssize < addrbos ||
-	    sgp >= max_ssize)
-		return (KERN_NO_SPACE);
+	    addrbos + max_ssize > vm_map_max(map) ||
+	    addrbos + max_ssize <= addrbos)
+		return (KERN_INVALID_ADDRESS);
+	sgp = (vm_size_t)stack_guard_page * PAGE_SIZE;
+	if (sgp >= max_ssize)
+		return (KERN_INVALID_ARGUMENT);
 
 	init_ssize = growsize;
 	if (max_ssize < init_ssize + sgp)
@@ -3685,7 +3773,7 @@ vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 	struct vmspace *vm;
 	struct ucred *cred;
 	vm_offset_t gap_end, gap_start, grow_start;
-	size_t grow_amount, max_grow;
+	size_t grow_amount, guard, max_grow;
 	rlim_t lmemlim, stacklim, vmemlim;
 	int rv, rv1;
 	bool gap_deleted, grow_down, is_procstack;
@@ -3698,9 +3786,18 @@ vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 
 	p = curproc;
 	vm = p->p_vmspace;
-	MPASS(map == &p->p_vmspace->vm_map);
+
+	/*
+	 * Disallow stack growth when the access is performed by a
+	 * debugger or AIO daemon.  The reason is that the wrong
+	 * resource limits are applied.
+	 */
+	if (map != &p->p_vmspace->vm_map || p->p_textvp == NULL)
+		return (KERN_FAILURE);
+
 	MPASS(!map->system_map);
 
+	guard = stack_guard_page * PAGE_SIZE;
 	lmemlim = lim_cur(curthread, RLIMIT_MEMLOCK);
 	stacklim = lim_cur(curthread, RLIMIT_STACK);
 	vmemlim = lim_cur(curthread, RLIMIT_VMEM);
@@ -3727,8 +3824,10 @@ retry:
 	} else {
 		return (KERN_FAILURE);
 	}
-	max_grow = gap_entry->end - gap_entry->start - stack_guard_page *
-	    PAGE_SIZE;
+	max_grow = gap_entry->end - gap_entry->start;
+	if (guard > max_grow)
+		return (KERN_NO_SPACE);
+	max_grow -= guard;
 	if (grow_amount > max_grow)
 		return (KERN_NO_SPACE);
 
