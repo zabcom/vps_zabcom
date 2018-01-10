@@ -522,44 +522,11 @@ vps_resume(struct vps *vps, int flags)
 		/* Allow proc being swapped out again (kernel stacks). */
 		p->p_lock--;
 
-#if 0
-		PROC_UNLOCK(p);
-		PROC_SLOCK(p);
-#endif
-#if 1
 		PROC_SLOCK(p);
 		thread_unsuspend(p);
-#else
-		PROC_UNLOCK(p);
-		PROC_SLOCK(p);
-		if ((p->p_flag & P_STOPPED_SIG) == 0) {
-			TAILQ_FOREACH(td, &p->p_threads, td_plist) {
-				DBGCORE("td=%p\n", td);
-				wakeup_swapper = 0;
-				thread_lock(td);
-				if (TD_IS_SUSPENDED(td))
-					wakeup_swapper =
-					    thread_unsuspend_one(td);
-				else
-					DBGCORE("%s: thread %p not "
-					    "suspended ---> MUST NOT "
-					    "HAPPEN !\n", __func__, td);
-				thread_unlock(td);
-				if (wakeup_swapper) {
-					DBGCORE("%s: wakeup_swapper()\n",
-					    __func__);
-					kick_proc0();
-				}
-			}
-		} else {
-			DBGCORE("%s: P_STOPPED_SIG, not resuming\n",
-			    __func__);
-		}
-#endif
 		PROC_SUNLOCK(p);
-#if 1
+
 		PROC_UNLOCK(p);
-#endif
 	}
 	sx_xunlock(&VPS_VPS(vps, allproc_lock));
 
