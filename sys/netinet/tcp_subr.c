@@ -1897,9 +1897,9 @@ tcp_pcblist(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_net_inet_tcp, TCPCTL_PCBLIST, pcblist,
+_SYSCTL_PROC(_net_inet_tcp, TCPCTL_PCBLIST, pcblist,
     CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_VNET, NULL, 0,
-    tcp_pcblist, "S,xtcpcb", "List of active TCP connections");
+    tcp_pcblist, "S,xtcpcb", "List of active TCP connections", VPS_PUBLIC);
 
 #ifdef INET
 static int
