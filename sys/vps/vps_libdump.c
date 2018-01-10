@@ -1189,6 +1189,33 @@ _vps_dumpobj_print_vmpage(struct vps_dumpobj *o, char *ident, uint64_t uidx,
 	return vdvmp->count;
 }
 
+static
+void _vps_dumpobj_vps(struct vps_dumpobj *o, char *ident)
+{
+	void *data;
+	struct vps_dump_vps *vdv;
+	size_t len;
+
+	data = o->data;
+	len = o->size - offsetof(struct vps_dumpobj, data);
+	vdv = (struct vps_dump_vps *)data;
+
+	printf("%s hostname %s\n", ident, vdv->hostname);
+	printf("%s vps_name %s\n", ident, vdv->vps_name);
+	printf("%s rootpath %s\n", ident, vdv->rootpath);
+
+	printf("%s boottime %ju.%ju\n", ident,
+	    (uintmax_t)vdv->boottime.sec,
+	    (uintmax_t)vdv->boottime.frac);
+
+	printf("%s lastpid %d\n", ident, vdv->lastpid);
+	printf("%s initpgrp_id %d\n", ident, vdv->initpgrp_id);
+	printf("%s initproc_id %d\n", ident, vdv->initproc_id);
+
+	printf("%s restore_count %u\n", ident, vdv->restore_count);
+}
+
+
 static void
 __vps_dumpobj_printtree(struct vps_snapst_ctx *ctx,
    struct vps_dumpobj *o)
@@ -1221,6 +1248,8 @@ __vps_dumpobj_printtree(struct vps_snapst_ctx *ctx,
 		_vps_dumpobj_print_vmobject(o, ident);
 	else if (o->type == VPS_DUMPOBJT_VMPAGE)
 		uidx += _vps_dumpobj_print_vmpage(o, ident, uidx, ctx);
+	else if (o->type == VPS_DUMPOBJT_VPS)
+		_vps_dumpobj_vps(o, ident);
 	if (o->level > 1)
 		ident[o->level * 4 - 1] = ' ';
 }
