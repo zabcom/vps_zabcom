@@ -941,5 +941,5 @@ SCTP_UINT_SYSCTL(output_unlocked, sctp_output_unlocked, SCTPCTL_OUTPUT_UNLOCKED)
 #endif
 SYSCTL_PROC(_net_inet_sctp, OID_AUTO, stats, CTLFLAG_VNET | CTLTYPE_STRUCT | CTLFLAG_RW,
     NULL, 0, sctp_sysctl_handle_stats, "S,sctpstat", "SCTP statistics (struct sctp_stat)");
-SYSCTL_PROC(_net_inet_sctp, OID_AUTO, assoclist, CTLFLAG_VNET | CTLTYPE_OPAQUE | CTLFLAG_RD,
-    NULL, 0, sctp_sysctl_handle_assoclist, "S,xassoc", "List of active SCTP associations");
+_SYSCTL_PROC(_net_inet_sctp, OID_AUTO, assoclist, CTLFLAG_VNET | CTLTYPE_OPAQUE | CTLFLAG_RD,
+    NULL, 0, sctp_sysctl_handle_assoclist, "S,xassoc", "List of active SCTP associations", VPS_PUBLIC);
