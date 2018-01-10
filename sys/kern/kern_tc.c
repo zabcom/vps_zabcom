@@ -158,17 +158,30 @@ init_V_kern_tc(struct bintime *boottimebin)
 	 * Otherwise we are passed our "time" and we need to apply
 	 * that to the offset.
 	 */
-	V_boottimebin = timehands->th_boottime;
-	V_offset = timehands->th_offset;
-	if (boottimebin != NULL) {
-		/*
-		 * XXX-BZ if that gets us negative as the guest
-		 * has more uptime than the (new) host, I assume
-		 * all fun things will happen; deal with that as
-		 * we can test.
-		 */
-		bintime_sub(&V_boottimebin, boottimebin);
-		bintime_sub(&V_offset, boottimebin);
+	if (boottimebin == NULL) {
+		struct timehands *th;
+		u_int gen;
+
+		do {
+			th = timehands;
+			gen = atomic_load_acq_int(&th->th_generation);
+			V_boottimebin = th->th_boottime;
+			V_offset = th->th_offset;
+			atomic_thread_fence_acq();
+		} while (gen == 0 || gen != th->th_generation);
+
+	} else {
+		/* boottimebin is a UNIX timestamp. */
+		/* XXX-BZ what do we do with the time that it was
+		 * was suspended, e.g. in transit or stuck in a file
+		 * for weeks? */
+		/* Need a suspend time, calculate the difference,
+		 * and advance V_boottimebin by that difference. */
+		/* Or only send the uptime time over and do maths:
+		 * NOW - uptime.  That way different cloks are OK as well. */
+		V_boottimebin = *boottimebin;
+		//V_offset = 0;
+#endif
 	}
 }
 #endif
@@ -586,18 +599,11 @@ getboottime(struct timeval *boottime)
 void
 V_getboottimebin(struct bintime *boottimebin)
 {
-	struct timehands *th;
-	u_int gen;
 
-	do {
-		th = timehands;
-		gen = atomic_load_acq_int(&th->th_generation);
-		*boottimebin = th->th_boottime;
-		atomic_thread_fence_acq();
-	} while (gen == 0 || gen != th->th_generation);
-
-	/* Apply offset. */
-	bintime_sub(boottimebin, &V_boottimebin);
+	if (curthread->td_vps == vps0)
+		getboottimebin(boottimebin);
+	else
+		*boottimebin = V_boottimebin;
 }
 
 void
