@@ -1110,9 +1110,9 @@ rip_pcblist(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_net_inet_raw, OID_AUTO/*XXX*/, pcblist,
+_SYSCTL_PROC(_net_inet_raw, OID_AUTO/*XXX*/, pcblist,
     CTLTYPE_OPAQUE | CTLFLAG_RD, NULL, 0,
-    rip_pcblist, "S,xinpcb", "List of active raw IP sockets");
+    rip_pcblist, "S,xinpcb", "List of active raw IP sockets", VPS_PUBLIC);
 
 #ifdef INET
 struct pr_usrreqs rip_usrreqs = {
