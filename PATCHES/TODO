@@ -2614,6 +2614,51 @@ $4 = {tf_rdi = 0x1, tf_rsi = 0x7fffffffecd0, tf_rdx = 0x0, tf_rcx = 0x0, tf_r8 =
   tf_r12 = 0x0, tf_r13 = 0x7fffffffedd0, tf_r14 = 0x7fffffffecd0, tf_r15 = 0x0, tf_trapno = 0xc, tf_fs = 0x13, tf_gs = 0x1b, tf_addr = 0x0, tf_flags = 0x1, tf_es = 0x3b, tf_ds = 0x3b,
   tf_err = 0x14, tf_rip = 0x0, tf_cs = 0x43, tf_rflags = 0x246, tf_rsp = 0x7fffffffecd0, tf_ss = 0x3b}
 
+--------------------------------------------------------------------------------
+
+vps1: bpf attached
+tcp_output: VPS_VNET_SUSPENDED --> returning EINTR, so=0xfffff8000e8c16b0
+Expensive timeout(9) function: 0xffffffff80c7e9e0(0xfffff8000ec2a6d0) 0.006426260 s
+vps_suspend_relink_delete: get_next_dirent() error=2
+Active VPS instances: 1
+Name                 State    VFS Root                     %CPU   Virtual Size
+testvps              suspended /vpsroot                        1      166039552
+Name:          testvps
+Status:        suspended
+VFS root:      /vpsroot
+Processes:           12
+Sockets:              4
+Interfaces:           2
+Restore count:        0
+root@rabbit3:~ # tcp_output: VPS_VNET_SUSPENDED --> returning EINTR, so=0xfffff8000e8c1358
+Expensive timeout(9) function: 0xffffffff80c7fd20(0xfffff8000ec2aa38) 0.006429691 s
+
+
+
+smmsp 425  0.0 25.0 550492 1024       -  I    13:57   0:00.00 sendmail: ./w063  25  423   0  33  0 select
+root  427  0.0 25.0 541508 1024       -  Is   13:57   0:00.00 /usr/sbin/cron -   0    1   0  23  0 nanslp
+root  457  0.0 23.4 550560  960       -  I    13:55   0:00.00 sendmail: w08Dsv   0  420   0  33  0 select
+root  524  0.0 25.0 534276 1024       -  S    14:03   0:00.00 /sbin/init         0    1   0  20  0 nanslp
+root  526  0.0 65.3  25868 2676 #C:0x9b  R+   14:03   0:00.00 ps axuwel          0  743   0  20  0 -
+root  743  0.0 95.5  25420 3912 #C:0x9b  Ss   13:58   0:00.01 /bin/csh           0    1   0  20  0 pause
+# procstat -k 524
+  PID    TID COMM                TDNAME              KSTACK
+  524 100115 init                -                   mi_switch sleepq_switch sleepq_catch_signals sleepq_timedwait_sig _sleep kern_clock_nanosleep sys_nanosleep amd64_syscall Xfast_syscall
+# procstat -k 457
+  PID    TID COMM                TDNAME              KSTACK
+  457 100103 sendmail            -                   mi_switch sleepq_switch sleepq_catch_signals sleepq_timedwait_sig _cv_timedwait_sig_sbt seltdwait kern_select sys_select amd64_syscall Xfast_syscall
+# procstat -k 427
+  PID    TID COMM                TDNAME              KSTACK
+  427 100104 cron                -                   mi_switch sleepq_switch sleepq_catch_signals sleepq_timedwait_sig _sleep kern_clock_nanosleep sys_nanosleep amd64_syscall Xfast_syscall
+# procstat -k 425
+  PID    TID COMM                TDNAME              KSTACK
+  425 100105 sendmail            -                   mi_switch sleepq_switch sleepq_catch_signals sleepq_timedwait_sig _cv_timedwait_sig_sbt seltdwait kern_select sys_select amd64_syscall Xfast_syscall
+# procstat -k 1
+  PID    TID COMM                TDNAME              KSTACK
+    1 100108 init                -                   mi_switch sleepq_switch sleepq_catch_signals sleepq_wait_sig _sleep kern_wait6 sys_wait4 amd64_syscall Xfast_syscall
+
+--------------------------------------------------------------------------------
+
 
 
 
