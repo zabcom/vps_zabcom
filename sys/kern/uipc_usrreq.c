@@ -1673,16 +1673,16 @@ unp_pcblist(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_net_local_dgram, OID_AUTO, pcblist, CTLTYPE_OPAQUE | CTLFLAG_RD,
+_SYSCTL_PROC(_net_local_dgram, OID_AUTO, pcblist, CTLTYPE_OPAQUE | CTLFLAG_RD,
     (void *)(intptr_t)SOCK_DGRAM, 0, unp_pcblist, "S,xunpcb",
-    "List of active local datagram sockets");
-SYSCTL_PROC(_net_local_stream, OID_AUTO, pcblist, CTLTYPE_OPAQUE | CTLFLAG_RD,
+    "List of active local datagram sockets", VPS_PUBLIC);
+_SYSCTL_PROC(_net_local_stream, OID_AUTO, pcblist, CTLTYPE_OPAQUE | CTLFLAG_RD,
     (void *)(intptr_t)SOCK_STREAM, 0, unp_pcblist, "S,xunpcb",
-    "List of active local stream sockets");
-SYSCTL_PROC(_net_local_seqpacket, OID_AUTO, pcblist,
+    "List of active local stream sockets", VPS_PUBLIC);
+_SYSCTL_PROC(_net_local_seqpacket, OID_AUTO, pcblist,
     CTLTYPE_OPAQUE | CTLFLAG_RD,
     (void *)(intptr_t)SOCK_SEQPACKET, 0, unp_pcblist, "S,xunpcb",
-    "List of active local seqpacket sockets");
+    "List of active local seqpacket sockets", VPS_PUBLIC);
 
 static void
 unp_shutdown(struct unpcb *unp)
