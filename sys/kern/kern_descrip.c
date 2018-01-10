@@ -3332,8 +3332,8 @@ sysctl_kern_file(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_kern, KERN_FILE, file, CTLTYPE_OPAQUE|CTLFLAG_RD|CTLFLAG_MPSAFE,
-    0, 0, sysctl_kern_file, "S,xfile", "Entire file table");
+_SYSCTL_PROC(_kern, KERN_FILE, file, CTLTYPE_OPAQUE|CTLFLAG_RD|CTLFLAG_MPSAFE,
+    0, 0, sysctl_kern_file, "S,xfile", "Entire file table", VPS_PUBLIC);
 
 #ifdef KINFO_FILE_SIZE
 CTASSERT(sizeof(struct kinfo_file) == KINFO_FILE_SIZE);
