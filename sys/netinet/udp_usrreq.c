@@ -930,9 +930,9 @@ udp_pcblist(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_net_inet_udp, UDPCTL_PCBLIST, pcblist,
+_SYSCTL_PROC(_net_inet_udp, UDPCTL_PCBLIST, pcblist,
     CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_VNET, NULL, 0,
-    udp_pcblist, "S,xinpcb", "List of active UDP sockets");
+    udp_pcblist, "S,xinpcb", "List of active UDP sockets", VPS_PUBLIC);
 
 #ifdef INET
 static int
