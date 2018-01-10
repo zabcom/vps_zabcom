@@ -493,6 +493,37 @@ struct vps_dump_proc {
 			sint64 rlim_max;
 		} pl_rlimit[RLIM_NLIMITS];
 	} p_limit;
+
+	struct {
+		struct {	/* rusage */
+			struct timeval ru_utime;
+			struct timeval ru_stime;
+			sint64	ru_maxrss;
+			sint64	ru_ixrss;
+			sint64	ru_idrss;
+			sint64	ru_isrss;
+			sint64	ru_minflt;
+			sint64	ru_majflt;
+			sint64	ru_nswap;
+			sint64	ru_inblock;
+			sint64	ru_oublock;
+			sint64	ru_msgsnd;
+			sint64	ru_msgrcv;
+			sint64	ru_nsignals;
+			sint64	ru_nvcsw;
+			sint64	ru_nivcsw;
+		} p_cru;
+		struct  itimerval p_timer[3];
+
+		struct {
+			uint64	pr_base;	/* caddr_t */
+			uint64  pr_size;
+			uint64  pr_off;
+			uint64  pr_scale;
+		} p_prof;
+
+		struct timeval p_start;
+	} p_stats;
 };
 
 struct vps_dump_pargs {
@@ -675,21 +706,60 @@ struct vps_dump_pts {
 struct vps_dump_socket {
 	PTR(so_orig_ptr);
 
-	PTR(so_cred);
 
-	sint16 so_family;
 	sint16 so_type;
-	sint16 so_protocol;
-	sint16 _pad0;
-
 	sint16 so_options;
-	uint16 so_qlimit;
+	sint16 so_linger;
 	sint16 so_state;
-	sint16 _pad1;
+	/* so_pcb */
+	PTR(so_vnet);
+	/* so_protosw: */
+	sint16 so_family;
+	sint16 so_protocol;
+	/* sint16 so_timeo; */
+	uint16 so_error;
+	/* so_sigio */
+	PTR(so_cred);
+	/* so_label */
+	/* (so_gencnt) */
+	/* so_emuldata */
+	/* osd */
+	sint32 so_fibnum;
+	uint32 so_user_cookie;
+	sint32 so_ts_clock;
+	uint32 so_max_pacing_rate;
 
+	/* UNION !LISTEN SOCKET */
+	/* so_rcv */
+	/* so_snd */
+	/* so_list */
+	/* so_listen */
 	sint32 so_qstate;
-	uint16 sol_qlen;
-	uint16 sol_incqlen;
+	/* so_peerlabel */
+	uint64 so_oobmark;
+
+	/* UNION LISTEN SOCKET */
+	/* sol_incomp */
+	/* sol_comp */
+	uint32 sol_qlen;
+	uint32 sol_incqlen;
+	uint32 so_qlimit;
+
+	/* sol_accept_filter */
+	/* sol_accept_filter_arg */
+	/* sol_accept_filter_str */
+
+	/* sol_upcall */
+	/* sol_upcallarg */
+
+	sint32 sol_sbrcv_lowat;
+	sint32 sol_sbsnd_lowat;
+	uint32 sol_sbrcv_hiwat;
+	uint32 sol_sbsnd_hiwat;
+	sint16 sol_sbrcv_flags;
+	sint16 sol_sbsnd_flags;
+	sint64 sol_sbrcv_timeo;
+	sint64 sol_sbsnd_timeo;
 };
 
 struct vps_dump_unixpcb {

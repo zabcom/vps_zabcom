@@ -2501,41 +2501,59 @@ again:
 
 	vds->so_type = so->so_type;
 	vds->so_options = so->so_options;
-	/* so_linger */
+	vds->so_linger = so->so_linger;
 	vds->so_state = so->so_state;
 	/* so_pcb */
-	/* so_vnet */
+	vds->so_vnet = so->so_vnet;
 	/* so_proto */
 	vds->so_family = so->so_proto->pr_domain->dom_family;
 	vds->so_protocol = so->so_proto->pr_protocol;
 	/* (so_timeo) */
-	/* so_error */
+	vds->so_error = so->so_error;
 	/* so_sigio */
 	vds->so_cred = so->so_cred;
 	/* so_label */
-	/* so_gencnt */
+	/* (so_gencnt) */
 	/* so_emuldata */
 	/* osd */
-	/* so_fibnum */
-	/* so_user_cookie */
-	/* so_ts_clock */
-	/* so_max_pacing_rate */
+	vds->so_fibnum = so->so_fibnum;
+	vds->so_user_cookie = so->so_user_cookie;
+	vds->so_ts_clock = so->so_ts_clock;
+	vds->so_max_pacing_rate = so->so_max_pacing_rate;
 
 	SOCK_UNLOCK(so);
 
 	if (!SOLISTENING(so)) {
+		/* Done below: so_rcv, so_snd */
+		/* so_list */
+		/* so_listen */
 		vds->so_qstate = so->so_qstate;
-		/* XXX-BZ TODO see restore code for full list of fields. */
+		/* so_peerlabel */
+		vds->so_oobmark = so->so_oobmark;
+
 	} else {
 		SOLISTEN_LOCK(so);
-		/* sol_incomp */
-		/* sol_comp */
+		/* Done below: sol_incomp, sol_comp */
 		vds->sol_qlen = so->sol_qlen;
 		vds->sol_incqlen = so->sol_incqlen;
 
 		vds->so_qlimit = so->sol_qlimit;
 
-		/* XXX-BZ TODO see restore code for full list of fields. */
+		/* sol_accept_filter */
+		/* sol_accept_filter_arg */
+		/* sol_accept_filter_str */
+
+		/* sol_upcall */
+		/* sol_upcallarg */
+
+		vds->sol_sbrcv_lowat = so->sol_sbrcv_lowat;
+		vds->sol_sbsnd_lowat = so->sol_sbsnd_lowat;
+		vds->sol_sbrcv_hiwat = so->sol_sbrcv_hiwat;
+		vds->sol_sbsnd_hiwat = so->sol_sbsnd_hiwat;
+		vds->sol_sbrcv_flags = so->sol_sbrcv_flags;
+		vds->sol_sbsnd_flags = so->sol_sbsnd_flags;
+		vds->sol_sbrcv_timeo = so->sol_sbrcv_timeo;
+		vds->sol_sbsnd_timeo = so->sol_sbsnd_timeo;
 
 		SOLISTEN_UNLOCK(so);
 	}
@@ -3655,6 +3673,34 @@ vps_snapshot_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps,
 		vdp->p_limit.pl_rlimit[i].rlim_max =
 		    p->p_limit->pl_rlimit[i].rlim_max;
 	}
+
+	vdp->p_stats.p_cru.ru_utime = p->p_stats->p_cru.ru_utime;
+	vdp->p_stats.p_cru.ru_stime = p->p_stats->p_cru.ru_stime;
+	vdp->p_stats.p_cru.ru_maxrss = p->p_stats->p_cru.ru_maxrss;
+	vdp->p_stats.p_cru.ru_ixrss = p->p_stats->p_cru.ru_ixrss;
+	vdp->p_stats.p_cru.ru_idrss = p->p_stats->p_cru.ru_idrss;
+	vdp->p_stats.p_cru.ru_isrss = p->p_stats->p_cru.ru_isrss;
+	vdp->p_stats.p_cru.ru_minflt = p->p_stats->p_cru.ru_minflt;
+	vdp->p_stats.p_cru.ru_majflt = p->p_stats->p_cru.ru_majflt;
+	vdp->p_stats.p_cru.ru_nswap = p->p_stats->p_cru.ru_nswap;
+	vdp->p_stats.p_cru.ru_inblock = p->p_stats->p_cru.ru_inblock;
+	vdp->p_stats.p_cru.ru_oublock = p->p_stats->p_cru.ru_oublock;
+	vdp->p_stats.p_cru.ru_msgsnd = p->p_stats->p_cru.ru_msgsnd;
+	vdp->p_stats.p_cru.ru_msgrcv = p->p_stats->p_cru.ru_msgrcv;
+	vdp->p_stats.p_cru.ru_nsignals = p->p_stats->p_cru.ru_nsignals;
+	vdp->p_stats.p_cru.ru_nvcsw = p->p_stats->p_cru.ru_nvcsw;
+	vdp->p_stats.p_cru.ru_nivcsw = p->p_stats->p_cru.ru_nivcsw;
+
+	vdp->p_stats.p_timer[0] = p->p_stats->p_timer[0];
+	vdp->p_stats.p_timer[1] = p->p_stats->p_timer[1];
+	vdp->p_stats.p_timer[2] = p->p_stats->p_timer[2];
+
+	vdp->p_stats.p_prof.pr_base = (uint64_t)p->p_stats->p_prof.pr_base;
+	vdp->p_stats.p_prof.pr_size = p->p_stats->p_prof.pr_size;
+	vdp->p_stats.p_prof.pr_off = p->p_stats->p_prof.pr_off;
+	vdp->p_stats.p_prof.pr_scale = p->p_stats->p_prof.pr_scale;
+
+	vdp->p_stats.p_start = p->p_stats->p_start;
 
 	/* proc */
 	vdp->p_pptr_id = (p->p_pptr && p->p_pptr != vps->swappertd) ?

@@ -1666,9 +1666,25 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 	}
 	nso = fp->f_data;
 	SOCK_LOCK(nso);
-	nso->so_state = vds->so_state;
+	/* so_type restored during socreate() */
 	nso->so_options = vds->so_options;
-	/* XXX-BZ so_emuldata; */
+	nso->so_linger = vds->so_linger;
+	nso->so_state = vds->so_state;
+	/* so_pcb */
+	/* so_vnet restored during soalloc() from the cred */
+	/* so_proto restored during socreate() */
+	/* (so_timeo) */
+	nso->so_error = vds->so_error;
+	/* so_sigio */
+	/* so_cred restored during socreate() */
+	/* so_label */
+	/* (so_gencnt) */
+	/* so_emuldata; */
+	/* osd */
+	nso->so_fibnum = vds->so_fibnum;
+	nso->so_user_cookie = vds->so_user_cookie;
+	nso->so_ts_clock = vds->so_ts_clock;
+	nso->so_max_pacing_rate = vds->so_max_pacing_rate;
 	SOCK_UNLOCK(nso);
 
 	DBGR("%s: nso=%p nso->so_state = %08x\n",
@@ -1676,12 +1692,6 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 	DBGR("%s: nso->so_cred=%p nso->so_cred->cr_vps=%p "
 	    "nso->so_vnet=%p\n", __func__, nso->so_cred,
 	    nso->so_cred->cr_vps, nso->so_vnet);
-
-	/* XXX-BZ OSD */
-	/* XXX-BZ so_fibnum */
-	/* XXX-BZ so_user_cookie */
-	/* XXX-BZ so_ts_clock */
-	/* XXX-BZ so_max_pacing_rate */
 
 	if (!SOLISTENING(nso)) {
 		sblock(&nso->so_rcv, SBL_WAIT | SBL_NOINTR);
@@ -1716,7 +1726,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		/* so_listen */
 		nso->so_qstate = vds->so_qstate;
 		/* so_peerlabel */
-		/* so_oobmark */
+		nso->so_oobmark = vds->so_oobmark;
 		SOCK_UNLOCK(nso);
 	} else {
 		SOLISTEN_LOCK(nso);
@@ -1735,15 +1745,14 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		/* sol_upcall */
 		/* sol_upcallarg */
 
-		/* XXX-BZ locking unclear on these? */
-		/* sol_sbrcv_lowat */
-		/* sol_sbsnd_lowat */
-		/* sol_sbrcv_hiwat */
-		/* sol_sbsnd_hiwat */
-		/* sol_sbrcv_flags */
-		/* sol_sbsnd_flags */
-		/* sol_sbrcv_timeo */
-		/* sol_sbsnd_timeo */
+		nso->sol_sbrcv_lowat = vds->sol_sbrcv_lowat;
+		nso->sol_sbsnd_lowat = vds->sol_sbsnd_lowat;
+		nso->sol_sbrcv_hiwat = vds->sol_sbrcv_hiwat;
+		nso->sol_sbsnd_hiwat = vds->sol_sbsnd_hiwat;
+		nso->sol_sbrcv_flags = vds->sol_sbrcv_flags;
+		nso->sol_sbsnd_flags = vds->sol_sbsnd_flags;
+		nso->sol_sbrcv_timeo = vds->sol_sbrcv_timeo;
+		nso->sol_sbsnd_timeo = vds->sol_sbsnd_timeo;
 
 		SOLISTEN_UNLOCK(nso);
 	}
@@ -3644,7 +3653,6 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 	 * We get a struct proc that already contains loads
 	 * of resources, e.g. a thread ...
 	 * So release them all first ...
-	 * XXX p_stats
 	 * XXX p_ksi
 	 */
 
@@ -3711,6 +3719,34 @@ vps_restore_proc_one(struct vps_snapst_ctx *ctx, struct vps *vps)
 		np->p_sigacts->ps_usertramp.__bits[i] =
 		   vdp->p_sigacts.ps_usertramp[i];
 	}
+
+	np->p_stats->p_cru.ru_utime = vdp->p_stats.p_cru.ru_utime;
+	np->p_stats->p_cru.ru_stime = vdp->p_stats.p_cru.ru_stime;
+	np->p_stats->p_cru.ru_maxrss = vdp->p_stats.p_cru.ru_maxrss;
+	np->p_stats->p_cru.ru_ixrss = vdp->p_stats.p_cru.ru_ixrss;
+	np->p_stats->p_cru.ru_idrss = vdp->p_stats.p_cru.ru_idrss;
+	np->p_stats->p_cru.ru_isrss = vdp->p_stats.p_cru.ru_isrss;
+	np->p_stats->p_cru.ru_minflt = vdp->p_stats.p_cru.ru_minflt;
+	np->p_stats->p_cru.ru_majflt = vdp->p_stats.p_cru.ru_majflt;
+	np->p_stats->p_cru.ru_nswap = vdp->p_stats.p_cru.ru_nswap;
+	np->p_stats->p_cru.ru_inblock = vdp->p_stats.p_cru.ru_inblock;
+	np->p_stats->p_cru.ru_oublock = vdp->p_stats.p_cru.ru_oublock;
+	np->p_stats->p_cru.ru_msgsnd = vdp->p_stats.p_cru.ru_msgsnd;
+	np->p_stats->p_cru.ru_msgrcv = vdp->p_stats.p_cru.ru_msgrcv;
+	np->p_stats->p_cru.ru_nsignals = vdp->p_stats.p_cru.ru_nsignals;
+	np->p_stats->p_cru.ru_nvcsw = vdp->p_stats.p_cru.ru_nvcsw;
+	np->p_stats->p_cru.ru_nivcsw = vdp->p_stats.p_cru.ru_nivcsw;
+
+	np->p_stats->p_timer[0] = vdp->p_stats.p_timer[0];
+	np->p_stats->p_timer[1] = vdp->p_stats.p_timer[1];
+	np->p_stats->p_timer[2] = vdp->p_stats.p_timer[2];
+
+	np->p_stats->p_prof.pr_base = (caddr_t)vdp->p_stats.p_prof.pr_base;
+	np->p_stats->p_prof.pr_size = vdp->p_stats.p_prof.pr_size;
+	np->p_stats->p_prof.pr_off = vdp->p_stats.p_prof.pr_off;
+	np->p_stats->p_prof.pr_scale = vdp->p_stats.p_prof.pr_scale;
+
+	np->p_stats->p_start = vdp->p_stats.p_start;
 
 	/* plimit */
 	/* XXX check: vdp->p_limit.pl_nlimits == RLIM_NLIMITS */
