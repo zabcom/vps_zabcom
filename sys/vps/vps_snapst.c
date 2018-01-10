@@ -987,6 +987,7 @@ static int
 vps_snapshot_vps(struct vps_snapst_ctx *ctx, struct vps *vps)
 {
 	struct vps_dump_vps *vdi;
+	struct vps *save_vps;
 
 	/* Dump vps specific data. */
 	vdo_create(ctx, VPS_DUMPOBJT_VPS, M_WAITOK);
@@ -994,7 +995,12 @@ vps_snapshot_vps(struct vps_snapst_ctx *ctx, struct vps *vps)
 	vdi = vdo_space(ctx, sizeof(*vdi), M_WAITOK);
 	strlcpy(vdi->hostname, VPS_VPS(vps, hostname),
 	    sizeof(vdi->hostname));
-	V_getboottimebin(&vdi->boottime);			/* XXX-BZ is that right? */
+
+	save_vps = curthread->td_vps;
+	curthread->td_vps = vps;
+	V_getboottimebin(&vdi->boottime);
+	curthread->td_vps = save_vps;
+
 	vdi->lastpid = VPS_VPS(vps, lastpid);
 
 	vdi->restore_count = vps->restore_count;
