@@ -230,7 +230,7 @@ linux_current_uninit(void *arg __unused)
 	struct task_struct *ts;
 	struct thread *td;
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		PROC_LOCK(p);
 		FOREACH_THREAD_IN_PROC(p, td) {
@@ -241,7 +241,7 @@ linux_current_uninit(void *arg __unused)
 		}
 		PROC_UNLOCK(p);
 	}
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 
 	EVENTHANDLER_DEREGISTER(thread_dtor, linuxkpi_thread_dtor_tag);
 }

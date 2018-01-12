@@ -135,9 +135,9 @@ VPS_DEFINE(struct pgrphashhead *, pgrphashtbl);
 VPS_DEFINE(u_long, pgrphash);
 VPS_DEFINE(struct proclist, allproc);	/* List of all processes. */
 VPS_DEFINE(struct proclist, zombproc);	/* List of zombie processes. */
-VPS_DEFINE(struct sx __exclusive_cache_line, allproc_lock);
-VPS_DEFINE(struct sx __exclusive_cache_line, proctree_lock);
-VPS_DEFINE(struct mtx __exclusive_cache_line, ppeers_lock);
+VPS_DEFINE(struct sx, allproc_lock);
+VPS_DEFINE(struct sx, proctree_lock);
+VPS_DEFINE(struct mtx, ppeers_lock);
 uma_zone_t proc_zone;
 
 VPS_DEFINE(struct proc *, initproc);	/* Process slot for init. */
@@ -469,11 +469,11 @@ pfind_any(pid_t pid)
 {
 	struct proc *p;
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	p = pfind_locked(pid);
 	if (p == NULL)
 		p = zpfind_locked(pid);
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 
 	return (p);
 }
@@ -3262,7 +3262,7 @@ again:
 		}
 	}
 	/*  Did the loop above missed any stopped process ? */
-	LIST_FOREACH(p, &allproc, p_list) {
+	LIST_FOREACH(p, &V_allproc, p_list) {
 		/* No need for proc lock. */
 		if ((p->p_flag & P_TOTAL_STOP) != 0)
 			goto again;

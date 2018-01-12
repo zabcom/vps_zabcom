@@ -169,6 +169,9 @@ static void swapout_procs(int action);
 static void vm_req_vmdaemon(int req);
 static void vm_thread_swapin(struct thread *td);
 static void vm_thread_swapout(struct thread *td);
+#ifdef VPS
+int vps_pager_put_object(vm_object_t, long);
+#endif
 
 /*
  *	vm_swapout_object_deactivate_pages

@@ -938,7 +938,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		CTR2(KTR_PTRACE, "PT_ATTACH: pid %d, oppid %d", p->p_pid,
 		    p->p_oppid);
 
-		sx_xunlock(&proctree_lock);
+		sx_xunlock(&V_proctree_lock);
 		proctree_locked = 0;
 		MPASS(p->p_xthread == NULL);
 		MPASS((p->p_flag & P_STOPPED_TRACE) == 0);
@@ -1167,7 +1167,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			break;
 		}
 
-		sx_xunlock(&proctree_lock);
+		sx_xunlock(&V_proctree_lock);
 		proctree_locked = 0;
 
 	sendsig:

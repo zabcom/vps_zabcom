@@ -695,11 +695,11 @@ db_kill(db_expr_t dummy1, bool dummy2, db_expr_t dummy3, char *dummy4)
 	 * Find the process in question.  allproc_lock is not needed
 	 * since we're in DDB.
 	 */
-	/* sx_slock(&allproc_lock); */
+	/* sx_slock(&V_allproc_lock); */
 	FOREACH_PROC_IN_SYSTEM(p)
 	    if (p->p_pid == pid)
 		    break;
-	/* sx_sunlock(&allproc_lock); */
+	/* sx_sunlock(&V_allproc_lock); */
 	if (p == NULL)
 		DB_ERROR(("Can't find process with pid %ld\n", (long) pid));
 

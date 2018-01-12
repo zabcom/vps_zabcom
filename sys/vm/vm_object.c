@@ -125,20 +125,6 @@ vps_account_resident(vm_object_t object, int action, size_t charge)
                 action, charge << PAGE_SHIFT);
 }
 
-#define VPS_ACCOUNT_VIRTUAL(object, action, charge)      \
-		vps_account_virtual(object, action, charge)
- 
-static __inline void
-vps_account_virtual(vm_object_t object, int action, size_t charge)
-{  
- 
-        if (object->cred == NULL)
-                return;
-   
-        vps_account(object->cred->cr_vps, VPS_ACC_VIRT,
-                action, charge << PAGE_SHIFT);
-}
-
 #else
 
 #define VPS_ACCOUNT_RESIDENT(object, action, charge)
@@ -2590,16 +2576,16 @@ vm_object_in_map(vm_object_t object)
 {
 	struct proc *p;
 
-	/* sx_slock(&allproc_lock); */
+	/* sx_slock(&V_allproc_lock); */
 	FOREACH_PROC_IN_SYSTEM(p) {
 		if (!p->p_vmspace /* || (p->p_flag & (P_SYSTEM|P_WEXIT)) */)
 			continue;
 		if (_vm_object_in_map(&p->p_vmspace->vm_map, object, 0)) {
-			/* sx_sunlock(&allproc_lock); */
+			/* sx_sunlock(&V_allproc_lock); */
 			return 1;
 		}
 	}
-	/* sx_sunlock(&allproc_lock); */
+	/* sx_sunlock(&V_allproc_lock); */
 	if (_vm_object_in_map(kernel_map, object, 0))
 		return 1;
 	return 0;
@@ -2795,13 +2781,13 @@ DB_SHOW_COMMAND(vmobjlist, vm_object_print_list)
 #ifdef VPS
 		/* sx_slock(&vps_all_lock); */
         	LIST_FOREACH(vps, &vps_head, vps_all) {
-			/* sx_slock(&allproc_lock); */
+			/* sx_slock(&V_allproc_lock); */
 #endif
 			LIST_FOREACH(p, &VPS_VPS(vps, allproc), p_list) {
 				if (!p->p_vmspace /* || (p->p_flag & (P_SYSTEM|P_WEXIT)) */)
 					continue;
 				if (_vm_object_in_map(&p->p_vmspace->vm_map, obj, 0)) {
-					/* sx_sunlock(&allproc_lock); */
+					/* sx_sunlock(&V_allproc_lock); */
 					/*
 					db_printf("      is in vmspace %p proc %d/%p\n",
 						p->p_vmspace, p->p_pid, p);
@@ -2810,7 +2796,7 @@ DB_SHOW_COMMAND(vmobjlist, vm_object_print_list)
 					mapname = "vmspace";
 				}
 			}
-			/* sx_sunlock(&allproc_lock); */
+			/* sx_sunlock(&V_allproc_lock); */
 #ifdef VPS
 		}
 		/* sx_sunlock(&vps_all_lock); */

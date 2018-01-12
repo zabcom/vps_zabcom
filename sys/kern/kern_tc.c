@@ -183,7 +183,6 @@ init_V_kern_tc(struct bintime *boottimebin)
 		 * NOW - uptime.  That way different cloks are OK as well. */
 		V_boottimebin = *boottimebin;
 		//V_offset = 0;
-#endif
 	}
 }
 #endif

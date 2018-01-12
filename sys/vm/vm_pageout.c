@@ -129,9 +129,6 @@ static int vm_pageout_cluster(vm_page_t m);
 static bool vm_pageout_scan(struct vm_domain *vmd, int pass);
 static void vm_pageout_mightbe_oom(struct vm_domain *vmd, int page_shortage,
     int starting_page_shortage);
-#ifdef VPS
-int vps_pager_put_object(vm_object_t, long);
-#endif
 
 SYSINIT(pagedaemon_init, SI_SUB_KTHREAD_PAGE, SI_ORDER_FIRST, vm_pageout_init,
     NULL);
