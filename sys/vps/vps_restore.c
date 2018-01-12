@@ -1730,10 +1730,11 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		SOCK_UNLOCK(nso);
 	} else {
 		SOLISTEN_LOCK(nso);
-		/* sol_incomp */
-		/* sol_comp */
-		nso->sol_qlen = vds->sol_qlen;
-		nso->sol_incqlen = vds->sol_incqlen;
+		/* Fill/incremented further down when we restore the tailqs. */
+		TAILQ_INIT(&nso->sol_incomp);
+		TAILQ_INIT(&nso->sol_comp);
+		nso->sol_qlen = 0;
+		nso->sol_incqlen = 0;
 
 		nso->sol_qlimit = vds->so_qlimit;
 
