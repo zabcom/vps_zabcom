@@ -732,9 +732,9 @@ trap_pfault(struct trapframe *frame, int usermode)
 		trap_fatal(frame, eva);
 		return (-1);
 	} else {
-		printf("%s proc=%p/%d map=%p eva=%016lx va=%016lx prot=%x "
-		    "rv=%d tf_rip=%#lx\n", __func__, p, p->p_pid, map,
-		    eva, va, ftype, rv, frame->tf_rip);
+		printf("%s proc=%p/%d:%s map=%p eva=%016lx va=%016lx ftype=%x "
+		    "rv=%d tf_rip=%#lx\n", __func__, p, p->p_pid, p->p_comm,
+		    map, eva, va, ftype, rv, frame->tf_rip);
 	}
 
 	return ((rv == KERN_PROTECTION_FAILURE) ? SIGBUS : SIGSEGV);
