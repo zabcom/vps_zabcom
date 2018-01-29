@@ -2659,6 +2659,223 @@ root  743  0.0 95.5  25420 3912 #C:0x9b  Ss   13:58   0:00.01 /bin/csh          
 
 --------------------------------------------------------------------------------
 
+# sockstat -vs
+USER     COMMAND    PID   FD PROTO  LOCAL ADDRESS         FOREIGN ADDRESS       PATH STATE   CONN STATE
+root     sendmail   436   3  tcp4   127.0.0.1:25          *:*                                LISTEN
+?        ?          ?     ?  tcp4   127.0.0.1:25          127.0.0.1:56358                    CLOSING
+?        ?          ?     ?  tcp4   127.0.0.1:56358       127.0.0.1:25                       FIN_WAIT_2
+# telnvps_account_threads: WARNING: ticks=-2147483619 vps_account_cpu_updated=2147483577
+et 127.1 25
+
+
+Fatal trap 12: page fault while in kernel mode
+cpuid = 0; apic id = 02
+fault virtual address   = 0x1030000
+fault code              = supervisor write data, page not present
+instruction pointer     = 0x20:0xffffffff80b1f2df
+stack pointer           = 0x28:0xfffffe0096f85620
+frame pointer           = 0x28:0xfffffe0096f85660
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 12 (swi1: netisr 0)
+[ thread pid 12 tid 100014 ]
+Stopped at      sonewconn+0x5ef:        movq    %r14,(%rcx)
+db> where
+Tracing pid 12 tid 100014 td 0xfffff80003565580
+sonewconn() at sonewconn+0x5ef/frame 0xfffffe0096f85660
+syncache_expand() at syncache_expand+0x9ba/frame 0xfffffe0096f857c0
+tcp_input() at tcp_input+0x114d/frame 0xfffffe0096f85910
+ip_input() at ip_input+0x13f/frame 0xfffffe0096f85970
+swi_net() at swi_net+0x17b/frame 0xfffffe0096f859e0
+intr_event_execute_handlers() at intr_event_execute_handlers+0xe9/frame 0xfffffe0096f85a20
+ithread_loop() at ithread_loop+0xe6/frame 0xfffffe0096f85a70
+fork_exit() at fork_exit+0x82/frame 0xfffffe0096f85ab0
+fork_trampoline() at fork_trampoline+0xe/frame 0xfffffe0096f85ab0
+--- trap 0, rip = 0, rsp = 0, rbp = 0 ---
+db>
+
+db> trace 100014
+Tracing pid 12 tid 100014 td 0xfffff80003565580
+sonewconn() at sonewconn+0x5ef/frame 0xfffffe0096f85660
+syncache_expand() at syncache_expand+0x9ba/frame 0xfffffe0096f857c0
+tcp_input() at tcp_input+0x114d/frame 0xfffffe0096f85910
+ip_input() at ip_input+0x13f/frame 0xfffffe0096f85970
+swi_net() at swi_net+0x17b/frame 0xfffffe0096f859e0
+intr_event_execute_handlers() at intr_event_execute_handlers+0xe9/frame 0xfffffe0096f85a20
+ithread_loop() at ithread_loop+0xe6/frame 0xfffffe0096f85a70
+fork_exit() at fork_exit+0x82/frame 0xfffffe0096f85ab0
+fork_trampoline() at fork_trampoline+0xe/frame 0xfffffe0096f85ab0
+--- trap 0, rip = 0, rsp = 0, rbp = 0 ---
+
+
+
+(gdb) l *0xffffffff80b1f2df
+0xffffffff80b1f2df is in vn_commname (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_cache.c:2709).
+warning: Source file is more recent than executable.
+
+2704                            error = get_next_dirent(dvp2, &dp, dirbuf, dirbuflen,
+2705                                &off, &cpos, &len, &eofflag, td);
+2706                            if (error != 0) {
+2707                                    VOP_UNLOCK(dvp2, 0);
+2708                                    goto out;
+2709                            }
+2710
+2711                            if (dp->d_fileno == inodenum) {
+2712                                    /* Found it ! */
+2713                                    if (buflen < strlen(dp->d_name)) {
+(gdb) l *sonewconn+0x5ef
+0xffffffff80afa4ff is in sonewconn (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/uipc_socket.c:685).
+warning: Source file is more recent than executable.
+
+680                             sp->so_qstate = SQ_NONE;
+681                             sp->so_listen = NULL;
+682                             SOCK_UNLOCK(sp);
+683                             sorele(head);   /* does SOLISTEN_UNLOCK, head stays */
+684                             soabort(sp);
+685                             SOLISTEN_LOCK(head);
+686                     }
+687                     TAILQ_INSERT_TAIL(&head->sol_incomp, so, so_list);
+688                     so->so_qstate = SQ_INCOMP;
+689                     head->sol_incqlen++;
+
+
+Fatal trap 12: page fault while in kernel mode
+cpuid = 0; apic id = 02
+fault virtual address   = 0x1030000
+fault code              = supervisor write data, page not present
+instruction pointer     = 0x20:0xffffffff80b1f2df
+stack pointer           = 0x28:0xfffffe0096f85620
+frame pointer           = 0x28:0xfffffe0096f85660
+code segment            = base 0x0, limit 0xfffff, type 0x1b
+                        = DPL 0, pres 1, long 1, def32 0, gran 1
+processor eflags        = interrupt enabled, resume, IOPL = 0
+current process         = 12 (swi1: netisr 0)
+[ thread pid 12 tid 100014 ]
+Stopped at      sonewconn+0x5ef:        movq    %r14,(%rcx)
+
+
+(gdb) l *0xffffffff80b1f2df
+0xffffffff80b1f2df is in vn_commname (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/vfs_cache.c:2709).
+warning: Source file is more recent than executable.
+
+2704                            error = get_next_dirent(dvp2, &dp, dirbuf, dirbuflen,
+2705                                &off, &cpos, &len, &eofflag, td);
+2706                            if (error != 0) {
+2707                                    VOP_UNLOCK(dvp2, 0);
+2708                                    goto out;
+2709                            }
+2710
+2711                            if (dp->d_fileno == inodenum) {
+2712                                    /* Found it ! */
+2713                                    if (buflen < strlen(dp->d_name)) {
+
+
+db> where
+Tracing pid 12 tid 100014 td 0xfffff80003565580
+sonewconn() at sonewconn+0x5ef/frame 0xfffffe0096f85660
+syncache_expand() at syncache_expand+0x9ba/frame 0xfffffe0096f857c0
+tcp_input() at tcp_input+0x114d/frame 0xfffffe0096f85910
+ip_input() at ip_input+0x13f/frame 0xfffffe0096f85970
+swi_net() at swi_net+0x17b/frame 0xfffffe0096f859e0
+intr_event_execute_handlers() at intr_event_execute_handlers+0xe9/frame 0xfffffe0096f85a20
+ithread_loop() at ithread_loop+0xe6/frame 0xfffffe0096f85a70
+fork_exit() at fork_exit+0x82/frame 0xfffffe0096f85ab0
+fork_trampoline() at fork_trampoline+0xe/frame 0xfffffe0096f85ab0
+--- trap 0, rip = 0, rsp = 0, rbp = 0 ---
+
+db> show thread 0xfffff80003565580
+Thread 100014 at 0xfffff80003565580:
+ proc (pid 12): 0xfffff80003545a80
+ name: swi1: netisr 0
+ cred: 0xfffff80003033b00
+ stack: 0xfffffe0096f82000-0xfffffe0096f85fff
+ flags: 0x4010004  pflags: 0x200400
+ state: RUNNING (CPU 0)
+ priority: 28
+ container lock: sched lock 0 (0xffffffff81cf6580)
+ last voluntary switch: 44 ms ago
+ last involuntary switch: 7 ms ago
+ td_frame: 0xfffffe0096f85ac0 td_intr_frame 0
+ td_kstack: 0xfffffe0096f82000 (4 pages, obj 0xfffff8000354ee10)
+ td_vps: 0xfffff80003020000
+ td_ucred->cr_vps: 0xfffff80003020000
+
+db> show frame 0xfffffe0096f85ac0
+ tf_rdi         0x0000000000000000
+ tf_rsi         0x0000000000000000
+ tf_rdx         0x0000000000000001
+ tf_rcx         0x0000000000000000
+ tf_r8          0x0000000000000000
+ tf_r9          0x0000000000000000
+ tf_rax         0x0000000000000000
+ tf_rbx         0x0000000000000000
+ tf_rbp         0x0000000000000000
+ tf_r10         0x0000000000000000
+ tf_r11         0x0000000000000000
+ tf_r12         0x0000000000000000
+ tf_r13         0x0000000000000000
+ tf_r14         0x0000000000000000
+ tf_r15         0x0000000000000000
+ tf_trapno      0x00000000
+ tf_fs          0x0000
+ tf_gs          0x0000
+ tf_addr        0x0000000000000000
+ tf_flags       0x00000000
+ tf_es          0x0000
+ tf_ds          0x0000
+ tf_err         0x0000000000000000
+ tf_rip         0x0000000000000000
+ tf_cs          0x0000000000000000
+ tf_rflags      0x0000000000000000
+ tf_rsp         0x0000000000000000
+ tf_ss          0x0000000000000000
+
+(gdb) l *sonewconn+0x5ef
+0xffffffff80afa4ff is in sonewconn (/tank/users/bz/vps_zambcom/vps_zabcom/sys/kern/uipc_socket.c:685).
+warning: Source file is more recent than executable.
+
+680                             sp->so_qstate = SQ_NONE;
+681                             sp->so_listen = NULL;
+682                             SOCK_UNLOCK(sp);
+683                             sorele(head);   /* does SOLISTEN_UNLOCK, head stays */
+684                             soabort(sp);
+685                             SOLISTEN_LOCK(head);
+686                     }
+687                     TAILQ_INSERT_TAIL(&head->sol_incomp, so, so_list);
+688                     so->so_qstate = SQ_INCOMP;
+689                     head->sol_incqlen++;
+
+
+
+
+
+--------------------------------------------------------------------------------
+
+vps1: bpf attached
+keg_dtor() at keg_dtor+0x45/frame 0xfffffe00a1327f60
+zone_dtor() at zone_dtor+0x489/frame 0xfffffe00a1327fc0
+uma_zdestroy() at uma_zdestroy+0x36/frame 0xfffffe00a1327fe0
+vnet_route_uninit() at vnet_route_uninit+0xd2/frame 0xfffffe00a1328010
+vps_restore_vnet_route() at vps_restore_vnet_route+0x36/frame 0xfffffe00a1328050
+vps_restore_vnet() at vps_restore_vnet+0xd9/frame 0xfffffe00a1328090
+vps_restore_vps() at vps_restore_vps+0x247/frame 0xfffffe00a13285e0
+vps_restore() at vps_restore+0x10f/frame 0xfffffe00a1328650
+vps_ioc_restore() at vps_ioc_restore+0x8f/frame 0xfffffe00a1328680
+devfs_ioctl() at devfs_ioctl+0xac/frame 0xfffffe00a13286d0
+VOP_IOCTL_APV() at VOP_IOCTL_APV+0x82/frame 0xfffffe00a1328700
+vn_ioctl() at vn_ioctl+0x1a4/frame 0xfffffe00a1328810
+devfs_ioctl_f() at devfs_ioctl_f+0x1f/frame 0xfffffe00a1328830
+kern_ioctl() at kern_ioctl+0x282/frame 0xfffffe00a13288a0
+sys_ioctl() at sys_ioctl+0x15c/frame 0xfffffe00a1328970
+amd64_syscall() at amd64_syscall+0x485/frame 0xfffffe00a1328ab0
+Xfast_syscall() at Xfast_syscall+0x104/frame 0xfffffe00a1328ab0
+--- syscall (54, FreeBSD ELF64, sys_ioctl), rip = 0x800bd24ea, rsp = 0x7fffffffcea8, rbp = 0x7fffffffeaa0 ---
+Freed UMA keg (rtentry) was not empty (15 items).  Lost 1 pages of memory.
+
+--------------------------------------------------------------------------------
+
+
 
 
 
