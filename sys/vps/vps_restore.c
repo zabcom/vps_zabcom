@@ -1630,6 +1630,15 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vds = (struct vps_dump_socket *)cpos;
 	cpos += sizeof(*vds);
 
+	SLIST_FOREACH(ro, &ctx->obj_list, list)
+		if (ro->type == VPS_DUMPOBJT_SOCKET &&
+		    ro->orig_ptr == vds->so_orig_ptr) {
+			DBGR("%s: socket=%p already restored\n",
+			    __func__, vds->so_orig_ptr);
+printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so_orig_ptr);
+			return (EEXIST);
+		}
+
 	if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_UCRED) {
 		vdo_next(ctx);
 		/* XXX don't put child objects in the middle of data ! */
@@ -1723,7 +1732,7 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		*/
 
 		SOCK_LOCK(nso);
-		/* so_listen */
+		/* so_listen */	/* XXX-BZ we have to find the so_orig_ptr and use the new nso of that.  This is possibly a delayed job once we are done with all sockets. */
 		nso->so_qstate = vds->so_qstate;
 		/* so_peerlabel */
 		nso->so_oobmark = vds->so_oobmark;
@@ -2170,6 +2179,15 @@ vps_restore_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 		}
 		curthread->td_retval[0] = fdidx_save;
 	}
+
+	/* Insert into global list of restored sockets. */
+	ro = malloc(sizeof(*ro), M_VPS_RESTORE, M_WAITOK | M_ZERO);
+	ro->type = VPS_DUMPOBJT_SOCKET;
+	ro->orig_ptr = vds->so_orig_ptr;
+	ro->new_ptr = nso;
+	ro->spare[0] = NULL;
+	ro->spare[1] = NULL;
+	SLIST_INSERT_HEAD(&ctx->obj_list, ro, list);
 
 	return (error);
 }
@@ -4588,6 +4606,35 @@ vps_restore_mounts(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 VPSFUNC
 static void
+vps_restore_socket_fixup(struct vps_snapst_ctx *ctx, struct vps *vps __unused)
+{
+	struct vps_restore_obj *ro, *ro2;
+	struct socket *nso;
+
+	SLIST_FOREACH(ro, &ctx->obj_list, list) {
+		if (ro->type != VPS_DUMPOBJT_SOCKET)
+			continue;
+
+		nso = (struct socket *)ro->new_ptr;
+		if (nso->so_listen == NULL)
+			continue;
+
+		/* Try to find the original socket. */
+		SLIST_FOREACH(ro2, &ctx->obj_list, list) {
+			if (ro2->type != VPS_DUMPOBJT_SOCKET)
+				continue;
+
+			if (nso->so_listen != ro2->orig_ptr)
+				continue;
+
+			nso->so_listen = (struct socket *)ro2->new_ptr;
+			break;
+		}
+	}
+}
+
+VPSFUNC
+static void
 vps_restore_prison_fixup(struct vps_snapst_ctx *ctx, struct vps *vps)
 {
 	struct vps_restore_obj *obj1;
@@ -4956,7 +5003,7 @@ vps_restore_vps(struct vps_snapst_ctx *ctx, const char *vps_name,
 	/*
 	 * Various fixup routines.
 	 */
-
+	vps_restore_socket_fixup(ctx, vps);
 	vps_restore_prison_fixup(ctx, vps);
 
 	if (vps_func->sem_restore_fixup &&

@@ -706,7 +706,6 @@ struct vps_dump_pts {
 struct vps_dump_socket {
 	PTR(so_orig_ptr);
 
-
 	sint16 so_type;
 	sint16 so_options;
 	sint16 so_linger;
@@ -733,7 +732,7 @@ struct vps_dump_socket {
 	/* so_rcv */
 	/* so_snd */
 	/* so_list */
-	/* so_listen */
+	PTR(so_listen);
 	sint32 so_qstate;
 	/* so_peerlabel */
 	uint64 so_oobmark;

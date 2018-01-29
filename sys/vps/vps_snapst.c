@@ -2532,7 +2532,7 @@ again:
 	if (!SOLISTENING(so)) {
 		/* Done below: so_rcv, so_snd */
 		/* so_list */
-		/* so_listen */
+		vds->so_listen = so->so_listen;
 		vds->so_qstate = so->so_qstate;
 		/* so_peerlabel */
 		vds->so_oobmark = so->so_oobmark;
