@@ -134,9 +134,9 @@ __FBSDID("$FreeBSD$");
 const int tcprexmtthresh = 3;
 
 VNET_DEFINE(int, tcp_log_in_vain) = 0;
-SYSCTL_INT(_net_inet_tcp, OID_AUTO, log_in_vain, CTLFLAG_VNET | CTLFLAG_RW,
-    &tcp_log_in_vain, 0,
-    "Log all incoming TCP segments to closed ports");
+_SYSCTL_INT(_net_inet_tcp, OID_AUTO, log_in_vain, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(tcp_log_in_vain), 0,
+    "Log all incoming TCP segments to closed ports", VPS_PUBLIC);
 
 VNET_DEFINE(int, blackhole) = 0;
 #define	V_blackhole		VNET(blackhole)
@@ -150,9 +150,9 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, delayed_ack, CTLFLAG_VNET | CTLFLAG_RW,
     "Delay ACK to try and piggyback it onto a data packet");
 
 VNET_DEFINE(int, drop_synfin) = 0;
-SYSCTL_INT(_net_inet_tcp, OID_AUTO, drop_synfin, CTLFLAG_VNET | CTLFLAG_RW,
+_SYSCTL_INT(_net_inet_tcp, OID_AUTO, drop_synfin, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(drop_synfin), 0,
-    "Drop TCP packets with SYN+FIN set");
+    "Drop TCP packets with SYN+FIN set", VPS_PUBLIC);
 
 VNET_DEFINE(int, tcp_do_rfc6675_pipe) = 0;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, rfc6675_pipe, CTLFLAG_VNET | CTLFLAG_RW,

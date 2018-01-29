@@ -117,8 +117,8 @@ SYSCTL_INT(_net_inet_udp, UDPCTL_CHECKSUM, checksum, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(udp_cksum), 0, "compute udp checksum");
 
 VNET_DEFINE(int, udp_log_in_vain) = 0;
-SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_VNET | CTLFLAG_RW,
-    &udp_log_in_vain, 0, "Log all incoming UDP packets");
+_SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(udp_log_in_vain), 0, "Log all incoming UDP packets", VPS_PUBLIC);
 
 VNET_DEFINE(int, udp_blackhole) = 0;
 SYSCTL_INT(_net_inet_udp, OID_AUTO, blackhole, CTLFLAG_VNET | CTLFLAG_RW,

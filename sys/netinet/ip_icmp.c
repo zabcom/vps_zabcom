@@ -117,15 +117,15 @@ SYSCTL_UINT(_net_inet_icmp, OID_AUTO, maskfake, CTLFLAG_VNET | CTLFLAG_RW,
 
 VNET_DEFINE(int, drop_redirect) = 0;
 #define	V_drop_redirect			VNET(drop_redirect)
-SYSCTL_INT(_net_inet_icmp, OID_AUTO, drop_redirect, CTLFLAG_VNET | CTLFLAG_RW,
+_SYSCTL_INT(_net_inet_icmp, OID_AUTO, drop_redirect, CTLFLAG_VNET | CTLFLAG_RW,
 	&VNET_NAME(drop_redirect), 0,
-	"Ignore ICMP redirects");
+	"Ignore ICMP redirects", VPS_PUBLIC);
 
 static VNET_DEFINE(int, log_redirect) = 0;
 #define	V_log_redirect			VNET(log_redirect)
-SYSCTL_INT(_net_inet_icmp, OID_AUTO, log_redirect, CTLFLAG_VNET | CTLFLAG_RW,
+_SYSCTL_INT(_net_inet_icmp, OID_AUTO, log_redirect, CTLFLAG_VNET | CTLFLAG_RW,
 	&VNET_NAME(log_redirect), 0,
-	"Log ICMP redirects to the console");
+	"Log ICMP redirects to the console", VPS_PUBLIC);
 
 static VNET_DEFINE(char, reply_src[IFNAMSIZ]);
 #define	V_reply_src			VNET(reply_src)
@@ -147,9 +147,10 @@ SYSCTL_INT(_net_inet_icmp, OID_AUTO, quotelen, CTLFLAG_VNET | CTLFLAG_RW,
 
 static VNET_DEFINE(int, icmpbmcastecho) = 0;
 #define	V_icmpbmcastecho		VNET(icmpbmcastecho)
-SYSCTL_INT(_net_inet_icmp, OID_AUTO, bmcastecho, CTLFLAG_VNET | CTLFLAG_RW,
+_SYSCTL_INT(_net_inet_icmp, OID_AUTO, bmcastecho, CTLFLAG_VNET | CTLFLAG_RW,
 	&VNET_NAME(icmpbmcastecho), 0,
-	"Reply to multicast ICMP Echo Request and Timestamp packets");
+	"Reply to multicast ICMP Echo Request and Timestamp packets",
+	VPS_PUBLIC);
 
 static VNET_DEFINE(int, icmptstamprepl) = 1;
 #define	V_icmptstamprepl		VNET(icmptstamprepl)

@@ -119,8 +119,9 @@ SYSCTL_PROC(_net_inet_tcp, OID_AUTO, rexmit_slop, CTLTYPE_INT|CTLFLAG_RW,
     "Retransmission Timer Slop");
 
 static VNET_DEFINE(int,	always_keepalive) = 1;
-SYSCTL_INT(_net_inet_tcp, OID_AUTO, always_keepalive, CTLFLAG_RW|CTLFLAG_VNET,
-    &always_keepalive , 0, "Assume SO_KEEPALIVE on all TCP connections");
+_SYSCTL_INT(_net_inet_tcp, OID_AUTO, always_keepalive, CTLFLAG_RW|CTLFLAG_VNET,
+    &VNET_NAME(always_keepalive), 0,
+     "Assume SO_KEEPALIVE on all TCP connections", VPS_PUBLIC);
 #define	V_always_keepalive	VNET(always_keepalive)
 
 int    tcp_fast_finwait2_recycle = 0;

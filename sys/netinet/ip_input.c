@@ -105,9 +105,9 @@ RM_SYSINIT(in_ifaddr_lock, &in_ifaddr_lock, "in_ifaddr_lock");
 VNET_DEFINE(int, rsvp_on);
 
 VNET_DEFINE(int, ipforwarding);
-SYSCTL_INT(_net_inet_ip, IPCTL_FORWARDING, forwarding, CTLFLAG_VNET | CTLFLAG_RW,
+_SYSCTL_INT(_net_inet_ip, IPCTL_FORWARDING, forwarding, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(ipforwarding), 0,
-    "Enable IP forwarding between interfaces");
+    "Enable IP forwarding between interfaces", VPS_PUBLIC);
 
 static VNET_DEFINE(int, ipsendredirects) = 1;	/* XXX */
 #define	V_ipsendredirects	VNET(ipsendredirects)

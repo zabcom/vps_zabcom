@@ -477,9 +477,9 @@ sysctl_ip6_tempvltime(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
-SYSCTL_INT(_net_inet6_ip6, IPV6CTL_FORWARDING, forwarding,
+_SYSCTL_INT(_net_inet6_ip6, IPV6CTL_FORWARDING, forwarding,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip6_forwarding), 0,
-	"Enable forwarding of IPv6 packets between interfaces");
+	"Enable forwarding of IPv6 packets between interfaces", VPS_PUBLIC);
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_SENDREDIRECTS, redirect,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip6_sendredirects), 0,
 	"Send ICMPv6 redirects for unforwardable IPv6 packets");
@@ -497,19 +497,19 @@ SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MAXFRAGPACKETS, maxfragpackets,
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_ACCEPT_RTADV, accept_rtadv,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip6_accept_rtadv), 0,
 	"Default value of per-interface flag for accepting ICMPv6 RA messages");
-SYSCTL_INT(_net_inet6_ip6, IPV6CTL_NO_RADR, no_radr,
+_SYSCTL_INT(_net_inet6_ip6, IPV6CTL_NO_RADR, no_radr,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip6_no_radr), 0,
 	"Default value of per-interface flag to control whether routers "
 	"sending ICMPv6 RA messages on that interface are added into the "
-	"default router list");
+	"default router list", VPS_PUBLIC);
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_NORBIT_RAIF, norbit_raif,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip6_norbit_raif), 0,
 	"Always set clear the R flag in ICMPv6 NA messages when accepting RA "
 	"on the interface");
-SYSCTL_INT(_net_inet6_ip6, IPV6CTL_RFC6204W3, rfc6204w3,
+_SYSCTL_INT(_net_inet6_ip6, IPV6CTL_RFC6204W3, rfc6204w3,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip6_rfc6204w3), 0,
 	"Accept the default router list from ICMPv6 RA messages even "
-	"when packet forwarding is enabled");
+	"when packet forwarding is enabled", VPS_PUBLIC);
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_LOG_INTERVAL, log_interval,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip6_log_interval), 0,
 	"Frequency in seconds at which to log IPv6 forwarding errors");
@@ -547,9 +547,9 @@ SYSCTL_PROC(_net_inet6_ip6, IPV6CTL_TEMPVLTIME, tempvltime,
 	CTLFLAG_VNET | CTLTYPE_INT | CTLFLAG_RW,
 	NULL, 0, sysctl_ip6_tempvltime, "I",
 	"Maximum valid lifetime for temporary addresses");
-SYSCTL_INT(_net_inet6_ip6, IPV6CTL_V6ONLY, v6only,
+_SYSCTL_INT(_net_inet6_ip6, IPV6CTL_V6ONLY, v6only,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip6_v6only), 0,
-	"Restrict AF_INET6 sockets to IPv6 addresses only");
+	"Restrict AF_INET6 sockets to IPv6 addresses only", VPS_PUBLIC);
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_AUTO_LINKLOCAL, auto_linklocal,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip6_auto_linklocal), 0,
 	"Default value of per-interface flag for automatically adding an IPv6 "
