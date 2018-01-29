@@ -697,7 +697,6 @@ SYSCTL_DECL(_net_inet_tcp_sack);
 MALLOC_DECLARE(M_TCPLOG);
 #endif
 
-extern	int tcp_log_in_vain;
 
 /*
  * Global TCP tunables shared between different stacks.
@@ -725,6 +724,7 @@ VNET_DECLARE(int, tcp_ecn_maxretries);
 VNET_DECLARE(int, tcp_initcwnd_segments);
 VNET_DECLARE(int, tcp_insecure_rst);
 VNET_DECLARE(int, tcp_insecure_syn);
+VNET_DECLARE(int, tcp_log_in_vain);
 VNET_DECLARE(int, tcp_minmss);
 VNET_DECLARE(int, tcp_mssdflt);
 VNET_DECLARE(int, tcp_recvspace);
@@ -760,6 +760,7 @@ VNET_DECLARE(struct inpcbinfo, tcbinfo);
 #define	V_tcp_initcwnd_segments		VNET(tcp_initcwnd_segments)
 #define	V_tcp_insecure_rst		VNET(tcp_insecure_rst)
 #define	V_tcp_insecure_syn		VNET(tcp_insecure_syn)
+#define	V_tcp_log_in_vain		VNET(tcp_log_in_vain)
 #define	V_tcp_minmss			VNET(tcp_minmss)
 #define	V_tcp_mssdflt			VNET(tcp_mssdflt)
 #define	V_tcp_recvspace			VNET(tcp_recvspace)

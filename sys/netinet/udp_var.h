@@ -151,7 +151,8 @@ VNET_DECLARE(int, udp_cksum);
 VNET_DECLARE(int, udp_blackhole);
 #define	V_udp_cksum		VNET(udp_cksum)
 #define	V_udp_blackhole		VNET(udp_blackhole)
-extern int			udp_log_in_vain;
+VNET_DECLARE(int, udp_log_in_vain);
+#define V_udp_log_in_vain	VNET(udp_log_in_vain)
 
 static __inline struct inpcbinfo *
 udp_get_inpcbinfo(int protocol)
