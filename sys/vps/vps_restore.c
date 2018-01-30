@@ -1812,8 +1812,16 @@ printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so
 				free(saddr_un, M_TEMP);
 				goto out;
 			}
-			kern_unlinkat(curthread, AT_FDCWD, saddr_un->sun_path,
-			    UIO_USERSPACE, 0);
+			error = kern_unlinkat(curthread, AT_FDCWD,
+			    saddr_un->sun_path, UIO_SYSSPACE, 0);
+			if (error) {
+				ERRMSG(ctx, "%s: kern_unlinkat() error: "
+				    "%d [%s]\n",
+				    __func__, error, saddr_un->sun_path);
+				free(statp, M_TEMP);
+				free(saddr_un, M_TEMP);
+				goto out;
+			}
 
 			error = sobind(nso, (struct sockaddr *)saddr_un,
 			    curthread);
@@ -1827,7 +1835,7 @@ printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so
 
 			/* Restore permissions. */
 			error = kern_fchownat(curthread, AT_FDCWD,
-			    saddr_un->sun_path, UIO_USERSPACE, statp->st_uid,
+			    saddr_un->sun_path, UIO_SYSSPACE, statp->st_uid,
 			    statp->st_gid, 0);
 			if (error) {
 				ERRMSG(ctx, "%s: kern_fchownat() error: "
@@ -1837,8 +1845,9 @@ printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so
 				free(saddr_un, M_TEMP);
 				goto out;
 			}
-			error = kern_fchmodat(curthread, AT_FDCWD, saddr_un->sun_path,
-			    UIO_SYSSPACE, statp->st_mode, 0);
+			error = kern_fchmodat(curthread, AT_FDCWD,
+			    saddr_un->sun_path, UIO_SYSSPACE,
+			    statp->st_mode, 0);
 			if (error) {
 				ERRMSG(ctx, "%s: kern_fchmodat() error: "
 				    "%d [%s]\n", __func__, error,
