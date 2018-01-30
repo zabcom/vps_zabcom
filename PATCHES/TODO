@@ -2876,6 +2876,104 @@ Freed UMA keg (rtentry) was not empty (15 items).  Lost 1 pages of memory.
 --------------------------------------------------------------------------------
 
 
+iRestoring on remote host ... ioctl VPS_IOC_RESTOR: Address already in use []
+Kernel error messages:
+------------------------
+vps_restore_proc: error = 48
+vps_restore_proc_one: error = 48
+vps_restore_proc_one:3887 error = 48
+vps_restore_file: vps_restore_socket() error: 48
+vps_restore_socket: error = 48
+vps_restore_socket: sobind() error: 48 [/var/run/log]
+------------------------
+
+-rw-------  1 root  wheel      3 Jan 27 16:12 cron.pid
+-rw-r--r--  1 root  wheel      0 Jan 27 16:11 dmesg.boot
+-r--r--r--  1 root  wheel    158 Jan 27 16:11 ld-elf.so.hints
+-r--r--r--  1 root  wheel    139 Jan 27 16:11 ld-elf32.so.hints
+srw-rw-rw-  1 root  wheel      0 Jan 27 16:11 log
+srw-------  1 root  wheel      0 Jan 27 16:11 logpriv
+drwxrwx---  2 root  network    2 Jul 19  2017 ppp
+-rw-------  2 root  wheel     78 Jan 27 16:12 sendmail.pid
+-rw-------  2 root  wheel      3 Jan 27 16:12 syslog.pid
+-rw-r--r--  1 root  wheel      0 Jan 27 16:11 syslogd.sockets
+-rw-r--r--  1 root  wheel    197 Jan 27 16:11 utx.active
+drwxr-xr-x  2 root  wheel      2 Jul 19  2017 wpa_supplicant
+# sockstat
+USER     COMMAND    PID   FD PROTO  LOCAL ADDRESS         FOREIGN ADDRESS
+root     cron       446   5  dgram  -> /var/run/logpriv
+smmsp    sendmail   442   3  dgram  -> /var/run/log
+root     sendmail   439   3  dgram  -> /var/run/logpriv
+root     sendmail   439   4  tcp4   127.0.0.1:25          *:*
+root     syslogd    324   5  udp6   *:514                 *:*
+root     syslogd    324   6  udp4   *:514                 *:*
+root     syslogd    324   7  dgram  /var/run/log
+root     syslogd    324   8  dgram  /var/run/logpriv
+root     init       1     0  dgram  -> /var/run/logpriv
+
+
+syslogd: child pid 324 exited with return code 71
+/etc/rc: WARNING: failed to start syslogd
+devfs rule: ioctl DEVFSIO_RGETNEXT: Operation not permitted
+/etc/rc: WARNING: devfs_init_rulesets: could not read rules from /etc/defaults/d
+evfs.rules
+devfs rule: ioctl DEVFSIO_RGETNEXT: Operation not permitted
+/etc/rc: WARNING: devfs_init_rulesets: could not read rules from /etc/defaults/devfs.rules
+
+dmesg: sysctl kern.msgbuf: Operation not permitted
+
+gpart: Cannot open library: utsname failed: 2.
+
+kern.random.harvest.mask=511
+
+nOK sysctl: net.inet.tcp.log_in_vain=0: No such file or directory
+nOK sysctl: net.inet.udp.log_in_vain=0: No such file or directory
+aOK sysctl: net.inet.tcp.rfc1323=1: No such file or directory
+nOK sysctl: net.inet.tcp.always_keepalive=1: No such file or directory
+aOK sysctl: net.inet.tcp.drop_synfin=0: No such file or directory
+aOK sysctl: net.inet6.ip6.v6only=1: No such file or directory
+aOK sysctl: net.inet6.ip6.no_radr=0: No such file or directory
+aOK sysctl: net.inet6.ip6.rfc6204w3=0: No such file or directory
+
+aOK sysctl: net.inet.icmp.bmcastecho=0: No such file or directory
+aOK sysctl: net.inet.icmp.drop_redirect=0: No such file or directory
+aOK sysctl: net.inet.icmp.log_redirect=0: No such file or directory
+aOK sysctl: net.inet.ip.forwarding=0: No such file or directory
+aOK sysctl: net.inet.ip.sourceroute=0: No such file or directory
+aOK sysctl: net.inet.ip.accept_sourceroute=0: No such file or directory
+aOK sysctl: net.link.ether.inet.proxyall=0: No such file or directory
+aOK sysctl: net.inet6.ip6.forwarding=0: No such file or directory
+
+
+ifconfig: ioctl(SIOCSIFINFO_IN6): Operation not permitted
+
+devd: devctl sysctl missing from kernel!
+/etc/rc: WARNING: failed to start devd
+
+ln: /dev/log: Operation not permitted
+
+devfs rule: ioctl DEVFSIO_RGETNEXT: Operation not permitted
+
+/etc/rc: WARNING: devfs_init_rulesets: could not read rules from /etc/defaults/devfs.rules
+
+open library: utsname failed: 2.
+--------------------------------------------------------------------------------
+
+   1090 Jan 29 14:45:00 foo cron[6026]: setloginclass(daemon): Operation not permitted
+   1091 Jan 29 14:56:52  syslogd: kernel boot file is /boot/kernel/kernel
+   1092 Jan 29 14:56:52  root: /etc/rc: WARNING: devfs_init_rulesets: could not read rules from /etc/defaults/devfs.rules
+   1093 Jan 29 14:56:53  init: cannot get kernel security level: No such file or directory
+--------------------------------------------------------------------------------
+
+# telnet 127.1 25
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+trap_pfault proc=0xfffff8011524f540/489:sendmail map=0xfffff80115202000 eva=00007ffffffdb0b8 va=00007ffffffdb000 ftype=2 rv=2 tf_rip=0x486ba7
+Connection closed by foreign host.
+#
+
+--------------------------------------------------------------------------------
 
 
 
