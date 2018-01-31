@@ -2222,7 +2222,8 @@ vps_restore_pathtovnode(struct vps_snapst_ctx *ctx, struct vps *vps,
 		vdfp->fp_path, curthread);
 	error = namei(&nd);
 	if (error) {
-		ERRMSG(ctx, "%s:%d error = %d\n", __func__, __LINE__, error);
+		ERRMSG(ctx, "%s:%d error = %d fp_path %s\n",
+		    __func__, __LINE__, error, vdfp->fp_path);
 		return (error);
 	}
 
