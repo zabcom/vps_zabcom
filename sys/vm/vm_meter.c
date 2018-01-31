@@ -137,13 +137,14 @@ sysctl_vm_loadavg(SYSCTL_HANDLER_ARGS)
 			la[0] = averunnable.ldavg[0];
 			la[1] = averunnable.ldavg[1];
 			la[2] = averunnable.ldavg[2];
-			la[3] = averunnable.fscale;
 		}
+		la[3] = averunnable.fscale;
 		return SYSCTL_OUT(req, la, sizeof(la));
 	} else
 #endif
 		if (req->td->td_vps != vps0) {
 			memset(&lafake, 0, sizeof(lafake));
+			lafake.fscale = averunnable.fscale;
 			return SYSCTL_OUT(req, &lafake, sizeof(lafake));
 		} else {
 			return SYSCTL_OUT(req, &averunnable, sizeof(averunnable));
