@@ -2646,6 +2646,41 @@ DB_SHOW_COMMAND(object, vm_object_print_static)
 	    object->shadow_count, 
 	    object->backing_object ? object->backing_object->ref_count : 0,
 	    object->backing_object, (uintmax_t)object->backing_object_offset);
+	db_iprintf(" type info: ");
+	switch (object->type) {
+	case OBJT_DEFAULT:
+		db_iprintf("default -\n");
+		break;
+	case OBJT_SWAP:
+		db_iprintf("swap -\n");
+		break;
+	case OBJT_VNODE:
+		db_iprintf("vnode %p\n", object->handle);
+		break;
+	case OBJT_DEVICE:
+		db_iprintf("device %p\n", object->handle);
+		break;
+	case OBJT_PHYS:
+		db_iprintf("phys -\n");
+		break;
+	case OBJT_DEAD:
+		db_iprintf("dead -\n");
+		break;
+	case OBJT_SG:
+		db_iprintf("sglist %p\n", object->handle);
+		break;
+	case OBJT_MGTDEVICE:
+		db_iprintf("mgtdevice -\n");
+		break;
+#ifdef VPS
+	case OBJT_VPS:
+		db_iprintf("vps -\n");
+		break;
+#endif
+	default:
+		db_iprintf("<type> %d <handle> %p\n", object->type, object->handle);
+		break;
+	}
 
 	if (!full)
 		return;
