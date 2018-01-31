@@ -238,7 +238,7 @@ sysctl_kern_randompid(SYSCTL_HANDLER_ARGS)
 		else if (pid < 0 || pid > pid_max - 100)
 			/* out of range */
 			V_randompid = pid_max - 100;
-		else if (pid < 100)	 
+		else if (pid < 100)
 			/* Make it reasonable */
 			V_randompid = 100;
 		else
