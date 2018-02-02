@@ -107,6 +107,10 @@ PMC_SOFT_DEFINE( , , page_fault, write);
 #include <sys/dtrace_bsd.h>
 #endif
 
+#ifdef VPS
+#include <vps/vps.h>
+#endif
+
 void __noinline trap(struct trapframe *frame);
 void trap_check(struct trapframe *frame);
 void dblfault_handler(struct trapframe *frame);
@@ -166,6 +170,19 @@ SYSCTL_INT(_machdep, OID_AUTO, uprintf_signal, CTLFLAG_RWTUN,
  * routines that prepare a suitable stack frame, and restore this
  * frame after the exception has been processed.
  */
+
+#ifdef VPS_DEBUG_BZ
+static void __noinline
+bz_debug_trap(struct proc *p, struct thread *td,
+    vm_map_t map, vm_offset_t eva, vm_offset_t va,
+    struct trapframe *frame, int rv)
+{
+
+	printf("XXX-BZ %s:%d p %p td %p map %p eva %016lx va %016lx "
+	    "frame %p rv %d\n",
+	    __func__, __LINE__, p, td, map, eva, va, frame, rv);
+}
+#endif
 
 void
 trap(struct trapframe *frame)
@@ -735,6 +752,22 @@ trap_pfault(struct trapframe *frame, int usermode)
 		printf("%s proc=%p/%d:%s map=%p eva=%016lx va=%016lx ftype=%x "
 		    "rv=%d tf_rip=%#lx\n", __func__, p, p->p_pid, p->p_comm,
 		    map, eva, va, ftype, rv, frame->tf_rip);
+#ifdef VPS_DEBUG_BZ
+		bz_debug_trap(p, td, map, eva, va, frame, rv);
+#if 0
+#ifdef VPS
+#ifdef KDB
+		if (td->td_vps && td->td_vps != vps0) {
+			if (kdb_active) {
+				kdb_reenter();
+			} else {
+				kdb_enter(KDB_WHY_BREAK, "XXX-BZ FIXME");
+			}
+		}
+#endif
+#endif
+#endif
+#endif
 	}
 
 	return ((rv == KERN_PROTECTION_FAILURE) ? SIGBUS : SIGSEGV);
