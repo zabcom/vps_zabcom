@@ -2,7 +2,12 @@ include		GENERIC
 
 ident		VPS_DBG
 
+options		DIAGNOSTIC
+nooptions	WITNESS
+options 	ALT_BREAK_TO_DEBUGGER
+
 # VPS
 options		VPS
 options		VPS_STATIC
-options		VIMAGE
+#options		VIMAGE
+
