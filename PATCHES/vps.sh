@@ -26,7 +26,7 @@ ifconfig vps0 up
 mount -t devfs devfs /vpsroot/dev
 
 vpsctl start testvps
-sleep 1
+sleep 19
 vpsctl suspend testvps
 vpsctl list
 vpsctl show testvps

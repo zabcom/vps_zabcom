@@ -19,9 +19,11 @@ mkdir -p ${INSTPATH}/vpsroot
 (cd .. && make -s installworld distribution KERNCONF=VPS_DBG DESTDIR=${INSTPATH}/vpsroot )
 
 mkdir -p ${INSTPATH}/etc/vps
+cp -pf loader.conf ${INSTPATH}/boot/
 cp -pf vps_testvps.conf ${INSTPATH}/etc/vps/
 cp -pf vps-m.sh vps.sh vps2.sh init.sh ${INSTPATH}/root/
 cp -pf init.sh ${INSTPATH}/vpsroot/root/
+cp -pf ttys rc.conf ${INSTPATH}/vpsroot/etc/
 
 echo "/dev/ada0p2	/	ufs	rw	0 0" > ${INSTPATH}/etc/fstab
 
