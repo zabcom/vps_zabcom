@@ -302,6 +302,17 @@ SYSCTL_STRING(_kern, OID_AUTO, supported_archs, CTLFLAG_RD | CTLFLAG_MPSAFE,
     MACHINE_ARCH, 0, "Supported architectures for binaries");
 #endif
 
+#ifdef VPS
+/*
+ * XXX-BZ this is orthogonal to prison.  Currently the implementation stores
+ * information with the prison.  Audit this entire file (such as hostid) once
+ * VPS and prisons merge.
+ */
+VPS_DEFINE(char, hostname[MAXHOSTNAMELEN]) = "";
+VPS_DEFINE(char, domainname[MAXHOSTNAMELEN]) = "";
+VPS_DEFINE(char, hostuuid[HOSTUUIDLEN]) = "";
+#endif
+
 static int
 sysctl_hostname(SYSCTL_HANDLER_ARGS)
 {
@@ -355,25 +366,19 @@ sysctl_hostname(SYSCTL_HANDLER_ARGS)
 	}
 	return (error);
 }
-
-#ifdef VPS
-VPS_DEFINE(char, hostname[MAXHOSTNAMELEN]) = "";
-VPS_DEFINE(char, domainname[MAXHOSTNAMELEN]) = "";
-VPS_DEFINE(char, hostuuid[HOSTUUIDLEN]) = "";
-#endif
  
-SYSCTL_PROC(_kern, KERN_HOSTNAME, hostname,
+_SYSCTL_PROC(_kern, KERN_HOSTNAME, hostname,
     CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_CAPRD | CTLFLAG_MPSAFE,
     (void *)(offsetof(struct prison, pr_hostname)), MAXHOSTNAMELEN,
-    sysctl_hostname, "A", "Hostname");
-SYSCTL_PROC(_kern, KERN_NISDOMAINNAME, domainname,
+    sysctl_hostname, "A", "Hostname", VPS_PUBLIC);
+_SYSCTL_PROC(_kern, KERN_NISDOMAINNAME, domainname,
     CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_CAPRD | CTLFLAG_MPSAFE,
     (void *)(offsetof(struct prison, pr_domainname)), MAXHOSTNAMELEN,
-    sysctl_hostname, "A", "Name of the current YP/NIS domain");
-SYSCTL_PROC(_kern, KERN_HOSTUUID, hostuuid,
+    sysctl_hostname, "A", "Name of the current YP/NIS domain", VPS_PUBLIC);
+_SYSCTL_PROC(_kern, KERN_HOSTUUID, hostuuid,
     CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_CAPRD | CTLFLAG_MPSAFE,
     (void *)(offsetof(struct prison, pr_hostuuid)), HOSTUUIDLEN,
-    sysctl_hostname, "A", "Host UUID");
+    sysctl_hostname, "A", "Host UUID", VPS_PUBLIC);
 
 static int	regression_securelevel_nonmonotonic = 0;
 
@@ -422,9 +427,9 @@ sysctl_kern_securelvl(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_PROC(_kern, KERN_SECURELVL, securelevel,
+_SYSCTL_PROC(_kern, KERN_SECURELVL, securelevel,
     CTLTYPE_INT|CTLFLAG_RW|CTLFLAG_PRISON, 0, 0, sysctl_kern_securelvl,
-    "I", "Current secure level");
+    "I", "Current secure level", VPS_PUBLIC);
 
 #ifdef INCLUDE_CONFIG_FILE
 /* Actual kernel configuration options. */
@@ -468,10 +473,9 @@ sysctl_hostid(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-/* XXX-BZ VPS? */
-SYSCTL_PROC(_kern, KERN_HOSTID, hostid,
+_SYSCTL_PROC(_kern, KERN_HOSTID, hostid,
     CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE | CTLFLAG_CAPRD,
-    NULL, 0, sysctl_hostid, "LU", "Host ID");
+    NULL, 0, sysctl_hostid, "LU", "Host ID", VPS_PUBLIC);
 
 /*
  * The osrelease string is copied from the global (osrelease in vers.c) into
