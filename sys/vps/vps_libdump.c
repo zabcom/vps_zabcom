@@ -1055,6 +1055,20 @@ vps_dumpobj_makerelative(struct vps_snapst_ctx *ctx)
 }
 
 static void
+_vps_dumpobj_file_path(struct vps_dumpobj *o, char *ident)
+{
+	void *data;
+	struct vps_dump_filepath *vdfp;
+
+	data = o->data;
+	vdfp = (struct vps_dump_filepath *)data;
+
+	printf("%s fp_size %u\n", ident, vdfp->fp_size);
+	printf("%s _pad0 %u\n", ident, vdfp->_pad0);
+	printf("%s fp_path %s\n", ident, vdfp->fp_path);
+}
+
+static void
 _vps_dumpobj_print_thread(struct vps_dumpobj *o, char *ident)
 {
 	void *data;
@@ -1250,6 +1264,8 @@ __vps_dumpobj_printtree(struct vps_snapst_ctx *ctx,
 		uidx += _vps_dumpobj_print_vmpage(o, ident, uidx, ctx);
 	else if (o->type == VPS_DUMPOBJT_VPS)
 		_vps_dumpobj_vps(o, ident);
+	else if (o->type == VPS_DUMPOBJT_FILE_PATH)
+		_vps_dumpobj_file_path(o, ident);
 	if (o->level > 1)
 		ident[o->level * 4 - 1] = ' ';
 }
