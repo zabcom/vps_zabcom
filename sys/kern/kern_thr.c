@@ -61,8 +61,6 @@ __FBSDID("$FreeBSD$");
 
 #include <security/audit/audit.h>
 
-#include <vm/vm_domain.h>
-
 #include <vps/vps.h>
 #include <vps/vps2.h>
 #include <vps/vps_account.h>

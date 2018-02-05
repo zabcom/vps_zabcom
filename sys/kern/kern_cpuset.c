@@ -494,7 +494,7 @@ domainset_notify(void)
 	struct thread *td;
 	struct proc *p;
 
-	sx_slock(&allproc_lock);
+	sx_slock(&V_allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
 		PROC_LOCK(p);
 		if (p->p_state == PRS_NEW) {
@@ -508,7 +508,7 @@ domainset_notify(void)
 		}
 		PROC_UNLOCK(p);
 	}
-	sx_sunlock(&allproc_lock);
+	sx_sunlock(&V_allproc_lock);
 	kernel_object->domain.dr_policy = cpuset_default->cs_domain;
 }
 

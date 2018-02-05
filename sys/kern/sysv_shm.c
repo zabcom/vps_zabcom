@@ -1127,7 +1127,7 @@ shminit(void)
 		}
 	}
 	V_shmalloced = V_shminfo.shmmni;
-	V_shmsegs = malloc(V_shmalloced * sizeof(shmsegs[0]), M_SHM,
+	V_shmsegs = malloc(V_shmalloced * sizeof(V_shmsegs[0]), M_SHM,
 	    M_WAITOK|M_ZERO);
 	for (i = 0; i < V_shmalloced; i++) {
 		V_shmsegs[i].u.shm_perm.mode = SHMSEG_FREE;

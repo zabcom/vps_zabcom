@@ -78,17 +78,17 @@ int vps_ip6_check2(struct vps *, struct in6_addr *, u_int8_t, int);
 
 MALLOC_DECLARE(M_VPS_CORE);
 
-#define BIT_SET(set, bit)					\
+#define VPS_BIT_SET(set, bit)					\
 	do {							\
             set[ bit >> 3 ] |= 1 << (bit - (bit >> 3 << 3 ));   \
         } while (0)
 
-#define BIT_UNSET(set, bit)					\
+#define VPS_BIT_UNSET(set, bit)					\
 	do {							\
             set[ bit >> 3 ] &= ~( 1 << (bit - (bit >> 3 << 3 )));\
         } while (0)
 
-#define BIT_ISSET(set, bit)                                     \
+#define VPS_BIT_ISSET(set, bit)                                 \
     (set[ bit >> 3 ] & 1 << (bit - (bit >> 3 << 3 )) ? 1 : 0)
 
 static struct unrhdr *vps_devfs_unrhdr;
@@ -99,7 +99,7 @@ vps_priv_check(struct ucred *cred, int priv)
         int rv;
 
 	/* Is this syscall/operation implemented ? */
-	rv = BIT_ISSET(cred->cr_vps->priv_impl_set, priv);
+	rv = VPS_BIT_ISSET(cred->cr_vps->priv_impl_set, priv);
 
 	if (rv==0) {
 		DBGCORE("%s: cred=%p priv=%d NOSYS\n",
@@ -108,7 +108,7 @@ vps_priv_check(struct ucred *cred, int priv)
 	}
 
 	/* Is this syscall/operation allowed ? */
-        rv = BIT_ISSET(cred->cr_vps->priv_allow_set, priv);
+        rv = VPS_BIT_ISSET(cred->cr_vps->priv_allow_set, priv);
 
         if (rv==0) {
                 DBGCORE("%s: cred=%p priv=%d EPERM\n",
@@ -134,106 +134,106 @@ vps_priv_setdefault(struct vps *vps, struct vps_param *vps_pr)
 
 	memset (a_set, 0, PRIV_SET_SIZE);
 
-	BIT_SET(a_set, PRIV_VFS_MOUNT);
-	BIT_SET(a_set, PRIV_VFS_MOUNT_NONUSER);
-	BIT_SET(a_set, PRIV_VFS_UNMOUNT);
-        BIT_SET(a_set, PRIV_VFS_GENERATION);
+	VPS_BIT_SET(a_set, PRIV_VFS_MOUNT);
+	VPS_BIT_SET(a_set, PRIV_VFS_MOUNT_NONUSER);
+	VPS_BIT_SET(a_set, PRIV_VFS_UNMOUNT);
+        VPS_BIT_SET(a_set, PRIV_VFS_GENERATION);
 
         /* Will perform vps destruction if not the vps0. */
-        BIT_SET(a_set, PRIV_REBOOT);
+        VPS_BIT_SET(a_set, PRIV_REBOOT);
 
-        BIT_SET(a_set, PRIV_KTRACE);
-        BIT_SET(a_set, PRIV_CRED_SETUID);
-        BIT_SET(a_set, PRIV_CRED_SETEUID);
-        BIT_SET(a_set, PRIV_CRED_SETGID);
-        BIT_SET(a_set, PRIV_CRED_SETEGID);
-        BIT_SET(a_set, PRIV_CRED_SETGROUPS);
-        BIT_SET(a_set, PRIV_CRED_SETREUID);
-        BIT_SET(a_set, PRIV_CRED_SETREGID);
-        BIT_SET(a_set, PRIV_CRED_SETRESUID);
-        BIT_SET(a_set, PRIV_CRED_SETRESGID);
-        BIT_SET(a_set, PRIV_SEEOTHERUIDS);
-        BIT_SET(a_set, PRIV_SEEOTHERGIDS);
-        BIT_SET(a_set, PRIV_DEBUG_DIFFCRED);
-        BIT_SET(a_set, PRIV_DEBUG_SUGID);
-        BIT_SET(a_set, PRIV_DEBUG_UNPRIV);
-        BIT_SET(a_set, PRIV_PROC_LIMIT);
-        BIT_SET(a_set, PRIV_PROC_SETLOGIN);
-        BIT_SET(a_set, PRIV_PROC_SETRLIMIT);
-        BIT_SET(a_set, PRIV_IPC_READ);
-        BIT_SET(a_set, PRIV_IPC_WRITE);
-        BIT_SET(a_set, PRIV_IPC_ADMIN);
-        BIT_SET(a_set, PRIV_IPC_MSGSIZE);
-        BIT_SET(a_set, PRIV_MQ_ADMIN);
-        BIT_SET(a_set, PRIV_SCHED_DIFFCRED);
-        BIT_SET(a_set, PRIV_SCHED_CPUSET);
-        BIT_SET(a_set, PRIV_SIGNAL_DIFFCRED);
-        BIT_SET(a_set, PRIV_SIGNAL_SUGID);
-        BIT_SET(a_set, PRIV_SYSCTL_WRITEJAIL);
-        BIT_SET(a_set, PRIV_VFS_GETQUOTA);
-        BIT_SET(a_set, PRIV_VFS_SETQUOTA);
-        BIT_SET(a_set, PRIV_VFS_READ);
-        BIT_SET(a_set, PRIV_VFS_WRITE);
-        BIT_SET(a_set, PRIV_VFS_ADMIN);
-        BIT_SET(a_set, PRIV_VFS_EXEC);
-        BIT_SET(a_set, PRIV_VFS_LOOKUP);
-        BIT_SET(a_set, PRIV_VFS_BLOCKRESERVE);
-        BIT_SET(a_set, PRIV_VFS_CHFLAGS_DEV);
-        BIT_SET(a_set, PRIV_VFS_CHOWN);
-        BIT_SET(a_set, PRIV_VFS_CHROOT);
-        BIT_SET(a_set, PRIV_VFS_RETAINSUGID);
-        BIT_SET(a_set, PRIV_VFS_FCHROOT);
-        BIT_SET(a_set, PRIV_VFS_LINK);
-        BIT_SET(a_set, PRIV_VFS_SETGID);
-        BIT_SET(a_set, PRIV_VFS_STAT);
-        BIT_SET(a_set, PRIV_VFS_STICKYFILE);
-        BIT_SET(a_set, PRIV_NETINET_RESERVEDPORT);
-        BIT_SET(a_set, PRIV_NETINET_REUSEPORT);
-        BIT_SET(a_set, PRIV_NETINET_SETHDROPTS);
-        BIT_SET(a_set, PRIV_NETINET_RAW);
-        BIT_SET(a_set, PRIV_NETINET_GETCRED);
-        BIT_SET(a_set, PRIV_NET_BRIDGE);
-        BIT_SET(a_set, PRIV_NET_GRE);
-        BIT_SET(a_set, PRIV_NET_BPF);
-        BIT_SET(a_set, PRIV_NET_RAW);
-        BIT_SET(a_set, PRIV_NET_ROUTE);
-        BIT_SET(a_set, PRIV_NET_TAP);
-        BIT_SET(a_set, PRIV_NET_SETIFMTU);
-        BIT_SET(a_set, PRIV_NET_SETIFFLAGS);
-        BIT_SET(a_set, PRIV_NET_SETIFCAP);
-        BIT_SET(a_set, PRIV_NET_SETIFNAME);
-        BIT_SET(a_set, PRIV_NET_SETIFMETRIC);
-        BIT_SET(a_set, PRIV_NET_SETIFPHYS);
-        BIT_SET(a_set, PRIV_NET_SETIFMAC);
-        BIT_SET(a_set, PRIV_NET_ADDMULTI);
-        BIT_SET(a_set, PRIV_NET_DELMULTI);
-        BIT_SET(a_set, PRIV_NET_HWIOCTL);
-        BIT_SET(a_set, PRIV_NET_SETLLADDR);
-        BIT_SET(a_set, PRIV_NET_ADDIFGROUP);
-        BIT_SET(a_set, PRIV_NET_DELIFGROUP);
-        BIT_SET(a_set, PRIV_NET_IFCREATE);
-        BIT_SET(a_set, PRIV_NET_IFDESTROY);
-        BIT_SET(a_set, PRIV_NET_ADDIFADDR);
-        BIT_SET(a_set, PRIV_NET_DELIFADDR);
-        BIT_SET(a_set, PRIV_NET_LAGG);
-        BIT_SET(a_set, PRIV_NETINET_ADDRCTRL6);
+        VPS_BIT_SET(a_set, PRIV_KTRACE);
+        VPS_BIT_SET(a_set, PRIV_CRED_SETUID);
+        VPS_BIT_SET(a_set, PRIV_CRED_SETEUID);
+        VPS_BIT_SET(a_set, PRIV_CRED_SETGID);
+        VPS_BIT_SET(a_set, PRIV_CRED_SETEGID);
+        VPS_BIT_SET(a_set, PRIV_CRED_SETGROUPS);
+        VPS_BIT_SET(a_set, PRIV_CRED_SETREUID);
+        VPS_BIT_SET(a_set, PRIV_CRED_SETREGID);
+        VPS_BIT_SET(a_set, PRIV_CRED_SETRESUID);
+        VPS_BIT_SET(a_set, PRIV_CRED_SETRESGID);
+        VPS_BIT_SET(a_set, PRIV_SEEOTHERUIDS);
+        VPS_BIT_SET(a_set, PRIV_SEEOTHERGIDS);
+        VPS_BIT_SET(a_set, PRIV_DEBUG_DIFFCRED);
+        VPS_BIT_SET(a_set, PRIV_DEBUG_SUGID);
+        VPS_BIT_SET(a_set, PRIV_DEBUG_UNPRIV);
+        VPS_BIT_SET(a_set, PRIV_PROC_LIMIT);
+        VPS_BIT_SET(a_set, PRIV_PROC_SETLOGIN);
+        VPS_BIT_SET(a_set, PRIV_PROC_SETRLIMIT);
+        VPS_BIT_SET(a_set, PRIV_IPC_READ);
+        VPS_BIT_SET(a_set, PRIV_IPC_WRITE);
+        VPS_BIT_SET(a_set, PRIV_IPC_ADMIN);
+        VPS_BIT_SET(a_set, PRIV_IPC_MSGSIZE);
+        VPS_BIT_SET(a_set, PRIV_MQ_ADMIN);
+        VPS_BIT_SET(a_set, PRIV_SCHED_DIFFCRED);
+        VPS_BIT_SET(a_set, PRIV_SCHED_CPUSET);
+        VPS_BIT_SET(a_set, PRIV_SIGNAL_DIFFCRED);
+        VPS_BIT_SET(a_set, PRIV_SIGNAL_SUGID);
+        VPS_BIT_SET(a_set, PRIV_SYSCTL_WRITEJAIL);
+        VPS_BIT_SET(a_set, PRIV_VFS_GETQUOTA);
+        VPS_BIT_SET(a_set, PRIV_VFS_SETQUOTA);
+        VPS_BIT_SET(a_set, PRIV_VFS_READ);
+        VPS_BIT_SET(a_set, PRIV_VFS_WRITE);
+        VPS_BIT_SET(a_set, PRIV_VFS_ADMIN);
+        VPS_BIT_SET(a_set, PRIV_VFS_EXEC);
+        VPS_BIT_SET(a_set, PRIV_VFS_LOOKUP);
+        VPS_BIT_SET(a_set, PRIV_VFS_BLOCKRESERVE);
+        VPS_BIT_SET(a_set, PRIV_VFS_CHFLAGS_DEV);
+        VPS_BIT_SET(a_set, PRIV_VFS_CHOWN);
+        VPS_BIT_SET(a_set, PRIV_VFS_CHROOT);
+        VPS_BIT_SET(a_set, PRIV_VFS_RETAINSUGID);
+        VPS_BIT_SET(a_set, PRIV_VFS_FCHROOT);
+        VPS_BIT_SET(a_set, PRIV_VFS_LINK);
+        VPS_BIT_SET(a_set, PRIV_VFS_SETGID);
+        VPS_BIT_SET(a_set, PRIV_VFS_STAT);
+        VPS_BIT_SET(a_set, PRIV_VFS_STICKYFILE);
+        VPS_BIT_SET(a_set, PRIV_NETINET_RESERVEDPORT);
+        VPS_BIT_SET(a_set, PRIV_NETINET_REUSEPORT);
+        VPS_BIT_SET(a_set, PRIV_NETINET_SETHDROPTS);
+        VPS_BIT_SET(a_set, PRIV_NETINET_RAW);
+        VPS_BIT_SET(a_set, PRIV_NETINET_GETCRED);
+        VPS_BIT_SET(a_set, PRIV_NET_BRIDGE);
+        VPS_BIT_SET(a_set, PRIV_NET_GRE);
+        VPS_BIT_SET(a_set, PRIV_NET_BPF);
+        VPS_BIT_SET(a_set, PRIV_NET_RAW);
+        VPS_BIT_SET(a_set, PRIV_NET_ROUTE);
+        VPS_BIT_SET(a_set, PRIV_NET_TAP);
+        VPS_BIT_SET(a_set, PRIV_NET_SETIFMTU);
+        VPS_BIT_SET(a_set, PRIV_NET_SETIFFLAGS);
+        VPS_BIT_SET(a_set, PRIV_NET_SETIFCAP);
+        VPS_BIT_SET(a_set, PRIV_NET_SETIFNAME);
+        VPS_BIT_SET(a_set, PRIV_NET_SETIFMETRIC);
+        VPS_BIT_SET(a_set, PRIV_NET_SETIFPHYS);
+        VPS_BIT_SET(a_set, PRIV_NET_SETIFMAC);
+        VPS_BIT_SET(a_set, PRIV_NET_ADDMULTI);
+        VPS_BIT_SET(a_set, PRIV_NET_DELMULTI);
+        VPS_BIT_SET(a_set, PRIV_NET_HWIOCTL);
+        VPS_BIT_SET(a_set, PRIV_NET_SETLLADDR);
+        VPS_BIT_SET(a_set, PRIV_NET_ADDIFGROUP);
+        VPS_BIT_SET(a_set, PRIV_NET_DELIFGROUP);
+        VPS_BIT_SET(a_set, PRIV_NET_IFCREATE);
+        VPS_BIT_SET(a_set, PRIV_NET_IFDESTROY);
+        VPS_BIT_SET(a_set, PRIV_NET_ADDIFADDR);
+        VPS_BIT_SET(a_set, PRIV_NET_DELIFADDR);
+        VPS_BIT_SET(a_set, PRIV_NET_LAGG);
+        VPS_BIT_SET(a_set, PRIV_NETINET_ADDRCTRL6);
 
 	/* sysctls are either hidden or virtual */
-	BIT_SET(a_set, PRIV_SYSCTL_WRITE);
+	VPS_BIT_SET(a_set, PRIV_SYSCTL_WRITE);
 
 	/* jail is virtualized */
-	BIT_SET(a_set, PRIV_JAIL_ATTACH);
-	BIT_SET(a_set, PRIV_JAIL_SET);
+	VPS_BIT_SET(a_set, PRIV_JAIL_ATTACH);
+	VPS_BIT_SET(a_set, PRIV_JAIL_SET);
 
 	/* Set of available operations (not necessarily allowed). */
 	/* Set everything to available by default. */
 	memset (i_set, 0xff, PRIV_SET_SIZE);
 	/* Remove items in order to have ENOSYS returned. */
-	BIT_UNSET(i_set, PRIV_AUDIT_CONTROL);
-	BIT_UNSET(i_set, PRIV_AUDIT_FAILSTOP);
-	BIT_UNSET(i_set, PRIV_AUDIT_GETAUDIT);
-	BIT_UNSET(i_set, PRIV_AUDIT_SETAUDIT);
-	BIT_UNSET(i_set, PRIV_AUDIT_SUBMIT);
+	VPS_BIT_UNSET(i_set, PRIV_AUDIT_CONTROL);
+	VPS_BIT_UNSET(i_set, PRIV_AUDIT_FAILSTOP);
+	VPS_BIT_UNSET(i_set, PRIV_AUDIT_GETAUDIT);
+	VPS_BIT_UNSET(i_set, PRIV_AUDIT_SETAUDIT);
+	VPS_BIT_UNSET(i_set, PRIV_AUDIT_SUBMIT);
 }
 
 int
@@ -600,19 +600,19 @@ vps_priv_setitem(struct vps *vpsp, struct vps *vps,
 
 	switch (priv->value) {
 	case VPS_ARG_PRIV_DENY:
-		BIT_UNSET(vps->priv_allow_set, priv->priv);
-		BIT_SET(vps->priv_impl_set, priv->priv);
+		VPS_BIT_UNSET(vps->priv_allow_set, priv->priv);
+		VPS_BIT_SET(vps->priv_impl_set, priv->priv);
 		break;
 	case VPS_ARG_PRIV_NOSYS:
-		BIT_UNSET(vps->priv_impl_set, priv->priv);
-		BIT_UNSET(vps->priv_allow_set, priv->priv);
+		VPS_BIT_UNSET(vps->priv_impl_set, priv->priv);
+		VPS_BIT_UNSET(vps->priv_allow_set, priv->priv);
 		break;
 	case VPS_ARG_PRIV_ALLOW:
 		/* Check if parent vps is allowed the priv in question. */
-		if (BIT_ISSET(vpsp->priv_allow_set, priv->priv) == 0)
+		if (VPS_BIT_ISSET(vpsp->priv_allow_set, priv->priv) == 0)
 			return (EPERM);
-		BIT_SET(vps->priv_allow_set, priv->priv);
-		BIT_SET(vps->priv_impl_set, priv->priv);
+		VPS_BIT_SET(vps->priv_allow_set, priv->priv);
+		VPS_BIT_SET(vps->priv_impl_set, priv->priv);
 		break;
 	default:
 		return (EINVAL);
@@ -637,9 +637,9 @@ vps_priv_getitemall(struct vps *vpsp, struct vps *vps, caddr_t kdata,
 		memset(item, 0, sizeof (*item));
 		item->type = VPS_ARG_ITEM_PRIV;
 		item->u.priv.priv = priv;
-		if (BIT_ISSET(vps->priv_impl_set, priv) == 0)
+		if (VPS_BIT_ISSET(vps->priv_impl_set, priv) == 0)
 			item->u.priv.value = VPS_ARG_PRIV_NOSYS;
-		else if (BIT_ISSET(vps->priv_allow_set, priv) == 0)
+		else if (VPS_BIT_ISSET(vps->priv_allow_set, priv) == 0)
 			item->u.priv.value = VPS_ARG_PRIV_DENY;
 		else
 			item->u.priv.value = VPS_ARG_PRIV_ALLOW;
