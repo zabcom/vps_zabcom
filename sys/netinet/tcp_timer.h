@@ -197,6 +197,8 @@ extern int tcp_ttl;			/* time to live for TCP segs */
 extern int tcp_backoff[];
 extern int tcp_syn_backoff[];
 
+VNET_DECLARE(int, tcp_always_keepalive);
+#define	V_tcp_always_keepalive		VNET(tcp_always_keepalive)
 extern int tcp_finwait2_timeout;
 extern int tcp_fast_finwait2_recycle;
 

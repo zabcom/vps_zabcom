@@ -72,7 +72,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpjdlog \
 	${_libproc} \
 	libprocstat \
-	librc \
+	libregex \
 	librpcsvc \
 	librss \
 	librt \

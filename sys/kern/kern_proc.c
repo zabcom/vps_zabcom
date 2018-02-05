@@ -2279,8 +2279,10 @@ sysctl_kern_proc_ovmmap(SYSCTL_HANDLER_ARGS)
 		}
 
 		for (lobj = tobj = obj; tobj; tobj = tobj->backing_object) {
-			if (tobj != obj)
+			if (tobj != obj) {
 				VM_OBJECT_RLOCK(tobj);
+				kve->kve_offset += tobj->backing_object_offset;
+			}
 			if (lobj != obj)
 				VM_OBJECT_RUNLOCK(lobj);
 			lobj = tobj;
@@ -2288,7 +2290,7 @@ sysctl_kern_proc_ovmmap(SYSCTL_HANDLER_ARGS)
 
 		kve->kve_start = (void*)entry->start;
 		kve->kve_end = (void*)entry->end;
-		kve->kve_offset = (off_t)entry->offset;
+		kve->kve_offset += (off_t)entry->offset;
 
 		if (entry->protection & VM_PROT_READ)
 			kve->kve_protection |= KVME_PROT_READ;
@@ -2509,6 +2511,7 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			for (tobj = obj; tobj != NULL;
 			    tobj = tobj->backing_object) {
 				VM_OBJECT_RLOCK(tobj);
+				kve->kve_offset += tobj->backing_object_offset;
 				lobj = tobj;
 			}
 			if (obj->backing_object == NULL)
@@ -2529,7 +2532,7 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 
 		kve->kve_start = entry->start;
 		kve->kve_end = entry->end;
-		kve->kve_offset = entry->offset;
+		kve->kve_offset += entry->offset;
 
 		if (entry->protection & VM_PROT_READ)
 			kve->kve_protection |= KVME_PROT_READ;

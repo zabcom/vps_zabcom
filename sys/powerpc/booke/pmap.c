@@ -380,6 +380,11 @@ static vm_offset_t	mmu_booke_quick_enter_page(mmu_t mmu, vm_page_t m);
 static void		mmu_booke_quick_remove_page(mmu_t mmu, vm_offset_t addr);
 static int		mmu_booke_change_attr(mmu_t mmu, vm_offset_t addr,
     vm_size_t sz, vm_memattr_t mode);
+static int		mmu_booke_map_user_ptr(mmu_t mmu, pmap_t pm,
+    volatile const void *uaddr, void **kaddr, size_t ulen, size_t *klen);
+static int		mmu_booke_decode_kernel_ptr(mmu_t mmu, vm_offset_t addr,
+    int *is_user, vm_offset_t *decoded_addr);
+
 
 static mmu_method_t mmu_booke_methods[] = {
 	/* pmap dispatcher interface */
@@ -432,6 +437,8 @@ static mmu_method_t mmu_booke_methods[] = {
 	MMUMETHOD(mmu_kremove,		mmu_booke_kremove),
 	MMUMETHOD(mmu_unmapdev,		mmu_booke_unmapdev),
 	MMUMETHOD(mmu_change_attr,	mmu_booke_change_attr),
+	MMUMETHOD(mmu_map_user_ptr,	mmu_booke_map_user_ptr),
+	MMUMETHOD(mmu_decode_kernel_ptr, mmu_booke_decode_kernel_ptr),
 
 	/* dumpsys() support */
 	MMUMETHOD(mmu_dumpsys_map,	mmu_booke_dumpsys_map),
@@ -2265,6 +2272,45 @@ mmu_booke_kremove(mmu_t mmu, vm_offset_t va)
 
 	tlb_miss_unlock();
 	mtx_unlock_spin(&tlbivax_mutex);
+}
+
+/*
+ * Provide a kernel pointer corresponding to a given userland pointer.
+ * The returned pointer is valid until the next time this function is
+ * called in this thread. This is used internally in copyin/copyout.
+ */
+int
+mmu_booke_map_user_ptr(mmu_t mmu, pmap_t pm, volatile const void *uaddr,
+    void **kaddr, size_t ulen, size_t *klen)
+{
+
+	if ((uintptr_t)uaddr + ulen > VM_MAXUSER_ADDRESS + PAGE_SIZE)
+		return (EFAULT);
+
+	*kaddr = (void *)(uintptr_t)uaddr;
+	if (klen)
+		*klen = ulen;
+
+	return (0);
+}
+
+/*
+ * Figure out where a given kernel pointer (usually in a fault) points
+ * to from the VM's perspective, potentially remapping into userland's
+ * address space.
+ */
+static int
+mmu_booke_decode_kernel_ptr(mmu_t mmu, vm_offset_t addr, int *is_user,
+    vm_offset_t *decoded_addr)
+{
+
+	if (addr < VM_MAXUSER_ADDRESS)
+		*is_user = 1;
+	else
+		*is_user = 0;
+
+	*decoded_addr = addr;
+	return (0);
 }
 
 /*

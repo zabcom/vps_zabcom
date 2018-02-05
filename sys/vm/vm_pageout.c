@@ -1936,16 +1936,13 @@ static void
 vm_pageout(void)
 {
 	int error;
-#ifdef VM_NUMA_ALLOC
 	int i;
-#endif
 
 	swap_pager_swap_init();
 	error = kthread_add(vm_pageout_laundry_worker, NULL, curproc, NULL,
 	    0, 0, "laundry: dom0");
 	if (error != 0)
 		panic("starting laundry for domain 0, error %d", error);
-#ifdef VM_NUMA_ALLOC
 	for (i = 1; i < vm_ndomains; i++) {
 		error = kthread_add(vm_pageout_worker, (void *)(uintptr_t)i,
 		    curproc, NULL, 0, 0, "dom%d", i);
@@ -1954,7 +1951,6 @@ vm_pageout(void)
 			    i, error);
 		}
 	}
-#endif
 	error = kthread_add(uma_reclaim_worker, NULL, curproc, NULL,
 	    0, 0, "uma");
 	if (error != 0)
