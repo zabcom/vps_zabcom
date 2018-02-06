@@ -2243,6 +2243,7 @@ vps_snapshot_sockbuf(struct vps_snapst_ctx *ctx, struct vps *vps,
 	vdsb->sb_state = sb->sb_state;
 	vdsb->sb_flags = sb->sb_flags;
 	vdsb->sb_sndptroff = sb->sb_sndptroff;
+	vdsb->sb_acc = sb->sb_acc;
 	vdsb->sb_ccc = sb->sb_ccc;
 	vdsb->sb_hiwat = sb->sb_hiwat;
 	vdsb->sb_mbcnt = sb->sb_mbcnt;

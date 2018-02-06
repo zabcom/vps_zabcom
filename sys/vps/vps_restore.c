@@ -1489,12 +1489,15 @@ vps_restore_sockbuf(struct vps_snapst_ctx *ctx, struct vps *vps,
 	DBGR("%s: mptrs[]: 0=%p 1=%p 2=%p 3=%p\n",
 	    __func__, mptrs[0], mptrs[1], mptrs[2], mptrs[3]);
 
+	/* XXX sb_sel */
+	nsb->sb_state = 		vdsb->sb_state;
 	nsb->sb_mb =			mptrs[0];
 	nsb->sb_mbtail =		mptrs[1];
 	nsb->sb_lastrecord =	 	mptrs[2];
 	nsb->sb_sndptr = 		mptrs[3];
-	nsb->sb_state = 		vdsb->sb_state;
+	/* sb_fnrdy */
 	nsb->sb_sndptroff = 		vdsb->sb_sndptroff;
+	nsb->sb_acc = 			vdsb->sb_acc;
 	nsb->sb_ccc = 			vdsb->sb_ccc;
 	nsb->sb_hiwat = 		vdsb->sb_hiwat;
 	nsb->sb_mbcnt = 		vdsb->sb_mbcnt;
@@ -1503,7 +1506,6 @@ vps_restore_sockbuf(struct vps_snapst_ctx *ctx, struct vps *vps,
 	nsb->sb_mbmax = 		vdsb->sb_mbmax;
 	nsb->sb_ctl = 			vdsb->sb_ctl;
 	nsb->sb_lowat = 		vdsb->sb_lowat;
-	nsb->sb_hiwat = 		vdsb->sb_hiwat;
 	nsb->sb_timeo = 		vdsb->sb_timeo;
 	nsb->sb_flags = 		vdsb->sb_flags;
 	/* XXX
@@ -1512,6 +1514,7 @@ vps_restore_sockbuf(struct vps_snapst_ctx *ctx, struct vps *vps,
 	*/
 	nsb->sb_upcall =		NULL;
 	nsb->sb_upcallarg =		NULL;
+	/* XXX AIO */
 
 	DBGR("%s: restored sockbuf=%p sb_ccc=%u sb_mcnt=%u "
 	    "sb_sndptroff=%u\n", __func__, nsb, nsb->sb_ccc,

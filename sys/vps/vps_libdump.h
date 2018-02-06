@@ -859,21 +859,16 @@ struct vps_dump_sockbuf {
 	sint16 sb_flags;
 	uint32 sb_sndptroff;
 
+	uint32 sb_acc;
 	uint32 sb_ccc;
 	uint32 sb_hiwat;
-
 	uint32 sb_mbcnt;
 	uint32 sb_mcnt;
-
 	uint32 sb_ccnt;
 	uint32 sb_mbmax;
-
 	uint32 sb_ctl;
 	sint32 sb_lowat;
-
 	uint32 sb_timeo;
-	uint32 _pad0;
-
 };
 
 struct vps_dump_mbufchain {
