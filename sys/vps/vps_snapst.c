@@ -2510,17 +2510,17 @@ again:
 	vds->so_options = so->so_options;
 	vds->so_linger = so->so_linger;
 	vds->so_state = so->so_state;
-	/* so_pcb */
+	/* so_pcb (below) */
 	vds->so_vnet = so->so_vnet;
-	/* so_proto */
+	/* so_proto (see lines below) */
 	vds->so_family = so->so_proto->pr_domain->dom_family;
 	vds->so_protocol = so->so_proto->pr_protocol;
-	/* (so_timeo) */
+	/* (so_timeo) (only used as a channel for sleep(9). */
 	vds->so_error = so->so_error;
 	/* so_sigio */
 	vds->so_cred = so->so_cred;
 	/* so_label */
-	/* (so_gencnt) */
+	/* (so_gencnt) (re-set to whatever on socket create on restore). */
 	/* so_emuldata */
 	/* osd */
 	vds->so_fibnum = so->so_fibnum;
@@ -2529,6 +2529,20 @@ again:
 	vds->so_max_pacing_rate = so->so_max_pacing_rate;
 
 	SOCK_UNLOCK(so);
+
+	if (so->so_sigio != NULL ||
+	    so->so_emuldata != NULL ||
+	    so->osd.osd_nslots != 0 ||
+	    so->osd.osd_slots != NULL) {
+		ERRMSG(ctx, "%s: unhandled socket state %p: "
+		    "%p %p %u %p\n", __func__, so,
+		    so->so_sigio,
+		    so->so_emuldata,
+		    so->osd.osd_nslots,
+		    so->osd.osd_slots);
+		error = ENOSYS;
+		goto drop;
+	}
 
 	if (!SOLISTENING(so)) {
 		/* Done below: so_rcv, so_snd */
@@ -2546,12 +2560,29 @@ again:
 
 		vds->so_qlimit = so->sol_qlimit;
 
+		if (so->sol_accept_filter != NULL ||
+		    so->sol_accept_filter_arg != NULL ||
+		    so->sol_accept_filter_str != NULL ||
+		    so->sol_upcall != NULL ||
+		    so->sol_upcallarg != NULL) {
 		/* sol_accept_filter */
 		/* sol_accept_filter_arg */
 		/* sol_accept_filter_str */
 
 		/* sol_upcall */
 		/* sol_upcallarg */
+
+			SOLISTEN_UNLOCK(so);
+			ERRMSG(ctx, "%s: unhandled listen socket state %p: "
+			    "%p %p %p %p %p\n", __func__, so,
+			    so->sol_accept_filter,
+			    so->sol_accept_filter_arg,
+			    so->sol_accept_filter_str,
+			    so->sol_upcall,
+			    so->sol_upcallarg);
+			error = ENOSYS;
+			goto drop;
+		}
 
 		vds->sol_sbrcv_lowat = so->sol_sbrcv_lowat;
 		vds->sol_sbsnd_lowat = so->sol_sbsnd_lowat;
