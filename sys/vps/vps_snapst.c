@@ -71,6 +71,7 @@ __IDSTRING(vpsid, "$Id: vps_snapst.c 206 2013-12-16 18:15:42Z klaus $");
 #include <sys/filedesc.h>
 #include <sys/mount.h>
 #include <sys/domain.h>
+#include <sys/poll.h>
 #include <sys/protosw.h>
 #include <sys/pipe.h>
 #include <sys/tty.h>
@@ -2364,29 +2365,38 @@ vps_snapshot_socket_inet(struct vps_snapst_ctx *ctx, struct vps *vps,
 		goto drop;
 	}
 
-	vdinpcb->inp_vflag = inpcb->inp_vflag;
+	vdinpcb->inp_have_ppcb = 0;
+
 	vdinpcb->inp_flags = inpcb->inp_flags;
 	vdinpcb->inp_flags2 = inpcb->inp_flags2;
+	vdinpcb->inp_flow = inpcb->inp_flow;
+	vdinpcb->inp_vflag = inpcb->inp_vflag;
+	vdinpcb->inp_ip_ttl = inpcb->inp_ip_ttl;
 	vdinpcb->inp_ip_p = inpcb->inp_ip_p;
-	vdinpcb->inp_have_ppcb = 0;
+	vdinpcb->inp_ip_minttl = inpcb->inp_ip_minttl;
 
 	vdinpcb->inp_inc.inc_flags = inpcb->inp_inc.inc_flags;
 	vdinpcb->inp_inc.inc_len = inpcb->inp_inc.inc_len;
 	vdinpcb->inp_inc.inc_fibnum = inpcb->inp_inc.inc_fibnum;
+
 	vdinpcb->inp_inc.ie_fport = inpcb->inp_inc.inc_ie.ie_fport;
 	vdinpcb->inp_inc.ie_lport = inpcb->inp_inc.inc_ie.ie_lport;
-
 	if (vdinpcb->inp_vflag & INP_IPV6) {
 		memcpy(vdinpcb->inp_inc.ie_ufaddr,
-		    &inpcb->inp_inc.inc6_faddr, 0x10);
+		    &inpcb->inp_inc.inc6_faddr, 16);
 		memcpy(vdinpcb->inp_inc.ie_uladdr,
-		    &inpcb->inp_inc.inc6_laddr, 0x10);
+		    &inpcb->inp_inc.inc6_laddr, 16);
 	} else {
 		memcpy(vdinpcb->inp_inc.ie_ufaddr,
-		    &inpcb->inp_inc.inc_faddr, 0x4);
+		    &inpcb->inp_inc.inc_faddr, 4);
 		memcpy(vdinpcb->inp_inc.ie_uladdr,
-		    &inpcb->inp_inc.inc_laddr, 0x4);
+		    &inpcb->inp_inc.inc_laddr, 4);
 	}
+
+	vdinpcb->inp_ip_tos = inpcb->inp_ip_tos;
+
+	vdinpcb->in6p_cksum = inpcb->in6p_cksum;
+	vdinpcb->in6p_hops = inpcb->in6p_hops;
 
 	if (inpcb->inp_ppcb == NULL)
 		return (0);
@@ -2409,8 +2419,24 @@ vps_snapshot_socket_inet(struct vps_snapst_ctx *ctx, struct vps *vps,
 			error = ENOMEM;
 			goto drop;
 		}
+
+		/* t_segq */
+		/* t_segqlen */
+		if (tcp_pcb->t_segqlen > 0) {
+			INP_RUNLOCK(inpcb);
+			INP_INFO_RUNLOCK(inpcb->inp_pcbinfo);
+			ERRMSG(ctx, "%s: vps %p so %p tcp_pcb %p "
+			    "t_segqlen %d > 0, not supported\n",
+			    __func__, vps, so, tcp_pcb, tcp_pcb->t_segqlen);
+			error = ENOSYS;
+			goto drop;
+		}
+		vdtcpcb->t_dupacks = tcp_pcb->t_dupacks;
+		/* t_timers */
+		/* t_inpcb */
 		vdtcpcb->t_state = tcp_pcb->t_state;
 		vdtcpcb->t_flags = tcp_pcb->t_flags;
+		/* t_vnet */
 		vdtcpcb->snd_una = tcp_pcb->snd_una;
 		vdtcpcb->snd_max = tcp_pcb->snd_max;
 		vdtcpcb->snd_nxt = tcp_pcb->snd_nxt;
@@ -2426,6 +2452,73 @@ vps_snapshot_socket_inet(struct vps_snapst_ctx *ctx, struct vps *vps,
 		vdtcpcb->snd_wnd = tcp_pcb->snd_wnd;
 		vdtcpcb->snd_cwnd = tcp_pcb->snd_cwnd;
 		vdtcpcb->snd_ssthresh = tcp_pcb->snd_ssthresh;
+		vdtcpcb->snd_recover = tcp_pcb->snd_recover;
+		vdtcpcb->t_rcvtime = tcp_pcb->t_rcvtime;
+		vdtcpcb->t_starttime = tcp_pcb->t_starttime;
+		vdtcpcb->t_rtttime = tcp_pcb->t_rtttime;
+		vdtcpcb->t_rtseq = tcp_pcb->t_rtseq;
+		vdtcpcb->t_rxtcur = tcp_pcb->t_rxtcur;
+		vdtcpcb->t_maxseg = tcp_pcb->t_maxseg;
+		vdtcpcb->t_pmtud_saved_maxseg = tcp_pcb->t_pmtud_saved_maxseg;
+		vdtcpcb->t_srtt = tcp_pcb->t_srtt;
+		vdtcpcb->t_rttvar = tcp_pcb->t_rttvar;
+		vdtcpcb->t_rxtshift = tcp_pcb->t_rxtshift;
+		vdtcpcb->t_rttmin = tcp_pcb->t_rttmin;
+		vdtcpcb->t_rttbest = tcp_pcb->t_rttbest;
+		vdtcpcb->t_rttupdated = tcp_pcb->t_rttupdated;
+		vdtcpcb->max_sndwnd = tcp_pcb->max_sndwnd;
+		vdtcpcb->t_softerror = tcp_pcb->t_softerror;
+		vdtcpcb->t_oobflags = tcp_pcb->t_oobflags;
+		vdtcpcb->t_iobc = tcp_pcb->t_iobc;
+		vdtcpcb->snd_scale = tcp_pcb->snd_scale;
+		vdtcpcb->rcv_scale = tcp_pcb->rcv_scale;
+		vdtcpcb->request_r_scale = tcp_pcb->request_r_scale;
+		vdtcpcb->ts_recent = tcp_pcb->ts_recent;
+		vdtcpcb->ts_recent_age = tcp_pcb->ts_recent_age;
+		vdtcpcb->ts_offset = tcp_pcb->ts_offset;
+		vdtcpcb->last_ack_sent = tcp_pcb->last_ack_sent;
+		vdtcpcb->snd_cwnd_prev = tcp_pcb->snd_cwnd_prev;
+		vdtcpcb->snd_ssthresh_prev = tcp_pcb->snd_ssthresh_prev;
+		vdtcpcb->snd_recover_prev = tcp_pcb->snd_recover_prev;
+		vdtcpcb->t_sndzerowin = tcp_pcb->t_sndzerowin;
+		vdtcpcb->t_badrxtwin = tcp_pcb->t_badrxtwin;
+		vdtcpcb->snd_limited = tcp_pcb->snd_limited;
+		vdtcpcb->snd_numholes = tcp_pcb->snd_numholes;
+		/* snd_holes */
+		vdtcpcb->snd_fack = tcp_pcb->snd_fack;
+		vdtcpcb->rcv_numsacks = tcp_pcb->rcv_numsacks;
+		/* sackblks[] */
+		vdtcpcb->sack_newdata = tcp_pcb->sack_newdata;
+		/* sackhint */
+		vdtcpcb->t_rttlow = tcp_pcb->t_rttlow;
+		vdtcpcb->rfbuf_ts = tcp_pcb->rfbuf_ts;
+		vdtcpcb->rfbuf_cnt = tcp_pcb->rfbuf_cnt;
+		/* tod */
+		vdtcpcb->t_sndrexmitpack = tcp_pcb->t_sndrexmitpack;
+		vdtcpcb->t_rcvoopack = tcp_pcb->t_rcvoopack;
+		/* t_toe */
+		vdtcpcb->t_bytes_acked = tcp_pcb->t_bytes_acked;
+		/* cc_algo */
+		/* ccv */
+		/* osd */
+		vdtcpcb->t_keepinit = tcp_pcb->t_keepinit;
+		vdtcpcb->t_keepidle = tcp_pcb->t_keepidle;
+		vdtcpcb->t_keepintvl = tcp_pcb->t_keepintvl;
+		vdtcpcb->t_keepcnt = tcp_pcb->t_keepcnt;
+		vdtcpcb->t_tsomax = tcp_pcb->t_tsomax;
+		vdtcpcb->t_tsomaxsegcount = tcp_pcb->t_tsomaxsegcount;
+		vdtcpcb->t_tsomaxsegsize = tcp_pcb->t_tsomaxsegsize;
+		vdtcpcb->t_flags2 = tcp_pcb->t_flags2;
+		/* t_fb */
+		/* t_fb_ptr */
+#ifdef TCP_RFC7413
+		vdtcpcb->t_tfo_cookie = tcp_pcb->t_tfo_cookie;
+		/* t_tfo_pending */
+#endif
+#ifdef TCPPCAP
+		/* t_inpkts */
+		/* t_outpkts */
+#endif
 		break;
 	case IPPROTO_UDP:
 		DBGS("%s: IPPROTO_UDP\n", __func__);
@@ -2446,7 +2539,11 @@ vps_snapshot_socket_inet(struct vps_snapst_ctx *ctx, struct vps *vps,
 			goto drop;
 		}
 		vdudpcb->u_have_tun_func = 0;
+		vdudpcb->u_have_icmp_func = 0;
+		/* XXX TODO? */
 		vdudpcb->u_flags = udp_pcb->u_flags;
+		vdudpcb->u_rxcslen = udp_pcb->u_rxcslen;
+		vdudpcb->u_txcslen = udp_pcb->u_txcslen;
 		break;
 	case IPPROTO_ICMP:
 	case IPPROTO_RAW:
@@ -2489,6 +2586,21 @@ vps_snapshot_socket(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 	/* If we couldn't allocate memory we try again. */
 again:
+	/* XXX-BZ locking, but for now this is debugging until we properly save. */
+{
+	int s1, s2, s3, s4;
+
+	s1 = !TAILQ_EMPTY(&so->so_rdsel.si_tdlist);
+	s2 = !TAILQ_EMPTY(&so->so_wrsel.si_tdlist);
+	s3 = !SLIST_EMPTY(&so->so_rdsel.si_note.kl_list);
+	s4 = !SLIST_EMPTY(&so->so_wrsel.si_note.kl_list);
+
+	if (s1 || s2 || s3 || s4) {
+		ERRMSG(ctx, "%s: so_rd/wrsel not empty: %d %d %d %d\n",
+		    __func__, s1, s2, s3, s4);
+		return (ENOSYS);
+	}
+}
 
 	KASSERT(so != NULL, ("%s: so is NULL ctx %p vps %p\n",
 	    __func__, ctx, vps));
@@ -3511,6 +3623,67 @@ vps_snapshot_thread_savefpu(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 VPSFUNC
 static int
+vps_snapshot_seltd(struct vps_snapst_ctx *ctx, struct vps *vps,
+    struct thread *td, int how)
+{
+	struct vps_dumpobj *o1;
+	struct vps_restore_obj *vbo;
+	struct vps_dump_seltd *vds;
+
+	/* Nothing to save.  Just return. */
+	if (td->td_sel == NULL)
+		return (0);
+
+	if (!STAILQ_EMPTY(&td->td_sel->st_selq)) {
+		ERRMSG(ctx, "%s: td %p td_sel %p st_selq not empty, "
+		    "cannot snapshot. ctx %p vps %p\n",
+		    __func__, td, td->td_sel, ctx, vps);
+		return (ENOSYS);
+	}
+
+	/* Nothing to save if we have backed it up already. */
+	SLIST_FOREACH(vbo, &ctx->obj_list, list)
+		if (vbo->type == VPS_DUMPOBJT_SELTD &&
+		    vbo->orig_ptr == td->td_sel)
+			return (0);
+
+	/* Seems we have to do the work. */
+	o1 = vdo_create(ctx, VPS_DUMPOBJT_SELTD, how);
+	if (o1 == NULL)
+		return (ENOMEM);
+	vds = vdo_space(ctx, sizeof(*vds), how);
+	if (vds == NULL) {
+		vdo_discard(ctx, o1);
+		return (ENOMEM);
+	}
+	memset(vds, 0, sizeof(*vds));
+
+	/*
+	 * We don't care about the st_free* (they are on the st_selq
+	 * or unused), the st_mtx, to the st_wait.
+	 * Don't try to be clever and store the st_flags with the
+	 * parent object; we still need the seltd for linking things up.
+	 */
+	vds->st_flags = td->td_sel->st_flags;
+
+	/* Insert into list of dumped objects. */
+	vbo = malloc(sizeof(*vbo), M_TEMP, how);
+	if (vbo == NULL) {
+		vdo_discard(ctx, o1);
+		return (ENOMEM);
+	}
+	vbo->type = VPS_DUMPOBJT_SELTD;
+	vbo->orig_ptr = td->td_sel;
+	vbo->new_ptr = NULL;
+	SLIST_INSERT_HEAD(&ctx->obj_list, vbo, list);
+
+	vdo_close(ctx);
+
+	return (0);
+}
+
+VPSFUNC
+static int
 vps_snapshot_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
     struct thread *td)
 {
@@ -3548,6 +3721,7 @@ vps_snapshot_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 		goto again;
 	}
 
+	vdtd->td_sel_orig = td->td_sel;
 	vdtd->td_tid = td->td_tid;
 	vdtd->td_xsig = td->td_xsig;
 	vdtd->td_dbgflags = td->td_dbgflags;
@@ -3605,6 +3779,10 @@ vps_snapshot_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 #ifdef DDB
 	db_trace_thread(td, 16);
 #endif
+
+	/* Dump seltd info. */
+	if ((error = vps_snapshot_seltd(ctx, vps, td, M_WAITOK)))
+		goto out;
 
 	/* not yet
 	if ((error = vps_snapshot_umtx(ctx, vps, td)))

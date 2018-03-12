@@ -94,6 +94,7 @@ void vps_libdump_printheader(struct vps_dumpheader *h);
 #define VPS_DUMPOBJT_THREAD             12
 #define VPS_DUMPOBJT_PGRP               14
 #define VPS_DUMPOBJT_SESSION            15
+#define	VPS_DUMPOBJT_SELTD		16
 #define VPS_DUMPOBJT_SAVEFPU		18
 #define VPS_DUMPOBJT_SYSENTVEC          19
 #define VPS_DUMPOBJT_VMSPACE            20
@@ -591,7 +592,19 @@ struct vps_dump_vmpages {
 	uint64 count;
 };
 
+struct vps_dump_seltd {
+	/* st_selq */
+	/* st_free1 */
+	/* st_free2 */
+	/* st_mtx */
+	/* st_wait */
+	uint32 st_flags;
+};
+
 struct vps_dump_thread {
+
+	PTR(td_sel_orig);
+
 	struct {
 		uint64 ss_sp;
 		uint64 ss_size;
@@ -788,39 +801,102 @@ struct vps_dump_unixpcb {
 };
 
 struct vps_dump_inetpcb {
-	uint8 inp_vflag;
-	uint8 inp_ip_p;
-	uint8 inp_have_ppcb;
-	uint8 _pad0[5];
+	/* inp_hash */
+	/* inp_pcbgrouphash */
+	/* inp_lock */
 
+	/* inp_refcount; initialized on in_pcballoc */
 	sint32 inp_flags;
 	sint32 inp_flags2;
+	/* inp_ppcb */
+	/* inp_socket; set during in_pcballoc */
+	/* inp_pcbinfo; set during in_pcballoc */
+	/* inp_pcbgroup */
+	/* inp_cred; inherited from socket */
+	uint32 inp_flow; /* from syncache, in6_pcbconnect_mbuf */
+	uint8 inp_vflag;
+	uint8 inp_ip_ttl;
+	uint8 inp_ip_p;
+	uint8 inp_ip_minttl;
+	/* inp_flowid */
+	/* inp_snd_tag */
+	/* inp_flowtype */
+	/* inp_rss_listen_bucket */
 
+	/* XXX-BZ review struct */
 	struct {
 		uint8 inc_flags;
 		uint8 inc_len;
-		uint16 inc_fibnum;
-		uint32 _pad0;
+		uint16 inc_fibnum;	/* inherited from socket */
 
-		uint8 ie_ufaddr[0x10];
-
-		uint8 ie_uladdr[0x10];
-
+		/* in_endpoints */
 		uint16 ie_fport;
 		uint16 ie_lport;
-		uint32 _pad1;
+		uint8 ie_ufaddr[16];
+		uint8 ie_uladdr[16];
+		uint32 ie6_zoneid;	/* dead code? */
+		uint32 _pad0;
 	} inp_inc;
+
+	/* inp_label */
+	/* inp_sp */
+
+	/* Protocol-dependent part; options. */
+	struct {
+		uint8 inp_ip_tos;
+		/* inp_options */	/* comes from syncache; should restore? */
+		/* inp_moptions */
+	};
+
+	struct {
+		/* in6p_options */	/* dead code */
+		/* in6p_outputopts */	/* comes from syncache; should restore? */
+		/* in6p_moptions */
+		/* in6p_icmp6filt */	/* XXX alloc()ed in rip6_attach() */
+		sint32 in6p_cksum;
+		uint16 in6p_hops;
+	};
+	/* inp_portlist */
+	/* inp_phd */
+	/* inp_gencnt; set on in_pcballoc */
+	/* inp_lle */			/* dead code? */
+	/* inp_rt_cookie */		/* Should fix itself. */
+	/*
+	uinon {
+		inp_route
+		inp_route6
+	};
+	*/
+	/* inp_list */
+
+	/* VPS INTERNAL */
+	uint8 inp_have_ppcb;
+	uint8 _pad0[7];
 };
 
 struct vps_dump_udppcb {
 	uint8 u_have_tun_func;
-	uint8 _pad0[3];
+	uint8 u_have_icmp_func;
+	uint8 _pad0[2];
 	uint32 u_flags;
+	uint16 u_rxcslen;
+	uint16 u_txcslen;
+	/* PTR(u_tun_ctx); */
 };
 
 struct vps_dump_tcppcb {
+
+	/* t_segq */
+	/* sint32 t_segqlen */
+	sint32 t_dupacks;
+
+	/* t_timers */
+	/* t_inpcb */
+
 	sint32 t_state;
-	sint32 t_flags;
+	uint32 t_flags;
+
+	/* t_vnet */
 
 	uint32 snd_una;
 	uint32 snd_max;
@@ -830,23 +906,94 @@ struct vps_dump_tcppcb {
 
 	uint32 snd_wl1;
 	uint32 snd_wl2;
-
 	uint32 iss;
 	uint32 irs;
 
 	uint32 rcv_nxt;
 	uint32 rcv_adv;
-
-	uint64 rcv_wnd;
-
+	uint32 rcv_wnd;
 	uint32 rcv_up;
-	uint32 _pad0;
 
-	uint64 snd_wnd;
+	uint32 snd_wnd;
+	uint32 snd_cwnd;
+	uint32 snd_ssthresh;
 
-	uint64 snd_cwnd;
+	uint32 snd_recover;
 
-	uint64 snd_ssthresh;
+	uint32 t_rcvtime;
+	uint32 t_starttime;
+	uint32 t_rtttime;
+	uint32 t_rtseq;
+
+	sint32 t_rxtcur;
+	uint32 t_maxseg;
+	uint32 t_pmtud_saved_maxseg;
+	sint32 t_srtt;
+	sint32 t_rttvar;
+
+	sint32 t_rxtshift;
+	uint32 t_rttmin;
+	uint32 t_rttbest;
+	uint64 t_rttupdated;
+	uint32 max_sndwnd;
+
+	sint32 t_softerror;
+
+	sint8 t_oobflags;
+	sint8 t_iobc;
+
+	uint8 snd_scale;
+	uint8 rcv_scale;
+	uint8 request_r_scale;
+	uint32 ts_recent;
+	uint32 ts_recent_age;
+	uint32 ts_offset;
+
+	uint32 last_ack_sent;
+
+	uint32 snd_cwnd_prev;
+	uint32 snd_ssthresh_prev;
+	uint32 snd_recover_prev;
+	sint32 t_sndzerowin;
+	uint32 t_badrxtwin;
+	uint8 snd_limited;
+
+	sint32 snd_numholes;
+	/* snd_holes */
+
+	uint32 snd_fack;
+	sint32 rcv_numsacks;
+	/* sackblks[] */
+	uint32 sack_newdata;
+	/* sackhint */
+	sint32 t_rttlow;
+	uint32 rfbuf_ts;
+	sint32 rfbuf_cnt;
+	/* tod */
+	sint32 t_sndrexmitpack;
+	sint32 t_rcvoopack;
+	/* t_toe */
+	sint32 t_bytes_acked;
+	/* cc_algo */
+	/* ccv */
+	/* osd */
+
+	uint32 t_keepinit;
+	uint32 t_keepidle;
+	uint32 t_keepintvl;
+	uint32 t_keepcnt;
+
+	uint32 t_tsomax;
+	uint32 t_tsomaxsegcount;
+	uint32 t_tsomaxsegsize;
+	uint32 t_flags2;
+	/* t_fb */
+	/* t_fb_ptr */
+	uint64 t_tfo_cookie;
+	/* t_tfo_pending */
+
+	/* t_inpkts */
+	/* t_outpkts */
 };
 
 struct vps_dump_sockbuf {

@@ -254,6 +254,7 @@ structsizes(void)
 	PRINT_STRUCT_SIZE(vps_dump_prison);
 	PRINT_STRUCT_SIZE(vps_dump_pgrp);
 	PRINT_STRUCT_SIZE(vps_dump_session);
+	PRINT_STRUCT_SIZE(vps_dump_seltd);
 	PRINT_STRUCT_SIZE(vps_dump_proc);
 	PRINT_STRUCT_SIZE(vps_dump_pargs);
 	PRINT_STRUCT_SIZE(vps_dump_savefpu);
@@ -1204,6 +1205,21 @@ _vps_dumpobj_print_vmpage(struct vps_dumpobj *o, char *ident, uint64_t uidx,
 }
 
 static
+void _vps_dumpobj_seltd(struct vps_dumpobj *o, char *ident)
+{
+	void *data;
+	struct vps_dump_seltd *vds;
+	size_t len;
+
+	data = o->data;
+	len = o->size - offsetof(struct vps_dumpobj, data);
+	vds = (struct vps_dump_seltd *)data;
+
+	printf("%s st_flags %#x\n", ident, vds->st_flags);
+}
+
+
+static
 void _vps_dumpobj_vps(struct vps_dumpobj *o, char *ident)
 {
 	void *data;
@@ -1264,6 +1280,8 @@ __vps_dumpobj_printtree(struct vps_snapst_ctx *ctx,
 		uidx += _vps_dumpobj_print_vmpage(o, ident, uidx, ctx);
 	else if (o->type == VPS_DUMPOBJT_VPS)
 		_vps_dumpobj_vps(o, ident);
+	else if (o->type == VPS_DUMPOBJT_SELTD)
+		_vps_dumpobj_seltd(o, ident);
 	else if (o->type == VPS_DUMPOBJT_FILE_PATH)
 		_vps_dumpobj_file_path(o, ident);
 	if (o->level > 1)
@@ -1396,6 +1414,8 @@ vps_libdump_objtype2str(int objt)
 		return ("VPS_DUMPOBJT_SAVEFPU");
 	case VPS_DUMPOBJT_SESSION:
 		return ("VPS_DUMPOBJT_SESSION");
+	case VPS_DUMPOBJT_SELTD:
+		return ("VPS_DUMPOBJT_SELTD");
 	case VPS_DUMPOBJT_SYSENTVEC:
 		return ("VPS_DUMPOBJT_SYSENTVEC");
 	case VPS_DUMPOBJT_VMSPACE:

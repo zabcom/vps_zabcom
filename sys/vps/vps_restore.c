@@ -1699,8 +1699,8 @@ printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so
 	nso->so_max_pacing_rate = vds->so_max_pacing_rate;
 	SOCK_UNLOCK(nso);
 
-	DBGR("%s: nso=%p nso->so_state = %08x\n",
-	    __func__, nso, nso->so_state);
+	DBGR("%s: nso=%p nso->so_state = %08x nso->so_options = %08x\n",
+	    __func__, nso, nso->so_state, nso->so_options);
 	DBGR("%s: nso->so_cred=%p nso->so_cred->cr_vps=%p "
 	    "nso->so_vnet=%p\n", __func__, nso->so_cred,
 	    nso->so_cred->cr_vps, nso->so_vnet);
@@ -1970,11 +1970,19 @@ printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so
 
 		ninpcb->inp_vnet = curvnet;
 
-		/* Connection info (endpoints). */
+		ninpcb->inp_flags = vdinpcb->inp_flags;
+		ninpcb->inp_flags2 = vdinpcb->inp_flags2;
+		ninpcb->inp_flow = vdinpcb->inp_flow;
+		ninpcb->inp_vflag = vdinpcb->inp_vflag;
+		ninpcb->inp_ip_ttl = vdinpcb->inp_ip_ttl;
+		ninpcb->inp_ip_p = vdinpcb->inp_ip_p;
+		ninpcb->inp_ip_minttl = vdinpcb->inp_ip_minttl;
 
+		/* Connection info (endpoints). */
 		ninpcb->inp_inc.inc_flags = vdinpcb->inp_inc.inc_flags;
 		ninpcb->inp_inc.inc_len = vdinpcb->inp_inc.inc_len;
 		ninpcb->inp_inc.inc_fibnum = vdinpcb->inp_inc.inc_fibnum;
+
 		ninpcb->inp_inc.inc_ie.ie_fport= vdinpcb->inp_inc.ie_fport;
 		ninpcb->inp_inc.inc_ie.ie_lport= vdinpcb->inp_inc.ie_lport;
 		if (vdinpcb->inp_vflag & INP_IPV6) {
@@ -2018,12 +2026,13 @@ printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so
 		    __func__, &ninpcb->inp_inc.inc6_laddr, ":");
 		*/
 
-		ninpcb->inp_vflag = vdinpcb->inp_vflag;
-		ninpcb->inp_flags = vdinpcb->inp_flags;
-		ninpcb->inp_flags2 = vdinpcb->inp_flags2;
+		ninpcb->inp_ip_tos = vdinpcb->inp_ip_tos;
+
+		ninpcb->in6p_cksum = vdinpcb->in6p_cksum;
+		ninpcb->in6p_hops = vdinpcb->in6p_hops;
+
 		/* in_pcbinshash() has NOT been called */
 		ninpcb->inp_flags &= ~INP_INHASHLIST;
-
 		in_pcbinshash(ninpcb);
 
 		DBGR("%s: ninpcb=%p inp_vflag=%02hhx inp_flags=%08x "
@@ -2054,7 +2063,14 @@ printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so
 				ntcpcb = (struct tcpcb *)ninpcb->inp_ppcb;
 
 				INP_INFO_WLOCK(&V_tcbinfo);
+				/* t_segq */
+				/* t_segqlen */
+				ntcpcb->t_dupacks = vdtcpcb->t_dupacks;
+				/* t_timers */
+				/* t_inpcb */
 				ntcpcb->t_state = vdtcpcb->t_state;
+				ntcpcb->t_flags = vdtcpcb->t_flags;
+				/* t_vnet */
 				ntcpcb->snd_una = vdtcpcb->snd_una;
 				ntcpcb->snd_max = vdtcpcb->snd_max;
 				ntcpcb->snd_nxt = vdtcpcb->snd_nxt;
@@ -2069,10 +2085,82 @@ printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so
 				ntcpcb->rcv_up = vdtcpcb->rcv_up;
 				ntcpcb->snd_wnd = vdtcpcb->snd_wnd;
 				ntcpcb->snd_cwnd = vdtcpcb->snd_cwnd;
-				ntcpcb->snd_ssthresh =
-				    vdtcpcb->snd_ssthresh;
+				ntcpcb->snd_ssthresh = vdtcpcb->snd_ssthresh;
+				ntcpcb->snd_recover = vdtcpcb->snd_recover;
+				ntcpcb->t_rcvtime = vdtcpcb->t_rcvtime;
+				ntcpcb->t_starttime = vdtcpcb->t_starttime;
+				ntcpcb->t_rtttime = vdtcpcb->t_rtttime;
+				ntcpcb->t_rtseq = vdtcpcb->t_rtseq;
+				ntcpcb->t_rxtcur = vdtcpcb->t_rxtcur;
+				ntcpcb->t_maxseg = vdtcpcb->t_maxseg;
+				ntcpcb->t_pmtud_saved_maxseg =
+				    vdtcpcb->t_pmtud_saved_maxseg;
+				ntcpcb->t_srtt = vdtcpcb->t_srtt;
+				ntcpcb->t_rttvar = vdtcpcb->t_rttvar;
+				ntcpcb->t_rxtshift = vdtcpcb->t_rxtshift;
+				ntcpcb->t_rttmin = vdtcpcb->t_rttmin;
+				ntcpcb->t_rttbest = vdtcpcb->t_rttbest;
+				ntcpcb->t_rttupdated = vdtcpcb->t_rttupdated;
+				ntcpcb->max_sndwnd = vdtcpcb->max_sndwnd;
+				ntcpcb->t_softerror = vdtcpcb->t_softerror;
+				ntcpcb->t_oobflags = vdtcpcb->t_oobflags;
+				ntcpcb->t_iobc = vdtcpcb->t_iobc;
+				ntcpcb->snd_scale = vdtcpcb->snd_scale;
+				ntcpcb->rcv_scale = vdtcpcb->rcv_scale;
+				ntcpcb->request_r_scale =
+				    vdtcpcb->request_r_scale;
+				ntcpcb->ts_recent = vdtcpcb->ts_recent;
+				ntcpcb->ts_recent_age = vdtcpcb->ts_recent_age;
+				ntcpcb->ts_offset = vdtcpcb->ts_offset;
+				ntcpcb->last_ack_sent = vdtcpcb->last_ack_sent;
+				ntcpcb->snd_cwnd_prev = vdtcpcb->snd_cwnd_prev;
+				ntcpcb->snd_ssthresh_prev =
+				    vdtcpcb->snd_ssthresh_prev;
+				ntcpcb->snd_recover_prev =
+				    vdtcpcb->snd_recover_prev;
+				ntcpcb->t_sndzerowin = vdtcpcb->t_sndzerowin;
+				ntcpcb->t_badrxtwin = vdtcpcb->t_badrxtwin;
+				ntcpcb->snd_limited = vdtcpcb->snd_limited;
+				ntcpcb->snd_numholes = vdtcpcb->snd_numholes;
+				/* snd_holes */
+				ntcpcb->snd_fack = vdtcpcb->snd_fack;
+				ntcpcb->rcv_numsacks = vdtcpcb->rcv_numsacks;
+				/* sackblks[] */
+				ntcpcb->sack_newdata = vdtcpcb->sack_newdata;
+				/* sackhint */
+				ntcpcb->t_rttlow = vdtcpcb->t_rttlow;
+				ntcpcb->rfbuf_ts = vdtcpcb->rfbuf_ts;
+				ntcpcb->rfbuf_cnt = vdtcpcb->rfbuf_cnt;
+				/* tod */
+				ntcpcb->t_sndrexmitpack =
+				    vdtcpcb->t_sndrexmitpack;
+				ntcpcb->t_rcvoopack = vdtcpcb->t_rcvoopack;
+				/* t_toe */
+				ntcpcb->t_bytes_acked = vdtcpcb->t_bytes_acked;
+				/* cc_algo */
+				/* ccv */
+				/* osd */
+				ntcpcb->t_keepinit = vdtcpcb->t_keepinit;
+				ntcpcb->t_keepidle = vdtcpcb->t_keepidle;
+				ntcpcb->t_keepintvl = vdtcpcb->t_keepintvl;
+				ntcpcb->t_keepcnt = vdtcpcb->t_keepcnt;
+				ntcpcb->t_tsomax = vdtcpcb->t_tsomax;
+				ntcpcb->t_tsomaxsegcount =
+				    vdtcpcb->t_tsomaxsegcount;
+				ntcpcb->t_tsomaxsegsize =
+				    vdtcpcb->t_tsomaxsegsize;
+				ntcpcb->t_flags2 = vdtcpcb->t_flags2;
+				/* t_fb */
+				/* t_fb_ptr */
+#ifdef TCP_RFC7413
+				ntcpcb->t_tfo_cookie = vdtcpcb->t_tfo_cookie;
+				/* t_tfo_pending */
+#endif
+#ifdef TCPPCAP
+				/* t_inpkts */
+				/* t_outpkts */
+#endif
 				INP_INFO_WUNLOCK(&V_tcbinfo);
-
 				break;
 
 			case IPPROTO_UDP:
@@ -2086,8 +2174,18 @@ printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so
 					error = EINVAL;
 					goto out;
 				}
-				nudpcb->u_flags = vdudpcb->u_flags;
+				if (vdudpcb->u_have_icmp_func != 0) {
+					ERRMSG(ctx, "%s: ucb->u_icmp_func "
+					    "!= NULL, unsupported\n",
+					    __func__);
+					error = EINVAL;
+					goto out;
+				}
 				nudpcb->u_tun_func = NULL;
+				nudpcb->u_icmp_func = NULL;
+				nudpcb->u_flags = vdudpcb->u_flags;
+				nudpcb->u_rxcslen = vdudpcb->u_rxcslen;
+				nudpcb->u_txcslen = vdudpcb->u_txcslen;
 
 				break;
 
@@ -2190,6 +2288,14 @@ printf("XXX-BZ %s: socket so_orig_ptr %p already restored.\n", __func__, vds->so
 
 		}
 		curthread->td_retval[0] = fdidx_save;
+
+		KASSERT(vds->sol_qlen == nso->sol_qlen,
+		    ("%s: sol_qlen differs %u %u ctx %p vds %p nso %p",
+		    __func__, vds->sol_qlen, nso->sol_qlen, ctx, vds, nso));
+		KASSERT(vds->sol_incqlen == nso->sol_incqlen,
+		    ("%s: sol_incqlen differs %u %u ctx %p vds %p nso %p",
+		    __func__, vds->sol_incqlen, nso->sol_incqlen,
+		    ctx, vds, nso));
 	}
 
 	/* Insert into global list of restored sockets. */
@@ -3537,6 +3643,48 @@ vps_restore_thread_savefpu(struct vps_snapst_ctx *ctx, struct vps *vps,
 
 VPSFUNC
 static int
+vps_restore_seltd(struct vps_snapst_ctx *ctx, struct vps *vps,
+    struct vps_dump_thread *vdtd, struct proc *p, struct thread *ntd)
+{
+	struct vps_dumpobj *o1;
+	struct vps_dump_seltd *vds;
+	struct vps_restore_obj *ro;
+
+	if (vdtd->td_sel_orig == NULL) {
+		ERRMSG(ctx, "%s: vps %p proc %p ntd %p td_sel is NULL\n",
+		    __func__, vps, p, ntd);
+		return (EINVAL);
+	}
+
+	if (vdo_typeofnext(ctx) != VPS_DUMPOBJT_SELTD) {
+#ifdef __notyet__
+
+		/* XXX-BZ find the seldtd on the list of the restore objects. */
+		error = ENOSYS;
+
+		return (error);
+#endif
+	}
+
+	/* We know the type is a SELTD. */
+	o1 = vdo_next(ctx);
+	vds = (struct vps_dump_seltd *)o1->data;
+
+	seltdinit(ntd);
+	ntd->td_sel->st_flags = vds->st_flags;
+
+	/* Insert into restored objects list. */
+	ro = malloc(sizeof(*(ntd->td_sel)), M_VPS_RESTORE, M_WAITOK | M_ZERO);
+	ro->type = VPS_DUMPOBJT_SELTD;
+	ro->orig_ptr = vdtd->td_sel_orig;
+	ro->new_ptr = ntd->td_sel;
+	SLIST_INSERT_HEAD(&ctx->obj_list, ro, list);
+
+	return (0);
+}
+
+VPSFUNC
+static int
 vps_restore_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
     struct proc *p)
 {
@@ -3638,6 +3786,12 @@ vps_restore_thread(struct vps_snapst_ctx *ctx, struct vps *vps,
 	thread_cow_get_proc(ntd, p);
 	thread_link(ntd, p);
 	PROC_UNLOCK(p);
+
+	if (vdtd->td_sel_orig != NULL) {
+		error = vps_restore_seltd(ctx, vps, vdtd, p, ntd);
+		if (error != 0)
+			goto out;
+	}
 
 	/* not yet */
 	if (vdo_typeofnext(ctx) == VPS_DUMPOBJT_UMTX)
