@@ -1,9 +1,13 @@
 /*-
  * Copyright (c) 2009-2013 Klaus P. Ohrhallinger <k@7he.at>
+ * Copyright (c) 2017 iXsystems, Inc.
  * All rights reserved.
  *
  * Development of this software was partly funded by:
  *    TransIP.nl <http://www.transip.nl/>
+ *
+ * Portions of this software were developed by Bjoern Zeeb
+ * under sponsorship from iXsystems, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
