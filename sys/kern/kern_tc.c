@@ -9,6 +9,7 @@
  * ----------------------------------------------------------------------------
  *
  * Copyright (c) 2011, 2015, 2016 The FreeBSD Foundation
+ * Copyright (c) 2017 iXsystems, Inc.
  * All rights reserved.
  *
  * Portions of this software were developed by Julien Ridoux at the University
@@ -16,6 +17,9 @@
  *
  * Portions of this software were developed by Konstantin Belousov
  * under sponsorship from the FreeBSD Foundation.
+ *
+ * Portions of this software were developed by Bjoern Zeeb
+ * under sponsorship from iXsystems, Inc.
  */
 
 #include <sys/cdefs.h>
