@@ -1,9 +1,13 @@
 /*-
  * Copyright (c) 2009-2013 Klaus P. Ohrhallinger <k@7he.at>
+ * Copyright (c) 2017-2018 iXsystems, Inc.
  * All rights reserved.
  *
  * Development of this software was partly funded by:
  *    TransIP.nl <http://www.transip.nl/>
+ *
+ * Portions of this software were developed by Bjoern Zeeb
+ * under sponsorship from iXsystems, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -1350,7 +1354,7 @@ vc_migrate(int argc, char **argv)
 	char file_n[MAXPATHLEN];
 	char cnt_rsync, cfg_sync;
 	char str_suspend[] = "suspend";
-#if BZ_NO_ABORT_STOP
+#ifndef NO_ABORT_STOP
 	char str_abort[] = "abort";
 #endif
 	int pid, rfd, wfd;
@@ -1554,7 +1558,7 @@ vc_migrate(int argc, char **argv)
 
 	fprintf(stderr, "done\n");
 
-#if BZ_NO_ABORT_STOP
+#ifndef NO_ABORT_STOP
 	/* remote vps_resume */
 	snprintf(cmd, sizeof(cmd), "vpsctl resume %s remote\n", vps);
 	write(wfd, cmd, strlen(cmd));
@@ -1587,7 +1591,7 @@ vc_migrate(int argc, char **argv)
 
 	fprintf(stderr, "done\n");
 #else
-	fprintf(stderr, "XXX-BZ DEBUGGING... leaving VPS suspended on both ends\n");
+	fprintf(stderr, "XXX DEBUGGING... leaving VPS suspended on both ends\n");
 #endif
 
 	vc_close_ssh_transport(pid);	
